@@ -279,30 +279,33 @@ CREATE TABLE `t_appointment` (
 
 -- ---------------------------------------------------------------------------
 -- 外键约束（统一在建表完成后添加，避免建表顺序依赖）
+-- 注意：被引用列必须写各表 **真实的主键列名**。
+--   这批表的主键命名并不完全统一（t_finance_apply→apply_id、t_loan_group→group_id 等为简写），
+--   不能按「t_表名_id」推导，否则会引用到不存在的列。
 -- ---------------------------------------------------------------------------
-ALTER TABLE `t_user` ADD CONSTRAINT `fk_t_user_role_id` FOREIGN KEY (`role_id`) REFERENCES `t_role` (`t_role_id`);
-ALTER TABLE `t_farmer_profile` ADD CONSTRAINT `fk_t_farmer_profile_user_id` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_product` ADD CONSTRAINT `fk_t_product_seller_id` FOREIGN KEY (`seller_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_cart` ADD CONSTRAINT `fk_t_cart_buyer_id` FOREIGN KEY (`buyer_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_cart` ADD CONSTRAINT `fk_t_cart_product_id` FOREIGN KEY (`product_id`) REFERENCES `t_product` (`t_product_id`);
-ALTER TABLE `t_order` ADD CONSTRAINT `fk_t_order_buyer_id` FOREIGN KEY (`buyer_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_order` ADD CONSTRAINT `fk_t_order_seller_id` FOREIGN KEY (`seller_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_order` ADD CONSTRAINT `fk_t_order_product_id` FOREIGN KEY (`product_id`) REFERENCES `t_product` (`t_product_id`);
-ALTER TABLE `t_demand` ADD CONSTRAINT `fk_t_demand_publisher_id` FOREIGN KEY (`publisher_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_comment` ADD CONSTRAINT `fk_t_comment_user_id` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_finance_apply` ADD CONSTRAINT `fk_t_finance_apply_farmer_id` FOREIGN KEY (`farmer_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_finance_apply` ADD CONSTRAINT `fk_t_finance_apply_loan_product_id` FOREIGN KEY (`loan_product_id`) REFERENCES `t_loan_product` (`t_loan_product_id`);
-ALTER TABLE `t_finance_apply` ADD CONSTRAINT `fk_t_finance_apply_group_id` FOREIGN KEY (`group_id`) REFERENCES `t_loan_group` (`t_loan_group_id`);
-ALTER TABLE `t_loan_group` ADD CONSTRAINT `fk_t_loan_group_leader_id` FOREIGN KEY (`leader_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_approval` ADD CONSTRAINT `fk_t_approval_apply_id` FOREIGN KEY (`apply_id`) REFERENCES `t_finance_apply` (`t_finance_apply_id`);
-ALTER TABLE `t_approval` ADD CONSTRAINT `fk_t_approval_bank_user_id` FOREIGN KEY (`bank_user_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_expert` ADD CONSTRAINT `fk_t_expert_user_id` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_knowledge` ADD CONSTRAINT `fk_t_knowledge_author_id` FOREIGN KEY (`author_id`) REFERENCES `t_expert` (`t_expert_id`);
-ALTER TABLE `t_question` ADD CONSTRAINT `fk_t_question_asker_id` FOREIGN KEY (`asker_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_question` ADD CONSTRAINT `fk_t_question_expert_id` FOREIGN KEY (`expert_id`) REFERENCES `t_expert` (`t_expert_id`);
-ALTER TABLE `t_answer` ADD CONSTRAINT `fk_t_answer_question_id` FOREIGN KEY (`question_id`) REFERENCES `t_question` (`t_question_id`);
-ALTER TABLE `t_answer` ADD CONSTRAINT `fk_t_answer_expert_id` FOREIGN KEY (`expert_id`) REFERENCES `t_expert` (`t_expert_id`);
-ALTER TABLE `t_appointment` ADD CONSTRAINT `fk_t_appointment_farmer_id` FOREIGN KEY (`farmer_id`) REFERENCES `t_user` (`t_user_id`);
-ALTER TABLE `t_appointment` ADD CONSTRAINT `fk_t_appointment_expert_id` FOREIGN KEY (`expert_id`) REFERENCES `t_expert` (`t_expert_id`);
+ALTER TABLE `t_user` ADD CONSTRAINT `fk_t_user_role_id` FOREIGN KEY (`role_id`) REFERENCES `t_role` (`role_id`);
+ALTER TABLE `t_farmer_profile` ADD CONSTRAINT `fk_t_farmer_profile_user_id` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_product` ADD CONSTRAINT `fk_t_product_seller_id` FOREIGN KEY (`seller_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_cart` ADD CONSTRAINT `fk_t_cart_buyer_id` FOREIGN KEY (`buyer_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_cart` ADD CONSTRAINT `fk_t_cart_product_id` FOREIGN KEY (`product_id`) REFERENCES `t_product` (`product_id`);
+ALTER TABLE `t_order` ADD CONSTRAINT `fk_t_order_buyer_id` FOREIGN KEY (`buyer_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_order` ADD CONSTRAINT `fk_t_order_seller_id` FOREIGN KEY (`seller_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_order` ADD CONSTRAINT `fk_t_order_product_id` FOREIGN KEY (`product_id`) REFERENCES `t_product` (`product_id`);
+ALTER TABLE `t_demand` ADD CONSTRAINT `fk_t_demand_publisher_id` FOREIGN KEY (`publisher_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_comment` ADD CONSTRAINT `fk_t_comment_user_id` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_finance_apply` ADD CONSTRAINT `fk_t_finance_apply_farmer_id` FOREIGN KEY (`farmer_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_finance_apply` ADD CONSTRAINT `fk_t_finance_apply_loan_product_id` FOREIGN KEY (`loan_product_id`) REFERENCES `t_loan_product` (`loan_product_id`);
+ALTER TABLE `t_finance_apply` ADD CONSTRAINT `fk_t_finance_apply_group_id` FOREIGN KEY (`group_id`) REFERENCES `t_loan_group` (`group_id`);
+ALTER TABLE `t_loan_group` ADD CONSTRAINT `fk_t_loan_group_leader_id` FOREIGN KEY (`leader_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_approval` ADD CONSTRAINT `fk_t_approval_apply_id` FOREIGN KEY (`apply_id`) REFERENCES `t_finance_apply` (`apply_id`);
+ALTER TABLE `t_approval` ADD CONSTRAINT `fk_t_approval_bank_user_id` FOREIGN KEY (`bank_user_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_expert` ADD CONSTRAINT `fk_t_expert_user_id` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_knowledge` ADD CONSTRAINT `fk_t_knowledge_author_id` FOREIGN KEY (`author_id`) REFERENCES `t_expert` (`expert_id`);
+ALTER TABLE `t_question` ADD CONSTRAINT `fk_t_question_asker_id` FOREIGN KEY (`asker_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_question` ADD CONSTRAINT `fk_t_question_expert_id` FOREIGN KEY (`expert_id`) REFERENCES `t_expert` (`expert_id`);
+ALTER TABLE `t_answer` ADD CONSTRAINT `fk_t_answer_question_id` FOREIGN KEY (`question_id`) REFERENCES `t_question` (`question_id`);
+ALTER TABLE `t_answer` ADD CONSTRAINT `fk_t_answer_expert_id` FOREIGN KEY (`expert_id`) REFERENCES `t_expert` (`expert_id`);
+ALTER TABLE `t_appointment` ADD CONSTRAINT `fk_t_appointment_farmer_id` FOREIGN KEY (`farmer_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_appointment` ADD CONSTRAINT `fk_t_appointment_expert_id` FOREIGN KEY (`expert_id`) REFERENCES `t_expert` (`expert_id`);
 SET FOREIGN_KEY_CHECKS = 1;
 
