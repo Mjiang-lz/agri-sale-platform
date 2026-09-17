@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rxt.mapper.ExpertQaMapper">
+
+    <resultMap id="expertQaMap" type="com.rxt.vo.ExpertQaVO">
+        <id property="questionId" column="question_id"/>
+        <result property="askerId" column="asker_id"/>
+        <result property="expertId" column="expert_id"/>
+        <result property="questionContent" column="question_content"/>
+        <result property="answerContent" column="answer_content"/>
+        <result property="askTime" column="ask_time"/>
+        <result property="answerTime" column="answer_time"/>
+    </resultMap>
+
+    <select id="selectAnsweredByExpert" resultMap="expertQaMap">
+        SELECT q.question_id,
+               q.asker_id,
+               a.expert_id,
+               q.content AS question_content,
+               a.content AS answer_content,
+               q.ask_time,
+               a.answer_time
+        FROM t_question q
+                 INNER JOIN t_answer a ON a.question_id = q.question_id
+        WHERE a.expert_id = #{expertId}
+        ORDER BY a.answer_time DESC
+    </select>
+
+</mapper>

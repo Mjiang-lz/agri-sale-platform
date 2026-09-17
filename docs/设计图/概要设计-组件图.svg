@@ -1,0 +1,100 @@
+<svg viewBox="0 0 970 560" width="1940" height="1120" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>融销通平台系统组件图</title>
+<desc>融销通平台实现视图组件图：前端应用（Vue.js 3.x）通过 REST 接口依赖后端应用（Spring Boot 4.x），后端应用内含七个业务构件与 AI 推荐构件，并通过数据访问、文件存储、支付结算、短信通道四个接口依赖数据库、对象存储与两个模拟外部通道构件</desc>
+<rect x="0" y="0" width="970" height="560" fill="#FFFFFF"/>
+<defs>
+<marker id="cdep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M2 1 L9 5 L2 9" fill="none" stroke="#444441" stroke-width="1.3" stroke-linecap="round"/>
+</marker>
+</defs>
+
+<rect x="30" y="60" width="260" height="140" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<rect x="42" y="74" width="22" height="16" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="36" y="78" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="36" y="86" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<text x="72" y="86" font-size="9.5" fill="#5F5E5A">«component»</text>
+<text x="72" y="104" font-size="12.5" font-weight="500" fill="#2C2C2A">前端应用</text>
+<text x="72" y="120" font-size="9.5" fill="#5F5E5A">Vue.js 3.x ＋ Element Plus</text>
+<rect x="45" y="146" width="70" height="26" rx="2" fill="#F1EFE8" stroke="#444441" stroke-width="0.6"/>
+<text x="80" y="159" font-size="10" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">业务端页面</text>
+<rect x="125" y="146" width="70" height="26" rx="2" fill="#F1EFE8" stroke="#444441" stroke-width="0.6"/>
+<text x="160" y="159" font-size="10" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">管理后台</text>
+<rect x="205" y="146" width="70" height="26" rx="2" fill="#F1EFE8" stroke="#444441" stroke-width="0.6"/>
+<text x="240" y="159" font-size="10" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">公共组件</text>
+
+<rect x="340" y="60" width="250" height="440" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<rect x="352" y="74" width="22" height="16" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="346" y="78" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="346" y="86" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<text x="382" y="86" font-size="9.5" fill="#5F5E5A">«component»</text>
+<text x="382" y="104" font-size="12.5" font-weight="500" fill="#2C2C2A">后端应用</text>
+<text x="382" y="120" font-size="9.5" fill="#5F5E5A">Spring Boot 4.x</text>
+<rect x="355" y="142" width="220" height="36" rx="2" fill="#F1EFE8" stroke="#444441" stroke-width="0.6"/>
+<text x="465" y="160" font-size="10.5" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">用户与认证</text>
+<rect x="355" y="188" width="220" height="36" rx="2" fill="#F1EFE8" stroke="#444441" stroke-width="0.6"/>
+<text x="465" y="206" font-size="10.5" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">首页</text>
+<rect x="355" y="234" width="220" height="36" rx="2" fill="#E6F1FB" stroke="#444441" stroke-width="0.6"/>
+<text x="465" y="252" font-size="10.5" fill="#0C447C" text-anchor="middle" dominant-baseline="central">融资服务（含 AI 推荐构件）</text>
+<rect x="355" y="280" width="220" height="36" rx="2" fill="#F1EFE8" stroke="#444441" stroke-width="0.6"/>
+<text x="465" y="298" font-size="10.5" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">专家助力</text>
+<rect x="355" y="326" width="220" height="36" rx="2" fill="#F1EFE8" stroke="#444441" stroke-width="0.6"/>
+<text x="465" y="344" font-size="10.5" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">农产品交易</text>
+<rect x="355" y="372" width="220" height="36" rx="2" fill="#F1EFE8" stroke="#444441" stroke-width="0.6"/>
+<text x="465" y="390" font-size="10.5" fill="#2C2C2A" text-anchor="middle" dominant-baseline="central">个人信息</text>
+<rect x="355" y="418" width="220" height="36" rx="2" fill="#E6F1FB" stroke="#444441" stroke-width="0.6"/>
+<text x="465" y="436" font-size="10.5" fill="#0C447C" text-anchor="middle" dominant-baseline="central">融资管理（银行侧）</text>
+
+<rect x="650" y="60" width="280" height="80" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<rect x="662" y="74" width="22" height="16" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="656" y="78" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="656" y="86" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<text x="692" y="86" font-size="9.5" fill="#5F5E5A">«component»</text>
+<text x="692" y="106" font-size="12.5" font-weight="500" fill="#2C2C2A">数据库</text>
+<text x="692" y="124" font-size="9.5" fill="#5F5E5A">MySQL 8.0</text>
+
+<rect x="650" y="175" width="280" height="80" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<rect x="662" y="189" width="22" height="16" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="656" y="193" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="656" y="201" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<text x="692" y="201" font-size="9.5" fill="#5F5E5A">«component»</text>
+<text x="692" y="221" font-size="12.5" font-weight="500" fill="#2C2C2A">对象存储</text>
+<text x="692" y="239" font-size="9.5" fill="#5F5E5A">商品图片 / 知识配图 / 用户头像</text>
+
+<rect x="650" y="290" width="280" height="80" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<rect x="662" y="304" width="22" height="16" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="656" y="308" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="656" y="316" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<text x="692" y="316" font-size="9.5" fill="#5F5E5A">«component»</text>
+<text x="692" y="336" font-size="12.5" font-weight="500" fill="#2C2C2A">第三方支付</text>
+<text x="692" y="354" font-size="9.5" fill="#5F5E5A">模拟通道，不涉及真实资金</text>
+
+<rect x="650" y="405" width="280" height="80" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<rect x="662" y="419" width="22" height="16" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="656" y="423" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<rect x="656" y="431" width="10" height="4" fill="none" stroke="#444441" stroke-width="0.7"/>
+<text x="692" y="431" font-size="9.5" fill="#5F5E5A">«component»</text>
+<text x="692" y="451" font-size="12.5" font-weight="500" fill="#2C2C2A">短信服务</text>
+<text x="692" y="469" font-size="9.5" fill="#5F5E5A">模拟通道，发送验证码与通知</text>
+
+<circle cx="296" cy="130" r="4.5" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<path d="M300 130 H334" fill="none" stroke="#444441" stroke-width="0.9" marker-end="url(#cdep)"/>
+<text x="316" y="121" font-size="9.5" fill="#5F5E5A" text-anchor="middle">REST</text>
+
+<circle cx="594" cy="100" r="4.5" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<path d="M598 100 H644" fill="none" stroke="#444441" stroke-width="0.9" marker-end="url(#cdep)"/>
+<text x="621" y="91" font-size="10" fill="#5F5E5A" text-anchor="middle">数据访问</text>
+
+<circle cx="594" cy="215" r="4.5" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<path d="M598 215 H644" fill="none" stroke="#444441" stroke-width="0.9" marker-end="url(#cdep)"/>
+<text x="621" y="206" font-size="10" fill="#5F5E5A" text-anchor="middle">文件存储</text>
+
+<circle cx="594" cy="330" r="4.5" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<path d="M598 330 H644" fill="none" stroke="#444441" stroke-width="0.9" marker-end="url(#cdep)"/>
+<text x="621" y="321" font-size="10" fill="#5F5E5A" text-anchor="middle">支付结算</text>
+
+<circle cx="594" cy="445" r="4.5" fill="#FFFFFF" stroke="#444441" stroke-width="0.8"/>
+<path d="M598 445 H644" fill="none" stroke="#444441" stroke-width="0.9" marker-end="url(#cdep)"/>
+<text x="621" y="436" font-size="10" fill="#5F5E5A" text-anchor="middle">短信通道</text>
+
+<text x="30" y="536" font-size="10.5" fill="#5F5E5A">说明：圆角外框与内部小方块均为 «component» 构件；后端应用右侧的圆点为对外提供的接口，箭头表示依赖方向，接口名称标注在箭头旁。</text>
+</svg>

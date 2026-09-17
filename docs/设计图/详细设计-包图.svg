@@ -1,0 +1,80 @@
+<svg viewBox="0 0 970 580" width="1940" height="1160" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>融销通平台系统包图</title>
+<desc>融销通平台逻辑包结构：第一行为用户与认证、农产品交易、融资服务、专家助力四个业务包，第二行为首页、个人信息、融资管理，第三行为公共工具、配置、安全与权限三个公共包；虚线箭头表示包之间的依赖关系</desc>
+<rect x="0" y="0" width="970" height="580" fill="#FFFFFF"/>
+<defs>
+<marker id="dep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M2 1 L9 5 L2 9" fill="none" stroke="#444441" stroke-width="1.3" stroke-linecap="round"/>
+</marker>
+</defs>
+
+<rect x="40" y="84" width="60" height="14" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<rect x="40" y="98" width="195" height="62" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<text x="137" y="124" font-size="12.5" font-weight="500" fill="#2C2C2A" text-anchor="middle">用户与认证</text>
+<text x="137" y="143" font-size="9.5" fill="#5F5E5A" text-anchor="middle">com.rxt.user</text>
+
+<rect x="270" y="84" width="60" height="14" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<rect x="270" y="98" width="195" height="62" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<text x="367" y="124" font-size="12.5" font-weight="500" fill="#2C2C2A" text-anchor="middle">农产品交易</text>
+<text x="367" y="143" font-size="9.5" fill="#5F5E5A" text-anchor="middle">com.rxt.trade</text>
+
+<rect x="500" y="84" width="60" height="14" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<rect x="500" y="98" width="195" height="62" fill="#E6F1FB" stroke="#444441" stroke-width="0.7"/>
+<text x="597" y="124" font-size="12.5" font-weight="500" fill="#0C447C" text-anchor="middle">融资服务</text>
+<text x="597" y="143" font-size="9.5" fill="#185FA5" text-anchor="middle">com.rxt.finance</text>
+
+<rect x="730" y="84" width="60" height="14" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<rect x="730" y="98" width="195" height="62" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<text x="827" y="124" font-size="12.5" font-weight="500" fill="#2C2C2A" text-anchor="middle">专家助力</text>
+<text x="827" y="143" font-size="9.5" fill="#5F5E5A" text-anchor="middle">com.rxt.expert</text>
+
+<rect x="40" y="264" width="60" height="14" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<rect x="40" y="278" width="195" height="62" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="137" y="304" font-size="12.5" font-weight="500" fill="#2C2C2A" text-anchor="middle">首页</text>
+<text x="137" y="323" font-size="9.5" fill="#5F5E5A" text-anchor="middle">com.rxt.home</text>
+
+<rect x="270" y="264" width="60" height="14" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<rect x="270" y="278" width="195" height="62" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="367" y="304" font-size="12.5" font-weight="500" fill="#2C2C2A" text-anchor="middle">个人信息</text>
+<text x="367" y="323" font-size="9.5" fill="#5F5E5A" text-anchor="middle">com.rxt.profile</text>
+
+<rect x="500" y="264" width="60" height="14" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<rect x="500" y="278" width="195" height="62" fill="#E6F1FB" stroke="#444441" stroke-width="0.7"/>
+<text x="597" y="304" font-size="12.5" font-weight="500" fill="#0C447C" text-anchor="middle">融资管理</text>
+<text x="597" y="323" font-size="9.5" fill="#185FA5" text-anchor="middle">com.rxt.loanadmin</text>
+
+<rect x="40" y="444" width="60" height="14" fill="#D3D1C7" stroke="#444441" stroke-width="0.7"/>
+<rect x="40" y="458" width="195" height="62" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<text x="137" y="484" font-size="12.5" font-weight="500" fill="#2C2C2A" text-anchor="middle">公共工具</text>
+<text x="137" y="503" font-size="9.5" fill="#5F5E5A" text-anchor="middle">com.rxt.common</text>
+
+<rect x="270" y="444" width="60" height="14" fill="#D3D1C7" stroke="#444441" stroke-width="0.7"/>
+<rect x="270" y="458" width="195" height="62" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<text x="367" y="484" font-size="12.5" font-weight="500" fill="#2C2C2A" text-anchor="middle">配置</text>
+<text x="367" y="503" font-size="9.5" fill="#5F5E5A" text-anchor="middle">com.rxt.config</text>
+
+<rect x="500" y="444" width="60" height="14" fill="#D3D1C7" stroke="#444441" stroke-width="0.7"/>
+<rect x="500" y="458" width="195" height="62" fill="#F1EFE8" stroke="#444441" stroke-width="0.7"/>
+<text x="597" y="484" font-size="12.5" font-weight="500" fill="#2C2C2A" text-anchor="middle">安全与权限</text>
+<text x="597" y="503" font-size="9.5" fill="#5F5E5A" text-anchor="middle">com.rxt.security</text>
+
+<path d="M137 288 L367 110" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+<path d="M137 288 L597 110" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+<path d="M235 288 H248 V210 H827 V150" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+<path d="M560 146 V200 H400 V150" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+<path d="M597 250 V150" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+<path d="M367 250 V150" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+<path d="M367 340 L137 460" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+<path d="M597 340 L367 460" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+<path d="M137 288 L597 460" fill="none" stroke="#444441" stroke-width="0.9" stroke-dasharray="5 4" marker-end="url(#dep)"/>
+
+<text x="252" y="196" font-size="10" fill="#5F5E5A">聚合展示</text>
+<text x="482" y="196" font-size="10" fill="#5F5E5A" text-anchor="middle">«access» 读取交易行为数据</text>
+<text x="616" y="240" font-size="10" fill="#5F5E5A">«import» 读取融资申请</text>
+<text x="380" y="246" font-size="10" fill="#5F5E5A" text-anchor="end">«access» 我的发布</text>
+<text x="212" y="414" font-size="10" fill="#5F5E5A" text-anchor="middle">«import»</text>
+<text x="440" y="414" font-size="10" fill="#5F5E5A" text-anchor="middle">«import»</text>
+<text x="428" y="392" font-size="10" fill="#5F5E5A" text-anchor="end">«import» 权限校验</text>
+
+<text x="40" y="556" font-size="10.5" fill="#5F5E5A">说明：包按业务模块划分，虚线箭头表示包之间的依赖，箭头指向被依赖的包；全部业务包均依赖公共包，为图面清晰仅示出主要依赖。</text>
+</svg>

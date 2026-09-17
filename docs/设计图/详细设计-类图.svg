@@ -1,0 +1,193 @@
+<svg viewBox="0 0 940 780" width="1880" height="1560" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>图 4 融销通平台系统类图</title>
+<desc>融销通平台核心实体类图：共 18 个实体类，按用户与治理域、交易域、融资域、专家服务域四列排布；每类标注对应数据表名与主要属性，关联线两端标注多重度</desc>
+<rect x="0" y="0" width="940" height="780" fill="#FFFFFF"/>
+<text x="150" y="26" font-size="13" font-weight="500" fill="#5F5E5A" text-anchor="middle">（用户与治理域）</text>
+<text x="364" y="26" font-size="13" font-weight="500" fill="#5F5E5A" text-anchor="middle">（交易域）</text>
+<text x="578" y="26" font-size="13" font-weight="500" fill="#5F5E5A" text-anchor="middle">（融资域）</text>
+<text x="792" y="26" font-size="13" font-weight="500" fill="#5F5E5A" text-anchor="middle">（专家服务域）</text>
+<path d="M150 206 V166" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M150 302 V342" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M60 268 H30 V526 H54" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M60 240 H42 V52 H792 V472" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M240 118 H274" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M240 254 H274" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M150 254 L364 390" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M150 254 L364 526" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M364 206 V166" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M454 118 H466 V662 H458" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M150 118 L578 254" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M578 206 V166" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M578 342 V302" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M578 478 V438" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M668 390 H676 V40 H150 V66" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M792 206 V166" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M792 478 V438" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M702 140 H696 V390 H698" fill="none" stroke="#444441" stroke-width="1"/>
+<path d="M882 118 H898 V662 H886" fill="none" stroke="#444441" stroke-width="1"/>
+<text x="140" y="186" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="160" y="186" font-size="10" fill="#5F5E5A" text-anchor="start">0..1</text>
+<text x="140" y="322" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="160" y="322" font-size="10" fill="#5F5E5A" text-anchor="start">0..*</text>
+<text x="24" y="282" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="24" y="512" font-size="10" fill="#5F5E5A" text-anchor="end">0..*</text>
+<text x="36" y="226" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="800" y="46" font-size="10" fill="#5F5E5A" text-anchor="start">0..1</text>
+<text x="246" y="108" font-size="10" fill="#5F5E5A" text-anchor="start">1</text>
+<text x="270" y="108" font-size="10" fill="#5F5E5A" text-anchor="end">0..*</text>
+<text x="246" y="244" font-size="10" fill="#5F5E5A" text-anchor="start">1</text>
+<text x="270" y="244" font-size="10" fill="#5F5E5A" text-anchor="end">0..*</text>
+<text x="250" y="300" font-size="10" fill="#5F5E5A" text-anchor="start">1</text>
+<text x="300" y="330" font-size="10" fill="#5F5E5A" text-anchor="start">0..*</text>
+<text x="248" y="360" font-size="10" fill="#5F5E5A" text-anchor="start">1</text>
+<text x="284" y="452" font-size="10" fill="#5F5E5A" text-anchor="start">0..*</text>
+<text x="354" y="186" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="374" y="186" font-size="10" fill="#5F5E5A" text-anchor="start">0..*</text>
+<text x="472" y="132" font-size="10" fill="#5F5E5A" text-anchor="start">1</text>
+<text x="472" y="648" font-size="10" fill="#5F5E5A" text-anchor="start">0..*</text>
+<text x="246" y="156" font-size="10" fill="#5F5E5A" text-anchor="start">1</text>
+<text x="482" y="216" font-size="10" fill="#5F5E5A" text-anchor="end">0..*</text>
+<text x="568" y="186" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="588" y="186" font-size="10" fill="#5F5E5A" text-anchor="start">0..*</text>
+<text x="568" y="322" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="588" y="322" font-size="10" fill="#5F5E5A" text-anchor="start">0..1</text>
+<text x="568" y="458" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="588" y="458" font-size="10" fill="#5F5E5A" text-anchor="start">0..1</text>
+<text x="668" y="380" font-size="10" fill="#5F5E5A" text-anchor="end">*</text>
+<text x="158" y="34" font-size="10" fill="#5F5E5A" text-anchor="start">*</text>
+<text x="782" y="186" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="802" y="186" font-size="10" fill="#5F5E5A" text-anchor="start">0..*</text>
+<text x="782" y="458" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="802" y="458" font-size="10" fill="#5F5E5A" text-anchor="start">0..1</text>
+<text x="690" y="128" font-size="10" fill="#5F5E5A" text-anchor="end">1</text>
+<text x="690" y="332" font-size="10" fill="#5F5E5A" text-anchor="end">0..*</text>
+<text x="904" y="132" font-size="10" fill="#5F5E5A" text-anchor="start">1</text>
+<text x="904" y="648" font-size="10" fill="#5F5E5A" text-anchor="start">0..*</text>
+<rect x="60" y="70" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="150" y="89" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">FarmerProfile 农户档案</text>
+<text x="150" y="104" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_farmer_profile</text>
+<path d="M61 111 H239" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="69" y="128" font-size="11" fill="#2C2C2A">- profileId: Long</text>
+<text x="69" y="144" font-size="11" fill="#2C2C2A">- mainProduct: String</text>
+<text x="69" y="160" font-size="11" fill="#2C2C2A">- creditRecord: Text</text>
+<rect x="60" y="206" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="150" y="225" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">User 用户</text>
+<text x="150" y="240" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_user</text>
+<path d="M61 247 H239" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="69" y="264" font-size="11" fill="#2C2C2A">- userId: Long</text>
+<text x="69" y="280" font-size="11" fill="#2C2C2A">- phone: String</text>
+<text x="69" y="296" font-size="11" fill="#2C2C2A">- realName: String</text>
+<rect x="60" y="342" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="150" y="361" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Role 角色</text>
+<text x="150" y="376" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_role</text>
+<path d="M61 383 H239" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="69" y="400" font-size="11" fill="#2C2C2A">- roleId: Long</text>
+<text x="69" y="416" font-size="11" fill="#2C2C2A">- roleName: String</text>
+<text x="69" y="432" font-size="11" fill="#2C2C2A">- menuPerms: String</text>
+<rect x="60" y="478" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="150" y="497" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">AuditRecord 审核记录</text>
+<text x="150" y="512" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_audit</text>
+<path d="M61 519 H239" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="69" y="536" font-size="11" fill="#2C2C2A">- auditId: Long</text>
+<text x="69" y="552" font-size="11" fill="#2C2C2A">- targetType: String</text>
+<text x="69" y="568" font-size="11" fill="#2C2C2A">- auditResult: String</text>
+<rect x="274" y="70" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="364" y="89" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Product 商品货源</text>
+<text x="364" y="104" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_product</text>
+<path d="M275 111 H453" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="283" y="128" font-size="11" fill="#2C2C2A">- productId: Long</text>
+<text x="283" y="144" font-size="11" fill="#2C2C2A">- productName: String</text>
+<text x="283" y="160" font-size="11" fill="#2C2C2A">- price: BigDecimal</text>
+<rect x="274" y="206" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="364" y="225" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Order 订单</text>
+<text x="364" y="240" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_order</text>
+<path d="M275 247 H453" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="283" y="264" font-size="11" fill="#2C2C2A">- orderId: Long</text>
+<text x="283" y="280" font-size="11" fill="#2C2C2A">- orderAmount: BigDecimal</text>
+<text x="283" y="296" font-size="11" fill="#2C2C2A">- orderStatus: String</text>
+<rect x="274" y="342" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="364" y="361" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Demand 求购需求</text>
+<text x="364" y="376" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_demand</text>
+<path d="M275 383 H453" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="283" y="400" font-size="11" fill="#2C2C2A">- demandId: Long</text>
+<text x="283" y="416" font-size="11" fill="#2C2C2A">- category: String</text>
+<text x="283" y="432" font-size="11" fill="#2C2C2A">- quantity: Integer</text>
+<rect x="274" y="478" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="364" y="497" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Cart 购物车</text>
+<text x="364" y="512" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_cart</text>
+<path d="M275 519 H453" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="283" y="536" font-size="11" fill="#2C2C2A">- cartId: Long</text>
+<text x="283" y="552" font-size="11" fill="#2C2C2A">- buyerId: Long</text>
+<text x="283" y="568" font-size="11" fill="#2C2C2A">- totalAmount: BigDecimal</text>
+<rect x="274" y="614" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="364" y="633" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Comment 评论</text>
+<text x="364" y="648" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_comment</text>
+<path d="M275 655 H453" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="283" y="672" font-size="11" fill="#2C2C2A">- commentId: Long</text>
+<text x="283" y="688" font-size="11" fill="#2C2C2A">- content: String</text>
+<text x="283" y="704" font-size="11" fill="#2C2C2A">- auditStatus: String</text>
+<rect x="488" y="70" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="578" y="89" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">LoanProduct 贷款产品</text>
+<text x="578" y="104" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_loan_product</text>
+<path d="M489 111 H667" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="497" y="128" font-size="11" fill="#2C2C2A">- productId: Long</text>
+<text x="497" y="144" font-size="11" fill="#2C2C2A">- maxAmount: BigDecimal</text>
+<text x="497" y="160" font-size="11" fill="#2C2C2A">- annualRate: BigDecimal</text>
+<rect x="488" y="206" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="578" y="225" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">FinanceApply 融资申请</text>
+<text x="578" y="240" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_finance_apply</text>
+<path d="M489 247 H667" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="497" y="264" font-size="11" fill="#2C2C2A">- applyId: Long</text>
+<text x="497" y="280" font-size="11" fill="#2C2C2A">- applyAmount: BigDecimal</text>
+<text x="497" y="296" font-size="11" fill="#2C2C2A">- applyTerm: Integer</text>
+<rect x="488" y="342" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="578" y="361" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">LoanGroup 联合贷款小组</text>
+<text x="578" y="376" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_loan_group</text>
+<path d="M489 383 H667" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="497" y="400" font-size="11" fill="#2C2C2A">- groupId: Long</text>
+<text x="497" y="416" font-size="11" fill="#2C2C2A">- targetAmount: BigDecimal</text>
+<text x="497" y="432" font-size="11" fill="#2C2C2A">- memberCount: Integer</text>
+<rect x="488" y="478" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="578" y="497" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Approval 审批记录</text>
+<text x="578" y="512" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_approval</text>
+<path d="M489 519 H667" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="497" y="536" font-size="11" fill="#2C2C2A">- approvalId: Long</text>
+<text x="497" y="552" font-size="11" fill="#2C2C2A">- bankUserId: Long</text>
+<text x="497" y="568" font-size="11" fill="#2C2C2A">- approvalResult: String</text>
+<rect x="702" y="70" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="792" y="89" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">ExpertInfo 专家信息</text>
+<text x="792" y="104" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_expert</text>
+<path d="M703 111 H881" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="711" y="128" font-size="11" fill="#2C2C2A">- expertId: Long</text>
+<text x="711" y="144" font-size="11" fill="#2C2C2A">- expertDomain: String</text>
+<text x="711" y="160" font-size="11" fill="#2C2C2A">- auditStatus: String</text>
+<rect x="702" y="206" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="792" y="225" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Knowledge 农业知识</text>
+<text x="792" y="240" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_knowledge</text>
+<path d="M703 247 H881" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="711" y="264" font-size="11" fill="#2C2C2A">- knowledgeId: Long</text>
+<text x="711" y="280" font-size="11" fill="#2C2C2A">- title: String</text>
+<text x="711" y="296" font-size="11" fill="#2C2C2A">- auditStatus: String</text>
+<rect x="702" y="342" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="792" y="361" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Question 提问</text>
+<text x="792" y="376" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_question</text>
+<path d="M703 383 H881" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="711" y="400" font-size="11" fill="#2C2C2A">- questionId: Long</text>
+<text x="711" y="416" font-size="11" fill="#2C2C2A">- content: String</text>
+<text x="711" y="432" font-size="11" fill="#2C2C2A">- askTime: DateTime</text>
+<rect x="702" y="478" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="792" y="497" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Answer 回答</text>
+<text x="792" y="512" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_answer</text>
+<path d="M703 519 H881" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="711" y="536" font-size="11" fill="#2C2C2A">- answerId: Long</text>
+<text x="711" y="552" font-size="11" fill="#2C2C2A">- questionId: Long</text>
+<text x="711" y="568" font-size="11" fill="#2C2C2A">- content: String</text>
+<rect x="702" y="614" width="180" height="96" rx="2" fill="#FFFFFF" stroke="#444441" stroke-width="0.7"/>
+<text x="792" y="633" font-size="12" font-weight="500" fill="#2C2C2A" text-anchor="middle">Appointment 专家预约</text>
+<text x="792" y="648" font-size="9.5" fill="#888780" text-anchor="middle">«table» t_appointment</text>
+<path d="M703 655 H881" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="711" y="672" font-size="11" fill="#2C2C2A">- apptId: Long</text>
+<text x="711" y="688" font-size="11" fill="#2C2C2A">- apptTime: DateTime</text>
+<text x="711" y="704" font-size="11" fill="#2C2C2A">- apptStatus: String</text>
+<text x="30" y="758" font-size="10.5" fill="#5F5E5A">说明：类框内第一行为类名、第二行为对应的数据表，虚线下方为主要属性；关联线两端数字为多重度，均省略箭头表示双向关联。类框右上角所属分域见列标题。</text>
+</svg>
