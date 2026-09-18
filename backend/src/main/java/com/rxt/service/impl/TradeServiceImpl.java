@@ -11,6 +11,7 @@ import com.rxt.mapper.CartMapper;
 import com.rxt.mapper.OrderMapper;
 import com.rxt.mapper.ProductMapper;
 import com.rxt.service.TradeService;
+import com.rxt.vo.CartVO;
 import com.rxt.vo.ProductVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -133,6 +135,60 @@ public class TradeServiceImpl implements TradeService {
         return order.getOrderId();
     }
 
+    @Override
+    public IPage<CartVO> pageCart(Long buyerId, long pageNum, long pageSize) {
+        // 1. 只查当前买家的购物车条目，按加入时间倒序（最新加的排前面）
+        Page<Cart> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<Cart> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Cart::getBuyerId, buyerId)
+                .orderByDesc(Cart::getCreateTime);
+
+        // 2. 分页查询后把 Cart 转成 CartVO（VO 里会补齐商品名称、单价、库存等）
+        Page<Cart> cartPage = cartMapper.selectPage(page, wrapper);
+        return cartPage.convert(this::convertToCartVO);
+    }
+
+    @Override
+    public void updateCartQuantity(Long buyerId, Long cartId, Integer quantity) {
+        // 1. 参数校验
+        if (quantity == null || quantity < 0) {
+            throw new RuntimeException("数量不能为负数");
+        }
+        // 2. 校验条目归属：只能改自己的购物车
+        Cart cart = cartMapper.selectById(cartId);
+        if (cart == null || !Objects.equals(cart.getBuyerId(), buyerId)) {
+            throw new RuntimeException("购物车条目不存在");
+        }
+        // 3. 数量为 0 视为删除该条目
+        if (quantity == 0) {
+            cartMapper.deleteById(cartId);
+            return;
+        }
+        // 4. 校验商品状态与库存
+        Product product = productMapper.selectById(cart.getProductId());
+        if (product == null || !"已通过".equals(product.getAuditStatus()) || product.getStatus() != 1) {
+            throw new RuntimeException("商品不存在或已下架");
+        }
+        if (product.getStock() < quantity) {
+            throw new RuntimeException("库存不足，当前仅剩 " + product.getStock());
+        }
+        // 5. 更新数量并按商品当前价重算小计（价格以商品表为准，购物车不锁价）
+        cart.setQuantity(quantity);
+        cart.setTotalAmount(product.getPrice().multiply(BigDecimal.valueOf(quantity)));
+        cartMapper.updateById(cart);
+    }
+
+    @Override
+    public void removeCartItem(Long buyerId, Long cartId) {
+        // 1. 校验归属：只能删自己的购物车条目
+        Cart cart = cartMapper.selectById(cartId);
+        if (cart == null || !Objects.equals(cart.getBuyerId(), buyerId)) {
+            throw new RuntimeException("购物车条目不存在");
+        }
+        // 2. 删除
+        cartMapper.deleteById(cartId);
+    }
+
     /**
      * 生成订单编号。
      */
@@ -141,6 +197,30 @@ public class TradeServiceImpl implements TradeService {
         String random = String.format("%04d", ThreadLocalRandom.current().nextInt(10000));
         return "RX" + timestamp + random;
     }
+    /**
+     * 购物车实体转视图对象，补齐商品名称、单价、单位、库存等展示信息。
+     */
+    private CartVO convertToCartVO(Cart cart) {
+        CartVO vo = new CartVO();
+        vo.setCartId(cart.getCartId());
+        vo.setProductId(cart.getProductId());
+        vo.setQuantity(cart.getQuantity());
+        vo.setTotalAmount(cart.getTotalAmount());
+        vo.setCreateTime(cart.getCreateTime());
+
+        // 补齐商品信息（商品可能已被删除/下架，这里允许 product 为 null，前端按置灰处理）
+        Product product = productMapper.selectById(cart.getProductId());
+        if (product != null) {
+            vo.setProductName(product.getProductName());
+            vo.setImageUrl(product.getImageUrl());
+            vo.setUnit(product.getUnit());
+            vo.setPrice(product.getPrice());
+            vo.setStock(product.getStock());
+            vo.setStatus(product.getStatus());
+        }
+        return vo;
+    }
+
     /**
      * 商品实体转视图对象。
      */

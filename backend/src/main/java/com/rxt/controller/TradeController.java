@@ -4,11 +4,15 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.common.Result;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.service.TradeService;
+import com.rxt.vo.CartVO;
 import com.rxt.vo.ProductVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -55,5 +59,39 @@ public class TradeController {
     public Result<Long> createOrder(@RequestParam Long buyerId,
                                    @RequestBody @Valid OrderCreateDTO dto) {
         return Result.success(tradeService.createOrder(buyerId, dto));
+    }
+
+    /**
+     * 查询我的购物车（分页）。
+     * 注：登录鉴权未实现，临时用 buyerId 参数传入；鉴权完成后改回 UserContext.currentUserId()。
+     */
+    @GetMapping("/cart/list")
+    public Result<IPage<CartVO>> pageCart(@RequestParam Long buyerId,
+                                          @RequestParam(defaultValue = "1") long pageNum,
+                                          @RequestParam(defaultValue = "10") long pageSize) {
+        return Result.success(tradeService.pageCart(buyerId, pageNum, pageSize));
+    }
+
+    /**
+     * 修改购物车条目数量。quantity 传 0 表示删除该条目。
+     * 注：登录鉴权未实现，临时用 buyerId 参数传入。
+     */
+    @PutMapping("/cart/{cartId}")
+    public Result<Void> updateCartQuantity(@PathVariable Long cartId,
+                                           @RequestParam Long buyerId,
+                                           @RequestParam Integer quantity) {
+        tradeService.updateCartQuantity(buyerId, cartId, quantity);
+        return Result.success();
+    }
+
+    /**
+     * 删除购物车条目。
+     * 注：登录鉴权未实现，临时用 buyerId 参数传入。
+     */
+    @DeleteMapping("/cart/{cartId}")
+    public Result<Void> removeCartItem(@PathVariable Long cartId,
+                                       @RequestParam Long buyerId) {
+        tradeService.removeCartItem(buyerId, cartId);
+        return Result.success();
     }
 }

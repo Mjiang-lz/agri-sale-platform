@@ -2,6 +2,7 @@ package com.rxt.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.dto.OrderCreateDTO;
+import com.rxt.vo.CartVO;
 import com.rxt.vo.ProductVO;
 
 /**
@@ -25,5 +26,20 @@ public interface TradeService {
      * 创建订单并生成订单编号。
      */
     Long createOrder(Long buyerId, OrderCreateDTO dto);
+
+    /**
+     * 分页查询我的购物车。
+     */
+    IPage<CartVO> pageCart(Long buyerId, long pageNum, long pageSize);
+
+    /**
+     * 修改购物车条目数量（quantity 为 0 或负数时视为删除该条目）。
+     */
+    void updateCartQuantity(Long buyerId, Long cartId, Integer quantity);
+
+    /**
+     * 删除购物车条目。
+     */
+    void removeCartItem(Long buyerId, Long cartId);
 
 }
