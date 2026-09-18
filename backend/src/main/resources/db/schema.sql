@@ -203,12 +203,15 @@ CREATE TABLE `t_demand` (
   `unit`         VARCHAR(10)       NULL                            COMMENT '计量单位',
   `expect_price` DECIMAL(12,2)     NULL                            COMMENT '期望单价',
   `description`  TEXT              NULL                            COMMENT '需求补充说明',
+  `region`       VARCHAR(50)       NULL                            COMMENT '收货地区',
+  `valid_until`  DATETIME          NULL                            COMMENT '需求有效期',
+  `contact`      VARCHAR(50)       NULL                            COMMENT '联系方式',
   `status`       TINYINT       NOT NULL DEFAULT 1                  COMMENT '状态：1 有效，0 已关闭',
   `create_time`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP  COMMENT '发布时间',
   `update_time`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`demand_id`),
-  -- 求购需求检索（品类 + 关键词）
-  KEY `idx_demand_status_category` (`status`, `category`),
+  -- 求购需求检索（品类 + 地区）
+  KEY `idx_demand_status_category` (`status`, `category`, `region`),
   -- 我发布的求购
   KEY `idx_demand_publisher_id` (`publisher_id`)
 ) ENGINE = InnoDB
