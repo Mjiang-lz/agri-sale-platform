@@ -41,6 +41,15 @@ public class Demand implements Serializable {
     /** 需求补充说明 */
     private String description;
 
+    /** 收货地区 */
+    private String region;
+
+    /** 需求有效期 */
+    private LocalDateTime validUntil;
+
+    /** 联系方式 */
+    private String contact;
+
     /** 状态：1 有效，0 已关闭 */
     private Integer status;
 

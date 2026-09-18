@@ -28,6 +28,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/trade/product/**",        // ← 新增：商品详情公开
                         "/trade/cart",              // ← 临时放开：加购物车（登录鉴权未做，便于联调）
                         "/trade/order",             // ← 临时放开：下单（同上）
+                        "/demand/list",             // ← 新增：求购需求列表公开
+                        "/demand/**",               // ← 临时放开：求购需求其他接口（登录鉴权未做，便于联调）
                         "/error"
                 );
     }
