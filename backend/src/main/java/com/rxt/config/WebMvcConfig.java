@@ -26,6 +26,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/home/**",
                         "/trade/products",          // ← 新增：商品列表公开
                         "/trade/product/**",        // ← 新增：商品详情公开
+                        "/trade/cart",              // ← 临时放开：加购物车（登录鉴权未做，便于联调）
+                        "/trade/order",             // ← 临时放开：下单（同上）
                         "/error"
                 );
     }

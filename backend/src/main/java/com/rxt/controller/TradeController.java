@@ -3,7 +3,6 @@ package com.rxt.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.common.Result;
 import com.rxt.dto.OrderCreateDTO;
-import com.rxt.security.UserContext;
 import com.rxt.service.TradeService;
 import com.rxt.vo.ProductVO;
 import jakarta.validation.Valid;
@@ -37,18 +36,24 @@ public class TradeController {
 
     /**
      * 加入购物车。
+     * 注：登录鉴权(AuthServiceImpl)未实现，临时用 buyerId 参数传入；
+     * 鉴权完成后改回 tradeService.addToCart(UserContext.currentUserId(), productId, quantity)。
      */
     @PostMapping("/cart")
-    public Result<Void> addToCart(@RequestParam Long productId, @RequestParam Integer quantity) {
-        tradeService.addToCart(UserContext.currentUserId(), productId, quantity);
+    public Result<Void> addToCart(@RequestParam Long buyerId,
+                                 @RequestParam Long productId,
+                                 @RequestParam Integer quantity) {
+        tradeService.addToCart(buyerId, productId, quantity);
         return Result.success();
     }
 
     /**
      * 创建订单。
+     * 注：登录鉴权未实现，临时用 buyerId 参数传入；鉴权完成后改回 UserContext.currentUserId()。
      */
     @PostMapping("/order")
-    public Result<Long> createOrder(@RequestBody @Valid OrderCreateDTO dto) {
-        return Result.success(tradeService.createOrder(UserContext.currentUserId(), dto));
+    public Result<Long> createOrder(@RequestParam Long buyerId,
+                                   @RequestBody @Valid OrderCreateDTO dto) {
+        return Result.success(tradeService.createOrder(buyerId, dto));
     }
 }
