@@ -24,6 +24,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/auth/register",
                         "/auth/captcha",
                         "/home/**",
+                        "/trade/products",          // ← 新增：商品列表公开
+                        "/trade/product/**",        // ← 新增：商品详情公开
                         "/error"
                 );
     }
