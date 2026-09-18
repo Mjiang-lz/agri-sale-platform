@@ -7,9 +7,12 @@ import com.rxt.service.FinanceApplyService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.rxt.vo.UserVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service // ⚠️ 极其重要：加上这个注解，Controller 才能找到它！
 public class FinanceApplyServiceImpl extends ServiceImpl<FinanceApplyMapper, FinanceApply> implements FinanceApplyService {
@@ -34,9 +37,13 @@ public class FinanceApplyServiceImpl extends ServiceImpl<FinanceApplyMapper, Fin
     @Override
     public Page<FinanceApply> getMyApply(Long userId, Integer page, Integer size) {
         LambdaQueryWrapper<FinanceApply> wrapper = new LambdaQueryWrapper<>();
-        // ⚠️ 注意：这里也要改成 applyUserId 的真实字段名（getFarmerId）
         wrapper.eq(FinanceApply::getFarmerId, userId)
-                .orderByDesc(FinanceApply::getApplyTime); // 按申请时间倒序
+                .orderByDesc(FinanceApply::getApplyTime);
         return this.page(new Page<>(page, size), wrapper);
+    }
+
+    @Override
+    public List<UserVO> recommendGuarantors(Long userId) {
+        return new ArrayList<>();
     }
 }
