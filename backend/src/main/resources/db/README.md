@@ -84,6 +84,17 @@ mysql -u root -p rxt < backend/src/main/resources/db/migrations/2026-09-25_01_xx
 
 ## 待办
 
-- [ ] `feat/trade-demand` 合并时，把根目录下的 `migrate_t_demand_20260918.sql`
-      改名归位到本目录（`2026-09-18_01_t_demand_增加地区与有效期.sql`），
-      并确认它描述的变更已同步进 `schema.sql`
+- [ ] **删除 `db/migrate_t_demand_20260918.sql`**（不要"改名归位"，直接删）
+
+  原因（2026-09-20 核查）：
+
+  1. 它要加的 `region` / `valid_until` / `contact` 三列和 `idx_demand_status_category`
+     索引，**已经全部写在 `schema.sql` 里了**（第 206~208 行、第 214 行）。
+     跑一遍 `schema.sql` 就已经有了，它对任何环境都多余。
+  2. 它**没有 `USE \`rxt\`;`**（`schema.sql` 第 21 行、`data.sql` 第 28 行都有，只有它没有），
+     直接 `mysql < 文件` 执行会报 `ERROR 1046 (3D000) No database selected`。
+  3. 它的文件头写着"schema.sql 中的 CREATE TABLE 对'已存在'的表不生效" ——
+     但 `schema.sql` 是 `DROP TABLE` + `CREATE TABLE`，**本来就会重建**，这句注释与现实不符。
+
+  留着它只会让人以为是必跑步骤。**待办本身也正是"约定被违反"**：
+  上面第 17 行说「除以上四个位置外不要再放 SQL 文件」，而它就是第 5 个。
