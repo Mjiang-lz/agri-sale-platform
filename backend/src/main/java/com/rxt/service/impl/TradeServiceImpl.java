@@ -12,6 +12,7 @@ import com.rxt.mapper.OrderMapper;
 import com.rxt.mapper.ProductMapper;
 import com.rxt.service.TradeService;
 import com.rxt.vo.CartVO;
+import com.rxt.vo.OrderVO;
 import com.rxt.vo.ProductVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -189,6 +190,60 @@ public class TradeServiceImpl implements TradeService {
         cartMapper.deleteById(cartId);
     }
 
+    @Override
+    public IPage<OrderVO> pageOrders(Long buyerId, long pageNum, long pageSize, String orderStatus) {
+        // 1. 只查当前买家的订单，按下单时间倒序（最新的排前面）
+        Page<Order> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Order::getBuyerId, buyerId);
+        // 传了状态就按状态筛，不传查全部
+        if (StringUtils.hasText(orderStatus)) {
+            wrapper.eq(Order::getOrderStatus, orderStatus);
+        }
+        wrapper.orderByDesc(Order::getCreateTime);
+
+        // 2. 分页查询后转 VO（VO 里会补齐商品名称、单位、图片）
+        Page<Order> orderPage = orderMapper.selectPage(page, wrapper);
+        return orderPage.convert(this::convertToOrderVO);
+    }
+
+    @Override
+    public OrderVO orderDetail(Long buyerId, Long orderId) {
+        // 1. 校验归属：只能看自己的订单
+        Order order = orderMapper.selectById(orderId);
+        if (order == null || !Objects.equals(order.getBuyerId(), buyerId)) {
+            throw new RuntimeException("订单不存在");
+        }
+        return convertToOrderVO(order);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelOrder(Long buyerId, Long orderId) {
+        // 1. 校验归属：只能取消自己的订单
+        Order order = orderMapper.selectById(orderId);
+        if (order == null || !Objects.equals(order.getBuyerId(), buyerId)) {
+            throw new RuntimeException("订单不存在");
+        }
+        // 2. 校验状态：已发货/已收货/已完成/已取消都不能再取消
+        String status = order.getOrderStatus();
+        if ("已取消".equals(status)) {
+            throw new RuntimeException("订单已取消，请勿重复操作");
+        }
+        if ("待收货".equals(status) || "已完成".equals(status)) {
+            throw new RuntimeException("订单已发货，无法取消，请联系卖家");
+        }
+        // 3. 回滚库存（下单时扣了多少就还多少，与状态更新在同一事务里）
+        Product product = productMapper.selectById(order.getProductId());
+        if (product != null) {
+            product.setStock(product.getStock() + order.getQuantity());
+            productMapper.updateById(product);
+        }
+        // 4. 更新订单状态
+        order.setOrderStatus("已取消");
+        orderMapper.updateById(order);
+    }
+
     /**
      * 生成订单编号。
      */
@@ -217,6 +272,35 @@ public class TradeServiceImpl implements TradeService {
             vo.setPrice(product.getPrice());
             vo.setStock(product.getStock());
             vo.setStatus(product.getStatus());
+        }
+        return vo;
+    }
+
+    /**
+     * 订单实体转视图对象，补齐商品名称、单位、图片等展示信息。
+     */
+    private OrderVO convertToOrderVO(Order order) {
+        OrderVO vo = new OrderVO();
+        vo.setOrderId(order.getOrderId());
+        vo.setOrderNo(order.getOrderNo());
+        vo.setBuyerId(order.getBuyerId());
+        vo.setSellerId(order.getSellerId());
+        vo.setProductId(order.getProductId());
+        vo.setQuantity(order.getQuantity());
+        vo.setUnitPrice(order.getUnitPrice());
+        vo.setOrderAmount(order.getOrderAmount());
+        vo.setOrderStatus(order.getOrderStatus());
+        vo.setPayTime(order.getPayTime());
+        vo.setDeliverTime(order.getDeliverTime());
+        vo.setReceiveTime(order.getReceiveTime());
+        vo.setCreateTime(order.getCreateTime());
+
+        // 补齐商品信息（商品可能已被删除/下架，这里允许 product 为 null）
+        Product product = productMapper.selectById(order.getProductId());
+        if (product != null) {
+            vo.setProductName(product.getProductName());
+            vo.setImageUrl(product.getImageUrl());
+            vo.setUnit(product.getUnit());
         }
         return vo;
     }

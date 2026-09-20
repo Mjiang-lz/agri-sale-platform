@@ -30,6 +30,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/trade/cart/list",         // ← 临时放开：购物车列表（同上）
                         "/trade/cart/**",           // ← 临时放开：购物车改数量/删除（同上）
                         "/trade/order",             // ← 临时放开：下单（同上）
+                        "/trade/order/list",        // ← 临时放开：订单列表（同上）
+                        "/trade/order/**",          // ← 临时放开：订单详情/取消（同上）
                         "/demand/list",             // ← 新增：求购需求列表公开
                         "/demand/**",               // ← 临时放开：求购需求其他接口（登录鉴权未做，便于联调）
                         "/error"
