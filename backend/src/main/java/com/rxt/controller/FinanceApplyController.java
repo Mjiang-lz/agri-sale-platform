@@ -8,6 +8,7 @@ import com.rxt.vo.UserVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -24,9 +25,18 @@ public class FinanceApplyController {
         financeApplyService.submitApply(userId, dto);
         return Result.success();
     }
+
     @GetMapping("/recommend")
     public Result<List<UserVO>> recommend() {
         Long userId = UserContext.currentUserId();
         return Result.success(financeApplyService.recommendGuarantors(userId));
+    }
+    @PostMapping("/bank/approve")
+    public Result<Void> bankApprove(@RequestParam Long applyId,
+                                    @RequestParam String approvalResult,
+                                    @RequestParam(required = false) BigDecimal loanAmount,
+                                    @RequestParam(required = false) String approvalOpinion) {
+        financeApplyService.bankApprove(applyId, approvalResult, loanAmount, approvalOpinion);
+        return Result.success();
     }
 }

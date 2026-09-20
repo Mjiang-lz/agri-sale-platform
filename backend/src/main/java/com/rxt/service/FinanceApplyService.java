@@ -5,7 +5,9 @@ import com.rxt.entity.FinanceApply;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page; // 为接口3做准备
 import com.rxt.vo.UserVO;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface FinanceApplyService extends IService<FinanceApply> {
@@ -17,4 +19,6 @@ public interface FinanceApplyService extends IService<FinanceApply> {
 
     // 接口4：联合融资人智能推荐
     List<UserVO> recommendGuarantors(Long userId);
+
+    void bankApprove(Long applyId, String approvalResult, BigDecimal loanAmount, String approvalOpinion);
 }
