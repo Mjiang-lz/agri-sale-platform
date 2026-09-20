@@ -4,16 +4,24 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
+import com.rxt.common.ResultCode;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.entity.Cart;
+import com.rxt.entity.FarmerProfile;
 import com.rxt.entity.Order;
 import com.rxt.entity.Product;
+import com.rxt.entity.User;
 import com.rxt.mapper.CartMapper;
+import com.rxt.mapper.FarmerProfileMapper;
 import com.rxt.mapper.OrderMapper;
 import com.rxt.mapper.ProductMapper;
+import com.rxt.mapper.UserMapper;
+import com.rxt.service.CommentService;
 import com.rxt.service.TradeService;
 import com.rxt.vo.CartVO;
+import com.rxt.vo.CommentVO;
 import com.rxt.vo.OrderVO;
+import com.rxt.vo.ProductDetailVO;
 import com.rxt.vo.ProductVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,21 +31,32 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 农产品交易模块业务实现。
  *
- * <p>骨架阶段仅保留方法签名，具体业务规则待按功能点逐个补齐。</p>
+ * <p>商品检索、购物车、订单三组功能均已实现，业务规则见《软件需求规格说明书》
+ * 对应功能点；未实现的部分在接口方法注释里标注。</p>
  */
 @Service
 @RequiredArgsConstructor
 public class TradeServiceImpl implements TradeService {
 
+    /** 审核通过状态，取值与 t_product.audit_status 一致 */
+    private static final String AUDIT_APPROVED = "已通过";
+
+    /** 商品详情内嵌的评论条数。看更多走 GET /api/comment/product/list 翻页 */
+    private static final int DETAIL_COMMENT_SIZE = 5;
+
     private final ProductMapper productMapper;
     private final CartMapper cartMapper;
     private final OrderMapper orderMapper;
+    private final UserMapper userMapper;
+    private final FarmerProfileMapper farmerProfileMapper;
+    private final CommentService commentService;
 
     @Override
     public IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword) {
@@ -63,6 +82,48 @@ public class TradeServiceImpl implements TradeService {
 
         // 5. 把 Product 转成 ProductVO
         return productPage.convert(this::convertToProductVO);
+    }
+
+    @Override
+    public ProductDetailVO productDetail(Long productId) {
+        // 1. 商品必须存在且已通过审核。
+        //    「通过后才在前台可见」是 REQ-15 的验收口径，不能只在列表接口上守 ——
+        //    否则拿着 id 直接请求详情就能看到待审 / 被驳回的内容，等于绕过了审核。
+        Product product = productMapper.selectById(productId);
+        if (product == null || !AUDIT_APPROVED.equals(product.getAuditStatus())) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "商品不存在或尚未上架");
+        }
+
+        // 2. 商品自身字段。images 由 JacksonTypeHandler 直接从 JSON 列转成 List<String>，
+        //    这里不需要手工解析字符串。
+        ProductDetailVO vo = new ProductDetailVO();
+        vo.setProductId(product.getProductId());
+        vo.setProductName(product.getProductName());
+        vo.setCategory(product.getCategory());
+        vo.setPrice(product.getPrice());
+        vo.setStock(product.getStock());
+        vo.setUnit(product.getUnit());
+        vo.setImageUrl(product.getImageUrl());
+        // 历史商品的 images 列是 NULL，直接返回会让前端拿到 null 再遍历时炸掉。
+        // 统一成空数组，前端只需处理「有没有图」，不用再判空。
+        vo.setImages(product.getImages() == null ? List.of() : product.getImages());
+        vo.setDescription(product.getDescription());
+        vo.setOrigin(product.getOrigin());
+        vo.setAuditStatus(product.getAuditStatus());
+        vo.setStatus(product.getStatus());
+        vo.setCreateTime(product.getCreateTime());
+
+        // 3. 发布农户的公开信息
+        fillSellerInfo(vo, product.getSellerId());
+
+        // 4. 评论首页。复用 CommentService 而不是自己写一份查询，
+        //    是为了让「只返回已过审评论」这条规则只有一处实现 ——
+        //    两处各写一遍，迟早会出现一边改了另一边忘了。
+        IPage<CommentVO> commentPage = commentService.pageProductComments(productId, 1, DETAIL_COMMENT_SIZE);
+        vo.setCommentTotal(commentPage.getTotal());
+        vo.setComments(commentPage.getRecords());
+
+        return vo;
     }
 
     @Override
@@ -309,6 +370,40 @@ public class TradeServiceImpl implements TradeService {
     /**
      * 商品实体转视图对象。
      */
+    /**
+     * 补齐商品详情里的农户公开信息。
+     *
+     * <p>只取姓名、头像，以及农户档案里的主营农产品与经营规模。
+     * <b>刻意不取 {@code credit_record}</b> —— 那份文本里含「意向额度 10 万元」
+     * 这类融资意向，属于审核员与融资模块的信息，不该出现在买家看得到的商品详情里。</p>
+     *
+     * <p>两次查询都只 select 需要的列，既避免把 {@code phone} / {@code password}
+     * 带进内存，也省掉无用的网络传输。</p>
+     */
+    private void fillSellerInfo(ProductDetailVO vo, Long sellerId) {
+        vo.setSellerId(sellerId);
+        if (sellerId == null) {
+            return;
+        }
+
+        User seller = userMapper.selectOne(new LambdaQueryWrapper<User>()
+                .select(User::getUserId, User::getRealName, User::getAvatarUrl)
+                .eq(User::getUserId, sellerId));
+        if (seller != null) {
+            vo.setSellerName(seller.getRealName());
+            vo.setSellerAvatarUrl(seller.getAvatarUrl());
+        }
+
+        // 农户档案是一对一（uk_farmer_profile_user_id），所以取一条即可
+        FarmerProfile profile = farmerProfileMapper.selectOne(new LambdaQueryWrapper<FarmerProfile>()
+                .select(FarmerProfile::getMainProduct, FarmerProfile::getScaleDesc)
+                .eq(FarmerProfile::getUserId, sellerId));
+        if (profile != null) {
+            vo.setSellerMainProduct(profile.getMainProduct());
+            vo.setSellerScaleDesc(profile.getScaleDesc());
+        }
+    }
+
     private ProductVO convertToProductVO(Product product) {
         ProductVO vo = new ProductVO();
         vo.setProductId(product.getProductId());
