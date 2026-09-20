@@ -18,4 +18,7 @@ public class UserVO implements Serializable {
     private String avatarUrl;
     private String roleName;
     private Integer status;
+
+    /** 农户经营档案；非农户角色为 null */
+    private FarmerProfileVO farmerProfile;
 }
