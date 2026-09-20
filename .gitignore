@@ -45,3 +45,14 @@ application-local.yml
 application-prod.yml
 *.keystore
 *.jks
+
+# ---------------------- 数据库导出 / 转储 ----------------------
+# 结构变更一律改 db/schema.sql 或 db/migrations/ 下的脚本，
+# 不要提交从 Navicat 等工具导出的数据库文件（含真实数据、密码哈希）。
+*.dump
+*.ibd
+dump-*.sql
+*-dump.sql
+*_backup.sql
+*_bak.sql
+data-backup*/
