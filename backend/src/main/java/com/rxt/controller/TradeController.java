@@ -7,6 +7,7 @@ import com.rxt.security.UserContext;
 import com.rxt.service.TradeService;
 import com.rxt.vo.CartVO;
 import com.rxt.vo.OrderVO;
+import com.rxt.vo.ProductDetailVO;
 import com.rxt.vo.ProductVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,19 @@ public class TradeController {
                                                  @RequestParam(defaultValue = "10") long pageSize,
                                                  @RequestParam(required = false) String keyword) {
         return Result.success(tradeService.pageProducts(pageNum, pageSize, keyword));
+    }
+
+    /**
+     * 商品详情：商品全字段 + 库存 + 发布农户公开信息 + 已过审评论首页。
+     *
+     * <p>路径用 {@code /products/{productId}} 与列表接口 {@code /products} 成对，
+     * Spring 能区分「精确匹配的 /products」与「带路径变量的 /products/{id}」。</p>
+     *
+     * <p>只返回审核通过的商品；待审 / 未通过的商品在这里同样不可见（404）。</p>
+     */
+    @GetMapping("/products/{productId}")
+    public Result<ProductDetailVO> productDetail(@PathVariable Long productId) {
+        return Result.success(tradeService.productDetail(productId));
     }
 
     /**

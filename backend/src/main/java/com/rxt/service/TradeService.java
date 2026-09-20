@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.vo.CartVO;
 import com.rxt.vo.OrderVO;
+import com.rxt.vo.ProductDetailVO;
 import com.rxt.vo.ProductVO;
 
 /**
@@ -17,6 +18,17 @@ public interface TradeService {
      * 分页检索商品货源。
      */
     IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword);
+
+    /**
+     * 查询商品详情：商品全字段 + 库存 + 发布农户公开信息 + 已过审评论首页。
+     *
+     * <p>只返回审核通过的商品。买家不能通过本接口看到待审核 / 未通过的内容 ——
+     * 「通过后才在前台可见」是 REQ-15 的验收口径，不能只在列表接口上守着。</p>
+     *
+     * @param productId 商品主键
+     * @return 商品详情
+     */
+    ProductDetailVO productDetail(Long productId);
 
     /**
      * 加入购物车。
