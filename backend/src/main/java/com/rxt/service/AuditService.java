@@ -1,6 +1,7 @@
 package com.rxt.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.rxt.dto.AuditActionDTO;
 import com.rxt.vo.AuditTaskVO;
 
 import java.util.List;
@@ -73,5 +74,27 @@ public interface AuditService {
      * @param targetId   内容主键
      */
     List<AuditTaskVO> listAuditLogs(String targetType, Long targetId);
+
+    /**
+     * 提交审核结论：通过 / 驳回（一个入口覆盖三类内容，内部按类型分流到对应业务表）。
+     *
+     * <p>在自己的事务内完成两件事，要么全成、要么全不成：</p>
+     * <ol>
+     *   <li>更新被审内容的 {@code audit_status}；
+     *       商品额外联动上下架状态（通过即上架、驳回即下架），
+     *       否则审核通过的商品仍处于下架状态，加购与下单会被一并拦下；</li>
+     *   <li>向 t_audit 写入一条审核流水（结论、意见、审核人、审核时间）。</li>
+     * </ol>
+     *
+     * <p>只允许审核当前为「待审核」的内容。已审过的内容重复审核会被拒绝，
+     * 这样两个审核员同时点开同一条时，后提交的那次不会静默覆盖前一次的结论。</p>
+     *
+     * @param targetType 内容类型：PRODUCT / KNOWLEDGE / COMMENT
+     * @param targetId   内容主键
+     * @param auditorId  审核人 ID，取自登录态（UserContext.currentUserId()），不接受客户端传入
+     * @param action     审核结论与审核意见（驳回时意见必填）
+     * @return 审核后的内容视图（含本次审核流水），前端可直接用它刷新当前行
+     */
+    AuditTaskVO auditContent(String targetType, Long targetId, Long auditorId, AuditActionDTO action);
 
 }

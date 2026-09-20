@@ -2,12 +2,16 @@ package com.rxt.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.common.Result;
+import com.rxt.dto.AuditActionDTO;
 import com.rxt.security.UserContext;
 import com.rxt.service.AuditService;
 import com.rxt.vo.AuditTaskVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -82,6 +86,22 @@ public class AuditController {
     public Result<AuditTaskVO> contentDetail(@PathVariable String targetType,
                                              @PathVariable Long targetId) {
         return Result.success(auditService.contentDetail(targetType, targetId));
+    }
+
+    /**
+     * 提交审核结论（通过 / 不通过）。
+     *
+     * <p>与上面的内容详情同一路径，靠 HTTP 方法区分语义：GET 看内容全文，POST 提交结论。
+     * 一个入口覆盖三类内容，类型差异（商品要联动上下架、知识/评论不用）由 Service 内部消化。</p>
+     *
+     * <p>审核人取自登录态，请求体只带结论与意见。</p>
+     */
+    @PostMapping("/content/{targetType}/{targetId}")
+    public Result<AuditTaskVO> auditContent(@PathVariable String targetType,
+                                            @PathVariable Long targetId,
+                                            @RequestBody @Valid AuditActionDTO action) {
+        return Result.success(auditService.auditContent(
+                targetType, targetId, UserContext.currentUserId(), action));
     }
 
     /**
