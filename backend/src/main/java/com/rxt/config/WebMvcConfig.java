@@ -34,6 +34,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/trade/order/**",          // ← 临时放开：订单详情/取消（同上）
                         "/demand/list",             // ← 新增：求购需求列表公开
                         "/demand/**",               // ← 临时放开：求购需求其他接口（登录鉴权未做，便于联调）
+                        "/audit/**",                // ← 临时放开：内容审核全部接口（登录鉴权未做，便于联调）
                         "/error"
                 );
     }
