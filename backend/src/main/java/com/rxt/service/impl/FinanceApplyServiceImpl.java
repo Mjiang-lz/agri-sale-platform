@@ -1,21 +1,30 @@
 package com.rxt.service.impl;
 
 import com.rxt.dto.FinanceApplyDTO;
+import com.rxt.entity.Approval;
 import com.rxt.entity.FinanceApply;
+import com.rxt.mapper.ApprovalMapper;
 import com.rxt.mapper.FinanceApplyMapper;
+import com.rxt.security.UserContext;
 import com.rxt.service.FinanceApplyService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.rxt.vo.UserVO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service // ⚠️ 极其重要：加上这个注解，Controller 才能找到它！
 public class FinanceApplyServiceImpl extends ServiceImpl<FinanceApplyMapper, FinanceApply> implements FinanceApplyService {
+
+    @Autowired
+    private ApprovalMapper approvalMapper;
 
     @Override
     @Transactional // ⚠️ 团队红线：涉及写库，必须加事务
@@ -45,5 +54,26 @@ public class FinanceApplyServiceImpl extends ServiceImpl<FinanceApplyMapper, Fin
     @Override
     public List<UserVO> recommendGuarantors(Long userId) {
         return new ArrayList<>();
+    }
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void bankApprove(Long applyId, String approvalResult, BigDecimal loanAmount, String approvalOpinion) {
+        FinanceApply apply = this.getById(applyId);
+        if (apply == null) {
+            throw new RuntimeException("融资申请不存在");
+        }
+
+        apply.setApplyStatus("通过".equals(approvalResult) ? "已放款" : "已驳回");
+        this.updateById(apply);
+
+        Approval approval = new Approval();
+        approval.setApplyId(applyId);
+        approval.setBankUserId(UserContext.currentUserId());
+        approval.setApprovalResult(approvalResult);
+        approval.setLoanAmount(loanAmount);
+        approval.setApprovalOpinion(approvalOpinion);
+        approval.setApprovalTime(LocalDateTime.now());
+
+        approvalMapper.insert(approval);
     }
 }
