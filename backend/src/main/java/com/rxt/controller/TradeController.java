@@ -5,6 +5,7 @@ import com.rxt.common.Result;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.service.TradeService;
 import com.rxt.vo.CartVO;
+import com.rxt.vo.OrderVO;
 import com.rxt.vo.ProductVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +93,39 @@ public class TradeController {
     public Result<Void> removeCartItem(@PathVariable Long cartId,
                                        @RequestParam Long buyerId) {
         tradeService.removeCartItem(buyerId, cartId);
+        return Result.success();
+    }
+
+    /**
+     * 查询我的订单（分页），可按订单状态筛选。
+     * 注：登录鉴权未实现，临时用 buyerId 参数传入。
+     */
+    @GetMapping("/order/list")
+    public Result<IPage<OrderVO>> pageOrders(@RequestParam Long buyerId,
+                                             @RequestParam(defaultValue = "1") long pageNum,
+                                             @RequestParam(defaultValue = "10") long pageSize,
+                                             @RequestParam(required = false) String orderStatus) {
+        return Result.success(tradeService.pageOrders(buyerId, pageNum, pageSize, orderStatus));
+    }
+
+    /**
+     * 查询订单详情，只能查自己的订单。
+     * 注：登录鉴权未实现，临时用 buyerId 参数传入。
+     */
+    @GetMapping("/order/{orderId}")
+    public Result<OrderVO> orderDetail(@PathVariable Long orderId,
+                                       @RequestParam Long buyerId) {
+        return Result.success(tradeService.orderDetail(buyerId, orderId));
+    }
+
+    /**
+     * 取消订单：仅"待支付/待发货"可取消，取消后回滚库存。
+     * 注：登录鉴权未实现，临时用 buyerId 参数传入。
+     */
+    @PostMapping("/order/{orderId}/cancel")
+    public Result<Void> cancelOrder(@PathVariable Long orderId,
+                                    @RequestParam Long buyerId) {
+        tradeService.cancelOrder(buyerId, orderId);
         return Result.success();
     }
 }

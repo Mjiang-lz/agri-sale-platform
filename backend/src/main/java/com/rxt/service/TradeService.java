@@ -3,6 +3,7 @@ package com.rxt.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.vo.CartVO;
+import com.rxt.vo.OrderVO;
 import com.rxt.vo.ProductVO;
 
 /**
@@ -41,5 +42,20 @@ public interface TradeService {
      * 删除购物车条目。
      */
     void removeCartItem(Long buyerId, Long cartId);
+
+    /**
+     * 分页查询我的订单，可按订单状态筛选（status 为空表示查全部）。
+     */
+    IPage<OrderVO> pageOrders(Long buyerId, long pageNum, long pageSize, String orderStatus);
+
+    /**
+     * 查询订单详情，只能查自己的订单。
+     */
+    OrderVO orderDetail(Long buyerId, Long orderId);
+
+    /**
+     * 取消订单：仅"待支付/待发货"可取消，取消后回滚库存。
+     */
+    void cancelOrder(Long buyerId, Long orderId);
 
 }
