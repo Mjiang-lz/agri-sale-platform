@@ -79,6 +79,19 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+            密码加密：只引 spring-security-crypto 一个模块，用它的 BCryptPasswordEncoder。
+            版本由 spring-boot-starter-parent 的 BOM 统一管理，不需要写 version。
+
+            切勿改成 spring-boot-starter-security：那个 starter 会把整条 Spring Security
+            自动配置链带进来，接管全部请求并统统返回 401；本项目的鉴权是
+            LoginInterceptor + UserContext 手写实现的，两套机制会互相打架。
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
