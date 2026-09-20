@@ -1,10 +1,12 @@
 package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
+import com.rxt.dto.AuditActionDTO;
 import com.rxt.entity.AuditRecord;
 import com.rxt.entity.Comment;
 import com.rxt.entity.Knowledge;
@@ -20,6 +22,7 @@ import com.rxt.service.AuditService;
 import com.rxt.vo.AuditTaskVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -68,6 +71,10 @@ public class AuditServiceImpl implements AuditService {
 
     /** 评论摘要最大长度，超出截断 */
     private static final int COMMENT_SUMMARY_LENGTH = 50;
+
+    /** t_product.status 上下架取值：1 上架、0 下架 */
+    private static final int SHELF_ON = 1;
+    private static final int SHELF_OFF = 0;
 
     private final ProductMapper productMapper;
     private final KnowledgeMapper knowledgeMapper;
@@ -430,7 +437,132 @@ public class AuditServiceImpl implements AuditService {
     }
 
     // =====================================================================
-    // 四、转换辅助方法（下一步实现，先给出签名供你调用）
+    // 四、审核动作：通过 / 驳回
+    // =====================================================================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AuditTaskVO auditContent(String targetType, Long targetId, Long auditorId, AuditActionDTO action) {
+        permissionChecker.requireAdmin();
+
+        // 1) 结论词表校验：只认 t_audit.audit_result 的两个合法值
+        //    先把 pass 算出来，后面按它分流；非法值直接拒绝，避免脏结论落库
+        String result = action.getAuditResult();
+        boolean pass = RESULT_PASS.equals(result);
+        if (!pass && !RESULT_REJECT.equals(result)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "审核结论只能是「通过」或「不通过」：" + result);
+        }
+
+        // 2) 驳回必须给出理由：发布者要照着意见改，没有意见等于没驳回
+        if (!pass && !StringUtils.hasText(action.getAuditRemark())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "驳回时必须填写审核意见");
+        }
+
+        // 3) 更新被审内容的审核状态（存在性、是否待审核的校验都在各自方法内）
+        String newStatus = pass ? STATUS_PASSED : STATUS_REJECTED;
+        switch (targetType) {
+            case TYPE_PRODUCT -> applyProductAudit(targetId, newStatus, pass);
+            case TYPE_KNOWLEDGE -> applyKnowledgeAudit(targetId, newStatus);
+            case TYPE_COMMENT -> applyCommentAudit(targetId, newStatus);
+            default -> throw new BizException(ResultCode.BAD_REQUEST.getCode(), "内容类型不合法：" + targetType);
+        }
+
+        // 4) 落审核流水：t_audit 只记"谁、何时、对什么、结论如何"，不存内容快照
+        AuditRecord record = new AuditRecord();
+        record.setTargetType(targetType);
+        record.setTargetId(targetId);
+        record.setAuditResult(result);
+        record.setAuditRemark(action.getAuditRemark());
+        record.setAuditorId(auditorId);
+        record.setAuditTime(LocalDateTime.now());
+        auditRecordMapper.insert(record);
+
+        // 5) 返回审核后的内容视图：复用详情查询，顺带把刚写入的流水挂上，前端可直接刷新当前行
+        return contentDetail(targetType, targetId);
+    }
+
+    /**
+     * 商品审核：通过即上架、驳回即下架。
+     *
+     * <p>上下架必须跟着审核一起改 —— 加购与下单同时校验
+     * {@code audit_status = '已通过'} 与 {@code status = 1}，
+     * 只改审核状态的话，商品"审核通过了"却依然买不到。</p>
+     */
+    private void applyProductAudit(Long productId, String newStatus, boolean pass) {
+        Product product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "商品不存在：" + productId);
+        }
+        if (!STATUS_PENDING.equals(product.getAuditStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "该商品当前为「" + product.getAuditStatus() + "」，不能重复审核");
+        }
+
+        int rows = productMapper.update(null, new LambdaUpdateWrapper<Product>()
+                .eq(Product::getProductId, productId)
+                // 把"待审核"写进 WHERE：两人同时点开同一条时，后提交者更新不到行，不会覆盖前一次的结论
+                .eq(Product::getAuditStatus, STATUS_PENDING)
+                .set(Product::getAuditStatus, newStatus)
+                .set(Product::getStatus, pass ? SHELF_ON : SHELF_OFF));
+
+        // 上面刚查过状态，这里为 0 只可能是并发提交，提示刷新即可
+        if (rows == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "商品状态已变更，请刷新后重试");
+        }
+    }
+
+    /**
+     * 知识审核：只维护 audit_status（t_knowledge 没有上下架字段）。
+     */
+    private void applyKnowledgeAudit(Long knowledgeId, String newStatus) {
+        Knowledge knowledge = knowledgeMapper.selectById(knowledgeId);
+        if (knowledge == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在：" + knowledgeId);
+        }
+        if (!STATUS_PENDING.equals(knowledge.getAuditStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "该知识当前为「" + knowledge.getAuditStatus() + "」，不能重复审核");
+        }
+
+        int rows = knowledgeMapper.update(null, new LambdaUpdateWrapper<Knowledge>()
+                .eq(Knowledge::getKnowledgeId, knowledgeId)
+                .eq(Knowledge::getAuditStatus, STATUS_PENDING)
+                .set(Knowledge::getAuditStatus, newStatus));
+
+        if (rows == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "知识状态已变更，请刷新后重试");
+        }
+    }
+
+    /**
+     * 评论审核：只维护 audit_status。
+     *
+     * <p>驳回的评论仍留在库中（audit_status = 未通过），由前端按状态决定是否展示，
+     * 不做物理删除 —— 审核留痕要求可回溯。</p>
+     */
+    private void applyCommentAudit(Long commentId, String newStatus) {
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "评论不存在：" + commentId);
+        }
+        if (!STATUS_PENDING.equals(comment.getAuditStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "该评论当前为「" + comment.getAuditStatus() + "」，不能重复审核");
+        }
+
+        int rows = commentMapper.update(null, new LambdaUpdateWrapper<Comment>()
+                .eq(Comment::getCommentId, commentId)
+                .eq(Comment::getAuditStatus, STATUS_PENDING)
+                .set(Comment::getAuditStatus, newStatus));
+
+        if (rows == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "评论状态已变更，请刷新后重试");
+        }
+    }
+
+    // =====================================================================
+    // 五、转换辅助方法
     // =====================================================================
 
     /**
