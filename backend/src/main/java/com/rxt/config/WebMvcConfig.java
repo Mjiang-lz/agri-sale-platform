@@ -8,6 +8,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Web MVC 配置：注册登录拦截器并声明放行路径。
+ *
+ * <p>放行原则：只放行「不需要身份就能浏览」的只读接口
+ * （登录/注册、首页数据、商品列表、求购需求列表）。
+ * 凡是涉及「我的数据」或写操作的接口一律要求登录 ——
+ * 由 {@link LoginInterceptor} 从 Authorization 头解析 JWT 并写入 UserContext，
+ * 业务层据此判定数据归属，避免客户端自报 userId 造成的越权。</p>
+ *
+ * <p>新增放行路径前先确认：该接口是否真的允许游客访问？
+ * 若只是为了「联调方便」，请勿加进来。</p>
  */
 @Configuration
 @RequiredArgsConstructor
@@ -20,21 +29,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(loginInterceptor)
                 .addPathPatterns("/**")
                 .excludePathPatterns(
+                        // —— 认证：未登录也必须能访问 ——
                         "/auth/login",
                         "/auth/register",
-                        "/auth/captcha",
-                        "/home/**",
-                        "/trade/products",          // ← 新增：商品列表公开
-                        "/trade/product/**",        // ← 新增：商品详情公开
-                        "/trade/cart",              // ← 临时放开：加购物车（登录鉴权未做，便于联调）
-                        "/trade/cart/list",         // ← 临时放开：购物车列表（同上）
-                        "/trade/cart/**",           // ← 临时放开：购物车改数量/删除（同上）
-                        "/trade/order",             // ← 临时放开：下单（同上）
-                        "/trade/order/list",        // ← 临时放开：订单列表（同上）
-                        "/trade/order/**",          // ← 临时放开：订单详情/取消（同上）
-                        "/demand/list",             // ← 新增：求购需求列表公开
-                        "/demand/**",               // ← 临时放开：求购需求其他接口（登录鉴权未做，便于联调）
-                        "/audit/**",                // ← 临时放开：内容审核全部接口（登录鉴权未做，便于联调）
+
+                        // —— 游客可浏览的公开只读数据 ——
+                        "/home/**",              // 首页推荐商品、农业知识
+                        "/trade/products",       // 商品货源列表
+                        "/demand/list",          // 求购需求列表
+
+                        // —— 框架内部 ——
                         "/error"
                 );
     }

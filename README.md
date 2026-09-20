@@ -119,10 +119,16 @@ npm run dev
 `service.impl` 中各业务方法留有 `TODO`，按功能点逐个补齐即可。
 
 **已完成**：M1 登录 / 注册后端（`AuthServiceImpl`：手机号唯一校验、BCrypt 加密入库、JWT 签发、
-角色白名单）；M2 农产品交易；M2 求购需求；M4 融资服务部分接口。
+角色白名单）；M2 农产品交易；M2 求购需求；M4 融资服务部分接口；
+**M1 鉴权白名单收口** —— 交易与求购模块的用户身份一律改由登录态（`UserContext`）获取，
+不再接受客户端传入的 `buyerId` / `publisherId`。
 
-**未完成**：M1 个人资料（`UserServiceImpl.getProfile` 仍是 `TODO`）、M1 前端登录页；
-`config/WebMvcConfig.java` 中 `/trade/cart/**`、`/trade/order`、`/demand/**` 仍处于
-**"临时放开鉴权"** 状态，M1 鉴权收口后需一并移除。
+**未完成**：M1 个人资料（`UserServiceImpl.getProfile` 仍是 `TODO`）、M1 前端登录页、
+M1 角色权限校验（`PermissionChecker` 已实现但尚未接入，越权暂不返回 403）。
+
+`config/WebMvcConfig.java` 当前仅放行无需身份的只读接口：
+`/auth/login`、`/auth/register`、`/home/**`、`/trade/products`、`/demand/list`、`/error`，
+**其余接口一律要求登录**。新增放行路径前请先确认该接口是否真的允许游客访问；
+联调请带 `Authorization: Bearer <token>`，不要往白名单里加。
 
 第三方支付与短信服务为**模拟通道**，不涉及真实资金。
