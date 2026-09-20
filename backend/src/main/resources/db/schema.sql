@@ -132,7 +132,9 @@ CREATE TABLE `t_product` (
   -- 商品列表与品类筛选
   KEY `idx_product_status_category` (`status`, `category`),
   -- 我发布的商品
-  KEY `idx_product_seller_id` (`seller_id`)
+  KEY `idx_product_seller_id` (`seller_id`),
+  -- 审核中心待审队列：按审核状态筛选 + 按提交时间倒序
+  KEY `idx_product_audit_status` (`audit_status`, `create_time`)
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1
   DEFAULT CHARSET = utf8mb4
@@ -235,7 +237,9 @@ CREATE TABLE `t_comment` (
   -- 对象下的已通过评论
   KEY `idx_comment_target` (`target_type`, `target_id`, `audit_status`),
   -- 我的评论
-  KEY `idx_comment_user_id` (`user_id`)
+  KEY `idx_comment_user_id` (`user_id`),
+  -- 审核中心待审队列：按审核状态筛选 + 按提交时间倒序
+  KEY `idx_comment_audit_status` (`audit_status`, `create_time`)
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1
   DEFAULT CHARSET = utf8mb4
