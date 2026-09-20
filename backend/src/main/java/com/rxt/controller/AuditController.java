@@ -2,6 +2,7 @@ package com.rxt.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.common.Result;
+import com.rxt.security.UserContext;
 import com.rxt.service.AuditService;
 import com.rxt.vo.AuditTaskVO;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +17,11 @@ import java.util.List;
 /**
  * 内容审核接口。基础路径 /api/audit。
  *
- * <p>注：登录鉴权（AuthServiceImpl）未实现，auditorId 暂由参数传入；
- * 待 M1 完成后改为 UserContext.currentUserId()。</p>
+ * <p>审核属平台治理职能，全部接口都要求登录，且角色校验（仅管理员）在
+ * Service 层由 {@code PermissionChecker} 完成。</p>
+ *
+ * <p>审核人身份一律取自登录态 {@link UserContext}，不接受客户端传入 ——
+ * 用请求参数传身份可以被随意伪造，任何登录用户都能以他人名义审核。</p>
  */
 @RestController
 @RequestMapping("/audit")
@@ -50,15 +54,14 @@ public class AuditController {
     }
 
     /**
-     * 我已审核的记录。
-     * 注：登录鉴权未实现，临时用 auditorId 参数传入。
+     * 我已审核的记录。审核人身份取自登录态。
      */
     @GetMapping("/my")
-    public Result<IPage<AuditTaskVO>> pageMyAudits(@RequestParam Long auditorId,
-                                                   @RequestParam(required = false) String targetType,
+    public Result<IPage<AuditTaskVO>> pageMyAudits(@RequestParam(required = false) String targetType,
                                                    @RequestParam(defaultValue = "1") long pageNum,
                                                    @RequestParam(defaultValue = "10") long pageSize) {
-        return Result.success(auditService.pageMyAudits(auditorId, targetType, pageNum, pageSize));
+        return Result.success(auditService.pageMyAudits(
+                UserContext.currentUserId(), targetType, pageNum, pageSize));
     }
 
     /**

@@ -3,6 +3,8 @@ package com.rxt.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.rxt.common.BizException;
+import com.rxt.common.ResultCode;
 import com.rxt.entity.AuditRecord;
 import com.rxt.entity.Comment;
 import com.rxt.entity.Knowledge;
@@ -13,6 +15,7 @@ import com.rxt.mapper.CommentMapper;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
+import com.rxt.security.PermissionChecker;
 import com.rxt.service.AuditService;
 import com.rxt.vo.AuditTaskVO;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +74,7 @@ public class AuditServiceImpl implements AuditService {
     private final CommentMapper commentMapper;
     private final AuditRecordMapper auditRecordMapper;
     private final UserMapper userMapper;
+    private final PermissionChecker permissionChecker;
 
     // =====================================================================
     // 一、列表类接口
@@ -78,10 +82,13 @@ public class AuditServiceImpl implements AuditService {
 
     @Override
     public IPage<AuditTaskVO> pageAudits(String targetType, String auditStatus, long pageNum, long pageSize) {
+        // 内容审核是平台治理职能，仅管理员可访问（t_role 5 的菜单权限本就含 audit）
+        permissionChecker.requireAdmin();
+
         // 0) 类型白名单校验：传了就必须是本模块管辖的三种内容类型之一
         //    （不校验的话，前端传 EXPERT 会查出一批没有标题的流水，看着像 bug）
         if (StringUtils.hasText(targetType) && !CONTENT_TYPES.contains(targetType)) {
-            throw new IllegalArgumentException("内容类型不合法：" + targetType);
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "内容类型不合法：" + targetType);
         }
 
         // 1) 状态兜底：不传状态时按"待审核"处理（审核后台首屏就是待办队列）
@@ -98,12 +105,12 @@ public class AuditServiceImpl implements AuditService {
         }
 
         // 3) 非法状态直接拒绝，避免拼出恒不成立的 SQL 让前端看到"暂无数据"
-        throw new IllegalArgumentException("审核状态不合法：" + auditStatus);
+        throw new BizException(ResultCode.BAD_REQUEST.getCode(), "审核状态不合法：" + auditStatus);
     }
 
     @Override
     public IPage<AuditTaskVO> pagePendingAudits(String targetType, long pageNum, long pageSize) {
-        // 语义更明确的快捷方式，逻辑完全复用统一入口
+        // 语义更明确的快捷方式，逻辑完全复用统一入口（权限校验也在统一入口内）
         return pageAudits(targetType, STATUS_PENDING, pageNum, pageSize);
     }
 
@@ -149,7 +156,7 @@ public class AuditServiceImpl implements AuditService {
                         .orderByDesc(Comment::getCreateTime);
                 yield commentMapper.selectPage(page, wrapper).convert(this::pendingCommentVO);
             }
-            default -> throw new IllegalArgumentException("内容类型不合法：" + targetType);
+            default -> throw new BizException(ResultCode.BAD_REQUEST.getCode(), "内容类型不合法：" + targetType);
         };
 
         // 待审数据是从业务表取出来的，标题/提交时间已有，只差提交人姓名
@@ -254,6 +261,14 @@ public class AuditServiceImpl implements AuditService {
 
     @Override
     public IPage<AuditTaskVO> pageMyAudits(Long auditorId, String targetType, long pageNum, long pageSize) {
+        permissionChecker.requireAdmin();
+
+        // 身份来自登录态（UserContext），正常情况不会为空；为空说明拦截器被绕过
+        // 防御性兜底：绝不让 null 拼进 SQL（会生成恒不成立的 order by auditor_id = NULL）
+        if (auditorId == null) {
+            throw new BizException(ResultCode.UNAUTHORIZED);
+        }
+
         // 1) 分页对象：第几页、每页多少条
         Page<AuditRecord> page = new Page<>(pageNum, pageSize);
 
@@ -289,11 +304,12 @@ public class AuditServiceImpl implements AuditService {
 
     @Override
     public AuditTaskVO auditDetail(Long auditId) {
+        permissionChecker.requireAdmin();
+
         // 1) 按主键查审核流水；查不到说明前端传了个不存在的 ID，必须报错而不是返回 null
         AuditRecord record = auditRecordMapper.selectById(auditId);
         if (record == null) {
-            // 暂时用 RuntimeException，T4 统一业务异常时替换为 BizException
-            throw new RuntimeException("审核记录不存在：" + auditId);
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "审核记录不存在：" + auditId);
         }
 
         // 2) 先转成直接字段（含 auditStatus 口径统一）
@@ -310,13 +326,15 @@ public class AuditServiceImpl implements AuditService {
 
     @Override
     public AuditTaskVO contentDetail(String targetType, Long targetId) {
+        permissionChecker.requireAdmin();
+
         // 1) 按类型分流，取内容全文与提交人；同时把业务表里的 audit_status 带出来
         //    （审核员可能点开一条已审过的内容，所以状态不能硬编码成"待审核"）
         AuditTaskVO vo = switch (targetType) {
             case TYPE_PRODUCT -> {
                 Product product = productMapper.selectById(targetId);
                 if (product == null) {
-                    throw new RuntimeException("商品不存在：" + targetId);
+                    throw new BizException(ResultCode.NOT_FOUND.getCode(), "商品不存在：" + targetId);
                 }
                 AuditTaskVO item = newPendingVO(TYPE_PRODUCT, product.getProductId(),
                         product.getProductName(), product.getSellerId(), product.getCreateTime());
@@ -327,7 +345,7 @@ public class AuditServiceImpl implements AuditService {
             case TYPE_KNOWLEDGE -> {
                 Knowledge knowledge = knowledgeMapper.selectById(targetId);
                 if (knowledge == null) {
-                    throw new RuntimeException("知识不存在：" + targetId);
+                    throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在：" + targetId);
                 }
                 AuditTaskVO item = newPendingVO(TYPE_KNOWLEDGE, knowledge.getKnowledgeId(),
                         knowledge.getTitle(), knowledge.getAuthorId(), knowledge.getCreateTime());
@@ -338,7 +356,7 @@ public class AuditServiceImpl implements AuditService {
             case TYPE_COMMENT -> {
                 Comment comment = commentMapper.selectById(targetId);
                 if (comment == null) {
-                    throw new RuntimeException("评论不存在：" + targetId);
+                    throw new BizException(ResultCode.NOT_FOUND.getCode(), "评论不存在：" + targetId);
                 }
                 AuditTaskVO item = newPendingVO(TYPE_COMMENT, comment.getCommentId(),
                         summarize(comment.getContent()), comment.getUserId(), comment.getCreateTime());
@@ -346,7 +364,7 @@ public class AuditServiceImpl implements AuditService {
                 item.setAuditStatus(comment.getAuditStatus());
                 yield item;
             }
-            default -> throw new IllegalArgumentException("内容类型不合法：" + targetType);
+            default -> throw new BizException(ResultCode.BAD_REQUEST.getCode(), "内容类型不合法：" + targetType);
         };
 
         // 2) 挂上最近一次审核记录（该内容可能从未被审过，此时 latest 为 null，属正常情况）
@@ -384,6 +402,8 @@ public class AuditServiceImpl implements AuditService {
 
     @Override
     public List<AuditTaskVO> listAuditLogs(String targetType, Long targetId) {
+        permissionChecker.requireAdmin();
+
         // 1) 构造条件构造器
         LambdaQueryWrapper<AuditRecord> wrapper = new LambdaQueryWrapper<>();
 

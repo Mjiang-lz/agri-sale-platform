@@ -41,7 +41,7 @@ public interface AuditService {
     /**
      * 我已审核的记录列表，按审核时间倒序。
      *
-     * @param auditorId  审核员 ID（鉴权未完成前由 Controller 传入）
+     * @param auditorId  审核员 ID，取自登录态（UserContext.currentUserId()），不接受客户端传入
      * @param targetType 内容类型；为空表示不限类型
      */
     IPage<AuditTaskVO> pageMyAudits(Long auditorId, String targetType, long pageNum, long pageSize);
