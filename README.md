@@ -72,15 +72,28 @@ agri-sale-platform/
 # 1. 建库建表
 mysql -uroot -p < backend/src/main/resources/db/schema.sql
 
-# 2. 修改数据源（backend/src/main/resources/application-dev.yml）
+# 2. 灌演示数据（含 9 个演示账号。不跑这步库里没有账号，登录会一直失败）
+mysql -uroot -p < backend/src/main/resources/db/data.sql
 
-# 3. 启动
+# 3. 修改数据源（backend/src/main/resources/application-dev.yml）
+#    默认用户名密码都是 root，本机 MySQL 若不是这个就改这里
+
+# 4. 启动
 cd backend
 export JAVA_HOME=/path/to/jdk-17
 mvn spring-boot:run
 ```
 
+> ⚠️ **第 1、2 步的顺序不能反。** 先结构后数据，反过来跑 `data.sql` 第一条就会报表不存在。
+>
+> ⚠️ **`schema.sql` 是破坏性脚本**（每张表都是 `DROP TABLE` + `CREATE TABLE`，会清空数据），
+> 只在**首次搭环境**或**本地数据可以丢**时用。
+> 已经录了演示数据的库要更新结构，请改用 `db/migrations/` 下的增量脚本 —— 详见
+> `backend/src/main/resources/db/README.md`。
+
 服务默认监听 `http://localhost:8080/api`。
+（若本机 8080 已被别的项目占用，可加 `-Dspring-boot.run.arguments=--server.port=18080` 换端口，
+注意同时改 `frontend-web/vite.config.*` 里的代理地址。）
 
 ### 前端
 
@@ -105,4 +118,11 @@ npm run dev
 骨架已就绪：目录结构、实体映射、建表脚本、统一返回与异常处理、JWT 认证链路均已打通，
 `service.impl` 中各业务方法留有 `TODO`，按功能点逐个补齐即可。
 
-第三方支付与短信服务为**模拟通道**，不涉及真实资金。test
+**已完成**：M1 登录 / 注册后端（`AuthServiceImpl`：手机号唯一校验、BCrypt 加密入库、JWT 签发、
+角色白名单）；M2 农产品交易；M2 求购需求；M4 融资服务部分接口。
+
+**未完成**：M1 个人资料（`UserServiceImpl.getProfile` 仍是 `TODO`）、M1 前端登录页；
+`config/WebMvcConfig.java` 中 `/trade/cart/**`、`/trade/order`、`/demand/**` 仍处于
+**"临时放开鉴权"** 状态，M1 鉴权收口后需一并移除。
+
+第三方支付与短信服务为**模拟通道**，不涉及真实资金。

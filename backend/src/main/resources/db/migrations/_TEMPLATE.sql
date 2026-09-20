@@ -13,6 +13,10 @@
 --       并在提交前先在自己的本地库上执行通过。
 -- ===========================================================================
 
+-- 显式指定目标库：这样 `mysql < 文件` 和 `mysql rxt < 文件` 两种执行方式都能跑通。
+-- （schema.sql / data.sql 也是这么做的，保持一致，避免踩 1046 No database selected）
+USE `rxt`;
+
 -- 示例一 · 加字段（必须给 DEFAULT 或允许 NULL，否则已有数据会导致失败）
 -- ALTER TABLE `t_audit`
 --   ADD COLUMN `remark` VARCHAR(255) NULL COMMENT '审核备注' AFTER `audit_time`;
