@@ -2,41 +2,40 @@ package com.rxt.controller;
 
 import com.rxt.common.Result;
 import com.rxt.entity.Knowledge;
-import com.rxt.security.UserContext;
 import com.rxt.service.ExpertService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import com.rxt.security.UserContext; // 按你实际的导包路径为准
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 专家助力接口。基础路径 /api/expert。
- */
 @RestController
-@RequestMapping("/expert")
-@RequiredArgsConstructor
+@RequestMapping("/api/expert")
 public class ExpertController {
 
-    private final ExpertService expertService;
+    @Autowired
+    private ExpertService expertService;
 
-    /**
-     * 按分类查询农业知识。
-     */
-    @GetMapping("/knowledge")
+    @GetMapping("/knowledge/list")
     public Result<List<Knowledge>> listKnowledge(@RequestParam(required = false) String category) {
         return Result.success(expertService.listKnowledge(category));
     }
 
-    /**
-     * 向专家提问。expertId 为空表示公开提问，任何专家可认领。
-     */
-    @PostMapping("/question")
-    public Result<Long> askQuestion(@RequestParam(required = false) Long expertId,
-                                    @RequestParam String content) {
-        return Result.success(expertService.askQuestion(UserContext.currentUserId(), expertId, content));
+    @PostMapping("/ask")
+    public Result<Long> ask(@RequestParam Long expertId, @RequestParam String content) {
+        Long askerId = UserContext.currentUserId();
+        Long questionId = expertService.askQuestion(askerId, expertId, content);
+        return Result.success(questionId);
+    }
+
+    @PostMapping("/appointment/submit")
+    public Result<Long> submit(@RequestParam Long expertId,
+                               @RequestParam String apptTime,
+                               @RequestParam String topic) {
+        Long farmerId = UserContext.currentUserId();
+        LocalDateTime time = LocalDateTime.parse(apptTime);
+        Long apptId = expertService.makeAppointment(farmerId, expertId, time, topic);
+        return Result.success(apptId);
     }
 }
