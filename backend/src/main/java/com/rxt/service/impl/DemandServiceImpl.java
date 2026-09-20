@@ -3,6 +3,7 @@ package com.rxt.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.rxt.common.BizException;
 import com.rxt.dto.DemandPublishDTO;
 import com.rxt.entity.Demand;
 import com.rxt.mapper.DemandMapper;
@@ -63,7 +64,7 @@ public class DemandServiceImpl implements DemandService {
     public DemandVO detail(Long demandId) {
         Demand demand = demandMapper.selectById(demandId);
         if (demand == null) {
-            throw new RuntimeException("求购需求不存在");
+            throw new BizException("求购需求不存在");
         }
         return convertToDemandVO(demand);
     }
@@ -72,10 +73,10 @@ public class DemandServiceImpl implements DemandService {
     public void updateDemand(Long publisherId, Long demandId, DemandPublishDTO dto) {
         Demand demand = demandMapper.selectById(demandId);
         if (demand == null) {
-            throw new RuntimeException("求购需求不存在");
+            throw new BizException("求购需求不存在");
         }
         if (!demand.getPublisherId().equals(publisherId)) {
-            throw new RuntimeException("无权修改他人发布的需求");
+            throw new BizException("无权修改他人发布的需求");
         }
         demand.setCategory(dto.getCategory());
         demand.setQuantity(dto.getQuantity());
@@ -92,10 +93,10 @@ public class DemandServiceImpl implements DemandService {
     public void closeDemand(Long publisherId, Long demandId) {
         Demand demand = demandMapper.selectById(demandId);
         if (demand == null) {
-            throw new RuntimeException("求购需求不存在");
+            throw new BizException("求购需求不存在");
         }
         if (!demand.getPublisherId().equals(publisherId)) {
-            throw new RuntimeException("无权关闭他人发布的需求");
+            throw new BizException("无权关闭他人发布的需求");
         }
         demand.setStatus(0);
         demandMapper.updateById(demand);

@@ -3,6 +3,7 @@ package com.rxt.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.rxt.common.BizException;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.entity.Cart;
 import com.rxt.entity.Order;
@@ -69,11 +70,11 @@ public class TradeServiceImpl implements TradeService {
         // 1. 校验商品：必须存在、已通过审核、已上架
         Product product = productMapper.selectById(productId);
         if (product == null || !"已通过".equals(product.getAuditStatus()) || product.getStatus() != 1) {
-            throw new RuntimeException("商品不存在或已下架");
+            throw new BizException("商品不存在或已下架");
         }
         // 2. 校验库存是否足够
         if (product.getStock() < quantity) {
-            throw new RuntimeException("库存不足");
+            throw new BizException("库存不足");
         }
         // 3. 计算本条购物车的金额（单价 × 数量，用 BigDecimal 避免精度丢失）
         BigDecimal unitPrice = product.getPrice();
@@ -106,11 +107,11 @@ public class TradeServiceImpl implements TradeService {
         // 1. 校验商品：存在、已通过、已上架
         Product product = productMapper.selectById(dto.getProductId());
         if (product == null || !"已通过".equals(product.getAuditStatus()) || product.getStatus() != 1) {
-            throw new RuntimeException("商品不存在或已下架");
+            throw new BizException("商品不存在或已下架");
         }
         // 2. 校验库存
         if (product.getStock() < dto.getQuantity()) {
-            throw new RuntimeException("库存不足");
+            throw new BizException("库存不足");
         }
 
         // 3. 扣减库存（在同一事务里，报错会自动回滚）
@@ -153,12 +154,12 @@ public class TradeServiceImpl implements TradeService {
     public void updateCartQuantity(Long buyerId, Long cartId, Integer quantity) {
         // 1. 参数校验
         if (quantity == null || quantity < 0) {
-            throw new RuntimeException("数量不能为负数");
+            throw new BizException("数量不能为负数");
         }
         // 2. 校验条目归属：只能改自己的购物车
         Cart cart = cartMapper.selectById(cartId);
         if (cart == null || !Objects.equals(cart.getBuyerId(), buyerId)) {
-            throw new RuntimeException("购物车条目不存在");
+            throw new BizException("购物车条目不存在");
         }
         // 3. 数量为 0 视为删除该条目
         if (quantity == 0) {
@@ -168,10 +169,10 @@ public class TradeServiceImpl implements TradeService {
         // 4. 校验商品状态与库存
         Product product = productMapper.selectById(cart.getProductId());
         if (product == null || !"已通过".equals(product.getAuditStatus()) || product.getStatus() != 1) {
-            throw new RuntimeException("商品不存在或已下架");
+            throw new BizException("商品不存在或已下架");
         }
         if (product.getStock() < quantity) {
-            throw new RuntimeException("库存不足，当前仅剩 " + product.getStock());
+            throw new BizException("库存不足，当前仅剩 " + product.getStock());
         }
         // 5. 更新数量并按商品当前价重算小计（价格以商品表为准，购物车不锁价）
         cart.setQuantity(quantity);
@@ -184,7 +185,7 @@ public class TradeServiceImpl implements TradeService {
         // 1. 校验归属：只能删自己的购物车条目
         Cart cart = cartMapper.selectById(cartId);
         if (cart == null || !Objects.equals(cart.getBuyerId(), buyerId)) {
-            throw new RuntimeException("购物车条目不存在");
+            throw new BizException("购物车条目不存在");
         }
         // 2. 删除
         cartMapper.deleteById(cartId);
@@ -212,7 +213,7 @@ public class TradeServiceImpl implements TradeService {
         // 1. 校验归属：只能看自己的订单
         Order order = orderMapper.selectById(orderId);
         if (order == null || !Objects.equals(order.getBuyerId(), buyerId)) {
-            throw new RuntimeException("订单不存在");
+            throw new BizException("订单不存在");
         }
         return convertToOrderVO(order);
     }
@@ -223,15 +224,15 @@ public class TradeServiceImpl implements TradeService {
         // 1. 校验归属：只能取消自己的订单
         Order order = orderMapper.selectById(orderId);
         if (order == null || !Objects.equals(order.getBuyerId(), buyerId)) {
-            throw new RuntimeException("订单不存在");
+            throw new BizException("订单不存在");
         }
         // 2. 校验状态：已发货/已收货/已完成/已取消都不能再取消
         String status = order.getOrderStatus();
         if ("已取消".equals(status)) {
-            throw new RuntimeException("订单已取消，请勿重复操作");
+            throw new BizException("订单已取消，请勿重复操作");
         }
         if ("待收货".equals(status) || "已完成".equals(status)) {
-            throw new RuntimeException("订单已发货，无法取消，请联系卖家");
+            throw new BizException("订单已发货，无法取消，请联系卖家");
         }
         // 3. 回滚库存（下单时扣了多少就还多少，与状态更新在同一事务里）
         Product product = productMapper.selectById(order.getProductId());
