@@ -1,6 +1,9 @@
 package com.rxt.security;
 
+import com.rxt.config.FileStorageProperties;
+import com.rxt.storage.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.PathContainer;
@@ -62,9 +65,9 @@ public class PublicEndpoints {
     }
 
     /**
-     * 白名单规则表。改这里就是改攻击面，改动请连同 README 的接口约定一起更新。
+     * 与存储实现无关的固定规则。改这里就是改攻击面，改动请连同 README 的接口约定一起更新。
      */
-    private static final List<Rule> RULES = List.of(
+    private static final List<Rule> BASE_RULES = List.of(
             // —— 认证：未登录也必须能访问，否则无法登录 ——
             // 只放行 POST。登录/注册都是写操作，没有 GET 的必要。
             rule(HttpMethod.POST.name(), "/auth/login"),
@@ -81,6 +84,33 @@ public class PublicEndpoints {
             rule(null, "/error")
     );
 
+    /** 实际生效的规则表 = 上面那张固定表 + 随存储实现启用的规则 */
+    private final List<Rule> rules;
+
+    /**
+     * 构造时组装规则表。
+     *
+     * <p><b>本地文件访问规则为什么要跟着 {@code rxt.obs.enabled} 一起开关：</b>
+     * 只有 {@code enabled=false}（本地兜底模式）时，后端才真正提供 {@code /files/**} 这个
+     * 路径 —— 对应的资源映射见 {@link com.rxt.config.WebResourceConfig}。
+     * 若不管开关一律放行，OBS 模式下白名单里就会常驻一条「永远没有内容、但攻击面照算」的规则。
+     * 白名单是攻击面，不是便利开关，宁可少一条。两边读同一个配置值，
+     * 也就不会出现「放行了却没内容」或「有内容却访问不了」的错位。</p>
+     *
+     * <p><b>只放行 GET：</b>上传走 {@code POST /common/upload}，是写操作，仍然要求登录。</p>
+     */
+    public PublicEndpoints(FileStorageProperties fileStorageProperties) {
+        List<Rule> merged = new ArrayList<>(BASE_RULES);
+        if (!fileStorageProperties.isEnabled()) {
+            // 上传产物（商品图片 / 知识配图 / 头像）是公开内容：游客本就能浏览商品列表
+            // （GET /trade/products 早已放行），图片却要登录才能看是自相矛盾的。
+            // OBS 模式下图片 URL 直接指向对象存储、同样公网可读；
+            // 本地兜底保持一致的可见性，两种环境的行为才不会分裂。
+            merged.add(rule(HttpMethod.GET.name(), FileStorageService.LOCAL_PATH_PATTERN + "/**"));
+        }
+        this.rules = List.copyOf(merged);
+    }
+
     /**
      * 该请求是否命中白名单。
      *
@@ -90,7 +120,7 @@ public class PublicEndpoints {
     public boolean isPublic(HttpServletRequest request) {
         PathContainer path = PathContainer.parsePath(pathWithinApplication(request));
         String method = request.getMethod();
-        for (Rule r : RULES) {
+        for (Rule r : rules) {
             if (r.matches(method, path)) {
                 return true;
             }
