@@ -1,6 +1,8 @@
 package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.rxt.common.BizException;
+import com.rxt.common.ResultCode;
 import com.rxt.entity.Knowledge;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.service.KnowledgeService;
@@ -27,7 +29,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     public Knowledge getDetail(Long id) {
-
-        return knowledgeMapper.selectById(id);
+        Knowledge k = knowledgeMapper.selectOne(new LambdaQueryWrapper<Knowledge>()
+                .eq(Knowledge::getKnowledgeId, id)
+                .eq(Knowledge::getAuditStatus, "已通过"));
+        if (k == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在或未通过审核");
+        }
+        return k;
     }
 }
