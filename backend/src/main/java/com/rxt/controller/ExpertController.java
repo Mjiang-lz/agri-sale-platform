@@ -25,7 +25,7 @@ public class ExpertController {
 
     @PostMapping("/appointment/submit")
     public Result<Long> submit(@RequestBody @Valid AppointmentDTO dto) {
-        permissionChecker.requireRole(RoleConstant.FARMER)
+        permissionChecker.requireRole(RoleConstant.FARMER);
         Long farmerId = UserContext.currentUserId();
         Long apptId = expertService.makeAppointment(farmerId, dto);
         return Result.success(apptId);
