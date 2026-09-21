@@ -2,7 +2,7 @@
   <el-card shadow="never">
     <template #header>评论审核</template>
     <el-empty description="页面待开发，接口位置见下方说明" />
-    <p class="hint">对应后端接口：POST /api/admin/audit/comment</p>
+    <p class="hint">对应后端接口：GET /api/audit/pending?targetType=COMMENT（内容详情 GET、提交结论 POST 均为 /api/audit/content/COMMENT/{targetId}）；完整约定见 docs/接口约定-M6内容审核.md</p>
   </el-card>
 </template>
 
