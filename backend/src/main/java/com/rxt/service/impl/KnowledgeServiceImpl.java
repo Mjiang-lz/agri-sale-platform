@@ -1,6 +1,7 @@
 package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
 import com.rxt.entity.Knowledge;
@@ -17,14 +18,18 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private KnowledgeMapper knowledgeMapper;
 
     @Override
-    public List<Knowledge> listByCategory(String category) {
+    public Page<Knowledge> pageQuery(String category, String keyword, Integer page, Integer size) {
         LambdaQueryWrapper<Knowledge> wrapper = new LambdaQueryWrapper<>();
         if (category != null && !category.isEmpty()) {
             wrapper.eq(Knowledge::getCategory, category);
         }
-        wrapper.eq(Knowledge::getAuditStatus, "已通过");
-        wrapper.orderByDesc(Knowledge::getCreateTime);
-        return knowledgeMapper.selectList(wrapper);
+        if (keyword != null && !keyword.isEmpty()) {
+            wrapper.and(w -> w.like(Knowledge::getTitle, keyword)
+                    .or().like(Knowledge::getContent, keyword));
+        }
+        wrapper.eq(Knowledge::getAuditStatus, "已通过")
+                .orderByDesc(Knowledge::getCreateTime);
+        return knowledgeMapper.selectPage(new Page<>(page, size), wrapper);
     }
 
     @Override
