@@ -2,7 +2,7 @@
   <el-card shadow="never">
     <template #header>用户管理</template>
     <el-empty description="页面待开发，接口位置见下方说明" />
-    <p class="hint">对应后端接口：GET /api/user/list</p>
+    <p class="hint">对应后端接口：GET /api/admin/users（启停用 PUT /api/admin/users/{userId}/status，改角色 PUT /api/admin/users/{userId}/role，角色下拉 GET /api/admin/roles）</p>
   </el-card>
 </template>
 

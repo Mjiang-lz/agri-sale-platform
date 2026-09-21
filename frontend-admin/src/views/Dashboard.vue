@@ -2,7 +2,7 @@
   <el-card shadow="never">
     <template #header>仪表盘</template>
     <el-empty description="页面待开发，接口位置见下方说明" />
-    <p class="hint">对应后端接口：GET /api/loan-admin/statistics</p>
+    <p class="hint">对应后端接口：GET /api/admin/dashboard/statistics</p>
   </el-card>
 </template>
 
