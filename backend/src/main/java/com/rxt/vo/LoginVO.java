@@ -26,4 +26,15 @@ public class LoginVO implements Serializable {
 
     /** 角色名称，前端据此渲染菜单 */
     private String roleName;
+
+    /** 角色主键 */
+    private Long roleId;
+
+    /**
+     * 菜单权限标识集合（英文逗号分隔），取自 t_role.menu_perms。
+     *
+     * <p>前端按此渲染侧边栏，实现「不同角色看到的菜单不同」。
+     * 仅供展示，不构成安全边界 —— 真正的越权判定始终在后端服务层。</p>
+     */
+    private String menuPerms;
 }

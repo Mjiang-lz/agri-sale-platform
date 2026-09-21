@@ -1,7 +1,9 @@
 package com.rxt.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.Result;
 import com.rxt.dto.FinanceApplyDTO;
+import com.rxt.entity.FinanceApply;
 import com.rxt.security.UserContext;
 import com.rxt.service.FinanceApplyService;
 import com.rxt.vo.UserVO;
@@ -12,7 +14,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
-@RequestMapping("/finance-other")
+@RequestMapping("/finance")
 public class FinanceApplyController {
     @Autowired
     private FinanceApplyService financeApplyService;
@@ -31,12 +33,11 @@ public class FinanceApplyController {
         Long userId = UserContext.currentUserId();
         return Result.success(financeApplyService.recommendGuarantors(userId));
     }
-    @PostMapping("/bank/approve")
-    public Result<Void> bankApprove(@RequestParam Long applyId,
-                                    @RequestParam String approvalResult,
-                                    @RequestParam(required = false) BigDecimal loanAmount,
-                                    @RequestParam(required = false) String approvalOpinion) {
-        financeApplyService.bankApprove(applyId, approvalResult, loanAmount, approvalOpinion);
-        return Result.success();
+    @GetMapping("/apply/my")
+    public Result<Page<FinanceApply>> myApplies(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size) {
+        return Result.success(
+                financeApplyService.getMyApply(UserContext.currentUserId(), page, size));
     }
 }
