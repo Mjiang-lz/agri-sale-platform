@@ -20,6 +20,10 @@ public class ProductVO implements Serializable {
     private Integer stock;
     private String unit;
     private String imageUrl;
+
+    /** 产地（到市，如 江西赣州）。列表页展示并提供给前端做筛选回显 */
+    private String origin;
+
     private Long sellerId;
     private String auditStatus;
     private Integer status;

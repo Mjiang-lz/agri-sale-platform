@@ -3,6 +3,7 @@ package com.rxt.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -27,5 +28,6 @@ public class LoanApproveDTO {
     private BigDecimal loanAmount;
 
     /** 审批意见；不通过时必填 */
+    @Size(max = 200, message = "审批意见不能超过 200 字")
     private String approvalOpinion;
 }
