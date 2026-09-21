@@ -21,6 +21,8 @@ public class CorsConfig {
         config.addAllowedMethod("*");
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
+        // 让前端能读到链路标识，报错时可直接把 X-Trace-Id 交给后端定位
+        config.addExposedHeader("X-Trace-Id");
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

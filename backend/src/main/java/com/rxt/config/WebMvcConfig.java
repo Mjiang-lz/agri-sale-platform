@@ -1,5 +1,6 @@
 package com.rxt.config;
 
+import com.rxt.common.PageParamInterceptor;
 import com.rxt.security.LoginInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +25,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final LoginInterceptor loginInterceptor;
 
+    private final PageParamInterceptor pageParamInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(loginInterceptor)
@@ -41,5 +44,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         // —— 框架内部 ——
                         "/error"
                 );
+
+        // 分页参数下界校验。注册在登录拦截器之后：未登录的请求应先拿到 401，
+        // 而不是先被告知分页参数有误。详见 PageParamInterceptor 的类注释。
+        registry.addInterceptor(pageParamInterceptor)
+                .addPathPatterns("/**");
     }
 }
