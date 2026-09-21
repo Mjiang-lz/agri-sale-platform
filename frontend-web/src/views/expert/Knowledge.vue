@@ -7,8 +7,8 @@
         <p>按分类和关键词检索平台已审核通过的种植、养殖、病虫害防治、市场行情与政策知识。</p>
       </div>
       <div class="hero-stat">
-        <strong>{{ total }}</strong>
-        <span>条已审核知识</span>
+        <strong>{{ filteredList.length }}</strong>
+        <span>{{ filteredList.length === totalApproved ? '条已审核知识' : `条结果 / 全部 ${totalApproved} 条` }}</span>
       </div>
     </div>
 
@@ -34,19 +34,18 @@
 
       <div v-loading="loading" class="knowledge-grid">
         <article v-for="item in pagedList" :key="item.knowledgeId" class="knowledge-item" @click="openDetail(item)">
-          <div class="cover" :class="coverClass(item.knowledgeId)">
+          <div class="cover" :class="coverClass(item.category)">
             <span>{{ item.category }}</span>
             <strong>{{ (item.title || '农业知识').slice(0, 2) }}</strong>
           </div>
           <div class="item-body">
             <div class="meta">
-              <span>{{ formatDateTime(item.createTime) }}</span>
-              <span>{{ item.viewCount || 0 }} 次浏览</span>
+              <span>发布时间：{{ formatDateTime(item.createTime) }}</span>
             </div>
             <h3>{{ item.title }}</h3>
             <p>{{ summary(item.content) }}</p>
             <div class="item-footer">
-              <span>发布专家 ID：{{ item.authorId }}</span>
+              <span class="verified">平台审核通过</span>
               <el-button link type="primary">阅读全文</el-button>
             </div>
           </div>
@@ -66,7 +65,6 @@
           <h2 class="detail-title">{{ detail.title }}</h2>
           <div class="detail-meta">
             <span>发布时间：{{ formatDateTime(detail.createTime) }}</span>
-            <span>浏览：{{ detail.viewCount || 0 }}</span>
           </div>
           <el-image v-if="detail.imageUrl" class="detail-image" :src="detail.imageUrl" fit="cover" />
           <el-divider />
@@ -98,6 +96,7 @@ const knowledgeList = ref([])
 const detail = ref(null)
 const category = ref('全部')
 const keyword = ref('')
+const totalApproved = ref(0)
 const page = ref(1)
 const pageSize = ref(6)
 const categories = ['全部', '种植技术', '养殖技术', '病虫害防治', '市场行情', '政策解读']
@@ -129,22 +128,24 @@ const pagedList = computed(() => {
 
 /**
  * 从本地后端读取 rxt.t_knowledge 数据。
- * 分类筛选直接请求后端；页面再按审核状态过滤，只展示“已通过”的知识。
+ * 首次加载读取全部已通过知识，分类和关键词在内存中筛选，避免分类切换重复请求。
  * 演示数据只有 VITE_USE_DEMO=true 时才会启用，并显示顶部提示。
  */
 async function loadList() {
   loading.value = true
   demoMode.value = false
   try {
-    const data = await getKnowledgeList(category.value)
+    const data = await getKnowledgeList()
     const list = Array.isArray(data) ? data : data?.records || []
     knowledgeList.value = list.filter((item) => item.auditStatus === '已通过')
     if (!knowledgeList.value.length && useDemo) {
       knowledgeList.value = demoKnowledge()
       demoMode.value = true
     }
+    totalApproved.value = knowledgeList.value.length
   } catch {
     knowledgeList.value = useDemo ? demoKnowledge() : []
+    totalApproved.value = knowledgeList.value.length
     if (useDemo) demoMode.value = true
   } finally {
     loading.value = false
@@ -153,8 +154,6 @@ async function loadList() {
 
 function handleCategoryChange() {
   page.value = 1
-  demoMode.value = false
-  loadList()
 }
 
 async function openDetail(item) {
@@ -171,12 +170,20 @@ async function openDetail(item) {
   }
 }
 
-function coverClass(id) {
-  return `cover-${Number(id || 0) % 4}`
+function coverClass(categoryName) {
+  const coverIndex = {
+    '种植技术': 0,
+    '养殖技术': 1,
+    '病虫害防治': 2,
+    '市场行情': 3,
+    '政策解读': 4
+  }[categoryName] ?? 0
+  return `cover-${coverIndex % 5}`
 }
 
 function summary(value) {
-  return `${String(value || '').replace(/\s+/g, ' ').slice(0, 100)}...`
+  const content = String(value || '').replace(/\s+/g, ' ')
+  return content.length > 100 ? `${content.slice(0, 100)}...` : content
 }
 
 function formatDateTime(value) {
@@ -206,6 +213,7 @@ onMounted(loadList)
 .cover-1 { background: linear-gradient(135deg, #91602a, #d4a164); }
 .cover-2 { background: linear-gradient(135deg, #2c6679, #78adba); }
 .cover-3 { background: linear-gradient(135deg, #674b7d, #a991ba); }
+.cover-4 { background: linear-gradient(135deg, #8b5b24, #c8a15d); }
 .cover span { padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,.18); font-size: 12px; }
 .cover strong { align-self: flex-end; font-size: 32px; opacity: .25; }
 .item-body { padding: 15px; }
@@ -213,6 +221,7 @@ onMounted(loadList)
 .item-body h3 { min-height: 46px; margin: 12px 0 8px; font-size: 16px; line-height: 1.45; }
 .item-body p { min-height: 64px; margin: 0; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.65; }
 .item-footer { align-items: center; margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--el-border-color-lighter); }
+.verified { color: var(--el-color-success); }
 .pagination { display: flex; justify-content: center; padding-top: 22px; }
 .detail-title { margin: 14px 0 10px; line-height: 1.45; }
 .detail-meta { display: flex; gap: 20px; color: var(--el-text-color-secondary); font-size: 13px; }
