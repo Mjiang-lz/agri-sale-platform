@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/finance")
+@RequestMapping("/finance-other")
 public class FinanceApplyController {
     @Autowired
     private FinanceApplyService financeApplyService;

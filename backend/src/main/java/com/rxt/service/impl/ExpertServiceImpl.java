@@ -1,5 +1,9 @@
 package com.rxt.service.impl;
 
+import com.rxt.dto.AppointmentDTO;
+import com.rxt.entity.ExpertInfo;
+import com.rxt.mapper.ExpertInfoMapper;
+import org.springframework.transaction.annotation.Transactional;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.rxt.entity.Appointment;
 import com.rxt.entity.Knowledge;
@@ -20,6 +24,7 @@ public class ExpertServiceImpl implements ExpertService {
     @Autowired private KnowledgeMapper knowledgeMapper;
     @Autowired private QuestionMapper questionMapper;
     @Autowired private AppointmentMapper appointmentMapper;
+    @Autowired private ExpertInfoMapper expertInfoMapper;
 
     @Override
     public List<Knowledge> listKnowledge(String category) {
@@ -27,6 +32,7 @@ public class ExpertServiceImpl implements ExpertService {
         if (category != null && !category.isEmpty()) {
             wrapper.eq(Knowledge::getCategory, category);
         }
+        wrapper.eq(Knowledge::getAuditStatus, "已通过");
         wrapper.orderByDesc(Knowledge::getCreateTime);
         return knowledgeMapper.selectList(wrapper);
     }
@@ -44,12 +50,19 @@ public class ExpertServiceImpl implements ExpertService {
     }
 
     @Override
-    public Long makeAppointment(Long farmerId, Long expertId, LocalDateTime apptTime, String topic) {
+    @Transactional(rollbackFor = Exception.class)
+    public Long makeAppointment(Long farmerId, AppointmentDTO dto) {
+        ExpertInfo expert = expertInfoMapper.selectById(dto.getExpertId());
+        if (expert == null) {
+            throw new RuntimeException("专家不存在");
+        }
+
         Appointment app = new Appointment();
         app.setFarmerId(farmerId);
-        app.setExpertId(expertId);
-        app.setApptTime(apptTime);
-        app.setApptTopic(topic);
+        app.setExpertId(dto.getExpertId());
+        app.setApptTime(dto.getApptTime());
+        app.setApptTopic(dto.getApptTopic());
+        app.setRemark(dto.getRemark());
         app.setApptStatus("待处理");
         appointmentMapper.insert(app);
         return app.getApptId();

@@ -1,12 +1,22 @@
 package com.rxt.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
 public class AppointmentDTO {
-    private Long expertId;           // 预约哪位专家
-    private LocalDateTime apptTime;  // 预约时间
-    private String apptTopic;        // 咨询主题
-    private String remark;           // 备注
+    @NotNull(message = "expertId 不能为空")
+    private Long expertId;
+
+    @NotNull(message = "预约时间不能为空")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime apptTime;
+
+    @NotBlank(message = "咨询主题不能为空")
+    private String apptTopic;
+
+    private String remark;
 }

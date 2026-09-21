@@ -20,7 +20,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (category != null && !category.isEmpty()) {
             wrapper.eq(Knowledge::getCategory, category);
         }
-
+        wrapper.eq(Knowledge::getAuditStatus, "已通过");
         wrapper.orderByDesc(Knowledge::getCreateTime);
         return knowledgeMapper.selectList(wrapper);
     }

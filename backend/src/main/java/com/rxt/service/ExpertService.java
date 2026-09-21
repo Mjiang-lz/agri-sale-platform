@@ -3,6 +3,7 @@ package com.rxt.service;
 import com.rxt.entity.Knowledge;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.rxt.dto.AppointmentDTO;
 
 /**
  * 专家助力模块业务接口。
@@ -24,6 +25,6 @@ public interface ExpertService {
     /**
      * 预约专家。
      */
-    Long makeAppointment(Long farmerId, Long expertId, LocalDateTime apptTime, String topic);
+    Long makeAppointment(Long farmerId, AppointmentDTO dto);
 
 }
