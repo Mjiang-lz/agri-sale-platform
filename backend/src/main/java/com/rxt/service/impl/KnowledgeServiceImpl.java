@@ -29,6 +29,14 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         }
         wrapper.eq(Knowledge::getAuditStatus, "已通过")
                 .orderByDesc(Knowledge::getCreateTime);
+
+        // B2 修复：不传分页参数时返回全量，兼容前端内存切片
+        if (page == null || size == null) {
+            List<Knowledge> list = knowledgeMapper.selectList(wrapper);
+            Page<Knowledge> allPage = new Page<>(1, list.size());
+            allPage.setRecords(list);
+            return allPage;
+        }
         return knowledgeMapper.selectPage(new Page<>(page, size), wrapper);
     }
 

@@ -12,7 +12,7 @@ public class AppointmentDTO {
     private Long expertId;
 
     @NotNull(message = "预约时间不能为空")
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd[' ']['T']HH:mm:ss")
     private LocalDateTime apptTime;
 
     @NotBlank(message = "咨询主题不能为空")

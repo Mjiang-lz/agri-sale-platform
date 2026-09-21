@@ -20,8 +20,8 @@ public class KnowledgeController {
     public Result<Page<Knowledge>> list(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
-            @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "10") Integer size) {
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
         return Result.success(knowledgeService.pageQuery(category, keyword, page, size));
     }
 
