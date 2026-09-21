@@ -6,7 +6,10 @@
         <h2>我的融资</h2>
         <p>查看融资申请、联合小组、银行审批和放款进度。点击“查看进度”可展开完整时间轴。</p>
       </div>
-      <el-button :loading="loading" @click="loadApplies">刷新进度</el-button>
+      <div class="head-actions">
+        <el-tag v-if="demoMode" type="warning" effect="dark">演示数据</el-tag>
+        <el-button :loading="loading" @click="loadApplies">刷新进度</el-button>
+      </div>
     </div>
 
     <el-card shadow="never" class="table-card">
@@ -68,7 +71,7 @@
           <el-descriptions-item v-if="currentApply.applyPurpose" label="资金用途" :span="2">{{ currentApply.applyPurpose }}</el-descriptions-item>
         </el-descriptions>
 
-        <div class="timeline-title">审批节点</div>
+        <div class="timeline-title">状态进度时间轴（按申请状态生成）</div>
         <el-timeline>
           <el-timeline-item
             v-for="item in getTimeline(currentApply.applyStatus)"
@@ -88,17 +91,19 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { getMyFinanceApplies } from '@/api/financeP5'
+import { getMyFinanceApplies } from '@/api/finance'
 
 /**
  * 页面用途：我的融资。
- * 接口文件：frontend-web/src/api/financeP5.js
+ * 接口文件：frontend-web/src/api/finance.js
  * 主要接口：GET /api/finance/apply/my
  *
  * 后端 FinanceApplyVO 返回：
  * applyId、applyNo、applyAmount、applyTerm、applyStatus、applyTime。
- * 如果后端列表还是空实现，页面会使用同结构演示数据，便于单独检查前端布局。
+ * 默认只展示真实接口结果；只有 VITE_USE_DEMO=true 时才允许回退到演示数据。
  */
+const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
+const demoMode = ref(false)
 const loading = ref(false)
 const activeStatus = ref('全部')
 const keyword = ref('')
@@ -122,8 +127,8 @@ const filteredApplies = computed(() => {
   return applies.value.filter((item) => {
     const statusMatch = {
       '全部': true,
-      '待匹配': item.applyStatus === '待匹配',
-      '进行中': ['已组建小组', '已推送银行', '待审核'].includes(item.applyStatus),
+      '待匹配': ['待匹配', '待审核'].includes(item.applyStatus),
+      '进行中': ['已组建小组', '已推送银行'].includes(item.applyStatus),
       '已完成': ['审批通过', '已放款'].includes(item.applyStatus),
       '未通过': ['审批未通过', '已驳回', '未通过'].includes(item.applyStatus)
     }[activeStatus.value]
@@ -140,12 +145,16 @@ function normalizeList(data) {
 async function loadApplies() {
   loading.value = true
   try {
-    const data = await getMyFinanceApplies()
+    const data = await getMyFinanceApplies(1, 100)
     applies.value = normalizeList(data)
-    if (!applies.value.length) applies.value = demoApplies()
+    if (!applies.value.length && useDemo) {
+      applies.value = demoApplies()
+      demoMode.value = true
+    }
   } catch {
-    // 后端接口未启动时仍展示演示数据；正式联调成功后这里会自动使用真实结果。
-    applies.value = demoApplies()
+    // 默认保留真实错误状态；只有显式开启演示模式才回退，避免掩盖接口故障。
+    applies.value = useDemo ? demoApplies() : []
+    if (useDemo) demoMode.value = true
   } finally {
     loading.value = false
   }
@@ -197,7 +206,11 @@ function getTimeline(status) {
 }
 
 function formatMoney(value) {
-  return Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const number = Number(value || 0)
+  return new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: Number.isInteger(number) ? 0 : 2,
+    maximumFractionDigits: 2
+  }).format(number)
 }
 
 function formatDateTime(value) {
@@ -212,6 +225,7 @@ onMounted(loadApplies)
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 18px; }
 .page-head h2 { margin: 0; font-size: 24px; }
 .page-head p { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
+.head-actions { display: flex; align-items: center; gap: 10px; }
 .table-card { border-radius: 14px; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
 .toolbar :deep(.el-tabs__header) { margin: 0; }

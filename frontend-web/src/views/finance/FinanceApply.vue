@@ -6,7 +6,10 @@
         <h2>融资申请</h2>
         <p>选择贷款产品，填写额度、期限和资金用途。提交后系统将推荐经营特征相近的联保候选人。</p>
       </div>
-      <el-tag type="success" effect="plain">接口：POST /api/finance/apply</el-tag>
+      <div class="head-tags">
+        <el-tag type="success" effect="plain">接口：POST /api/finance/apply</el-tag>
+        <el-tag v-if="demoMode" type="warning" effect="dark">演示数据</el-tag>
+      </div>
     </div>
 
     <el-row :gutter="18">
@@ -132,8 +135,8 @@
     </el-row>
 
     <el-dialog v-model="recommendVisible" title="推荐联保人" width="min(760px, 94vw)" :close-on-click-modal="false">
-      <!-- 推荐数据优先使用 GET /api/finance/recommend，后端暂未返回时使用演示候选人。 -->
-      <p class="dialog-tip">请选择希望邀请的农户。当前后端推荐算法尚未完成，演示数据与初始用户表保持一致。</p>
+      <!-- 推荐数据优先使用真实接口；仅显式开启演示模式时才允许回退。 -->
+      <p class="dialog-tip">请选择希望邀请的农户。{{ useDemo ? '当前建议列表来自显式开启的演示数据。' : '推荐结果来自系统匹配。' }}</p>
       <el-checkbox-group v-model="selectedFarmerIds" class="candidate-list">
         <el-checkbox
           v-for="candidate in candidates"
@@ -150,6 +153,7 @@
           </el-tag>
         </el-checkbox>
       </el-checkbox-group>
+      <el-empty v-if="!candidates.length" description="暂未获取到推荐联保人，请稍后重试或联系后端负责人" />
       <el-alert
         v-if="selectedProduct"
         type="warning"
@@ -174,17 +178,19 @@ import {
   getLoanProducts,
   getRecommendedGuarantors,
   submitFinanceApply
-} from '@/api/financeP5'
+} from '@/api/finance'
 
 /**
  * 页面用途：融资申请。
- * 调用 financeP5.js：
+ * 调用 finance.js：
  * - getLoanProducts 获取贷款产品；
  * - submitFinanceApply 提交申请；
  * - getRecommendedGuarantors 获取联保推荐；
  * - createLoanGroup 创建联合贷款小组。
  */
 const router = useRouter()
+const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
+const demoMode = ref(false)
 const formRef = ref()
 const submitting = ref(false)
 const groupSubmitting = ref(false)
@@ -227,7 +233,11 @@ function normalizePage(data) {
 }
 
 function formatMoney(value) {
-  return Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const number = Number(value || 0)
+  return new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: Number.isInteger(number) ? 0 : 2,
+    maximumFractionDigits: 2
+  }).format(number)
 }
 
 function formatRate(value) {
@@ -247,8 +257,9 @@ function handleFileExceed() {
 }
 
 /**
- * 后端 LoanProductService 正常时使用真实产品；
- * 若服务尚未启动或返回空列表，则展示 data.sql 中的 5 款产品，方便前端单独调试。
+ * 贷款产品只使用真实接口结果。
+ * 只有显式设置 VITE_USE_DEMO=true 时，接口失败或返回空列表才启用演示数据，
+ * 并在页面顶部显示“演示数据”，避免把接口故障误判为功能正常。
  */
 async function loadProducts() {
   const demoProducts = [
@@ -261,9 +272,16 @@ async function loadProducts() {
   try {
     const data = await getLoanProducts()
     productList.value = normalizePage(data).filter((item) => item.status !== 0)
-    if (!productList.value.length) productList.value = demoProducts
+    if (!productList.value.length && useDemo) {
+      productList.value = demoProducts
+      demoMode.value = true
+    }
   } catch {
-    productList.value = demoProducts
+    productList.value = []
+    if (useDemo) {
+      productList.value = demoProducts
+      demoMode.value = true
+    }
   }
   if (productList.value.length) selectProduct(productList.value[0])
 }
@@ -291,9 +309,18 @@ async function handleSubmit() {
     ElMessage.success('融资申请提交成功')
     try {
       const recommended = await getRecommendedGuarantors()
-      candidates.value = Array.isArray(recommended) && recommended.length ? recommended : demoCandidates()
+      const list = Array.isArray(recommended) ? recommended : normalizePage(recommended)
+      if (list.length) {
+        candidates.value = list
+      } else if (useDemo) {
+        candidates.value = demoCandidates()
+        demoMode.value = true
+      } else {
+        candidates.value = []
+      }
     } catch {
-      candidates.value = demoCandidates()
+      candidates.value = useDemo ? demoCandidates() : []
+      if (useDemo) demoMode.value = true
     }
     selectedFarmerIds.value = []
     recommendVisible.value = true
@@ -317,7 +344,7 @@ async function handleCreateGroup() {
     await createLoanGroup({
       groupName: `${selectedProduct.value?.productName || '联合贷款'}小组`,
       // 当前后端 DTO 尚未提供 memberIds，先把成员名写入描述；后端扩展后替换为 memberIds 数组。
-      description: `发起人陈永春，拟邀请：${names}`
+      description: `拟邀请联保人：${names}`
     })
     recommendVisible.value = false
     ElMessage.success('联合贷款小组已创建')
@@ -341,6 +368,7 @@ onMounted(loadProducts)
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 18px; }
 .page-head h2 { margin: 0; font-size: 24px; }
 .page-head p { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
+.head-tags { display: flex; align-items: center; gap: 8px; }
 .content-card { border-radius: 14px; }
 .card-title { display: flex; justify-content: space-between; align-items: center; }
 .card-title span { color: var(--el-text-color-secondary); font-size: 12px; }
