@@ -2,6 +2,8 @@ package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.rxt.common.BizException;
+import com.rxt.common.ResultCode;
 import com.rxt.dto.AnswerDTO;
 import com.rxt.dto.QuestionDTO;
 import com.rxt.entity.Answer;
@@ -30,7 +32,7 @@ public class ExpertQaServiceImpl implements ExpertQaService {
         if (dto.getExpertId() != null) {
             ExpertInfo expert = expertInfoMapper.selectById(dto.getExpertId());
             if (expert == null) {
-                throw new RuntimeException("指定的专家不存在");
+                throw new BizException(ResultCode.NOT_FOUND.getCode(), "指定的专家不存在");
             }
         }
         Question q = new Question();
@@ -48,15 +50,15 @@ public class ExpertQaServiceImpl implements ExpertQaService {
         ExpertInfo expert = expertInfoMapper.selectOne(new LambdaQueryWrapper<ExpertInfo>()
                 .eq(ExpertInfo::getUserId, userId));
         if (expert == null) {
-            throw new RuntimeException("仅专家可回答问题");
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可回答问题");
         }
 
         Question q = questionMapper.selectById(dto.getQuestionId());
         if (q == null) {
-            throw new RuntimeException("问题不存在");
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "问题不存在");
         }
         if (q.getExpertId() != null && !q.getExpertId().equals(expert.getExpertId())) {
-            throw new RuntimeException("该问题已指定其他专家");
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "该问题已指定其他专家");
         }
 
         Answer a = new Answer();
@@ -84,7 +86,7 @@ public class ExpertQaServiceImpl implements ExpertQaService {
         ExpertInfo expert = expertInfoMapper.selectOne(new LambdaQueryWrapper<ExpertInfo>()
                 .eq(ExpertInfo::getUserId, userId));
         if (expert == null) {
-            throw new RuntimeException("仅专家可查看待回复问题");
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可查看待回复问题");
         }
         return questionMapper.selectList(new LambdaQueryWrapper<Question>()
                 .eq(Question::getStatus, "待回复")
