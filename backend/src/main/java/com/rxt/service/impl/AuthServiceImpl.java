@@ -78,7 +78,11 @@ public class AuthServiceImpl implements AuthService {
         vo.setUserId(user.getUserId());
         vo.setPhone(user.getPhone());
         vo.setRealName(user.getRealName());
+        vo.setRoleId(role.getRoleId());
         vo.setRoleName(role.getRoleName());
+        // 菜单权限随登录响应一起下发，前端据此渲染侧边栏，
+        // 实现「不同角色看到的菜单不同」；权限判定仍以后端服务层为准。
+        vo.setMenuPerms(role.getMenuPerms());
 
         log.info("登录成功 userId={} phone={} role={}", user.getUserId(), user.getPhone(), role.getRoleName());
         return vo;
