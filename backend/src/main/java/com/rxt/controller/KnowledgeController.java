@@ -8,7 +8,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/knowledge")
+// 注意：context-path 已是 /api，这里只写 /knowledge，写成 /api/knowledge 会变成 /api/api/knowledge
+@RequestMapping("/knowledge")
 public class KnowledgeController {
 
     @Autowired

@@ -46,3 +46,8 @@ rxt:
 logging:
   level:
     com.rxt: debug
+  pattern:
+    # 行首的 [traceId] 由 common/TraceIdFilter 写入 MDC。
+    # 排查时先按 traceId 过滤，就能把一次请求散落在各层的日志串成一条线；
+    # 响应头 X-Trace-Id 带的是同一个值，前端报错可以把它直接甩过来。
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId}] [%thread] %logger{36} - %msg%n"

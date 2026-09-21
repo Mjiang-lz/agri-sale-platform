@@ -2,10 +2,13 @@ package com.rxt.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.dto.OrderCreateDTO;
+import com.rxt.dto.ProductPublishDTO;
 import com.rxt.vo.CartVO;
 import com.rxt.vo.OrderVO;
 import com.rxt.vo.ProductDetailVO;
 import com.rxt.vo.ProductVO;
+
+import java.math.BigDecimal;
 
 /**
  * 农产品交易模块业务接口。
@@ -15,9 +18,47 @@ import com.rxt.vo.ProductVO;
 public interface TradeService {
 
     /**
-     * 分页检索商品货源。
+     * 分页检索商品货源，各条件可任意组合（都为 null 时返回全部在架商品）。
+     *
+     * @param keyword  商品名称模糊匹配
+     * @param category 品类精确匹配
+     * @param minPrice 价格下限（含）
+     * @param maxPrice 价格上限（含）
+     * @param origin   产地模糊匹配（传「赣州」或「江西」都能命中）
      */
-    IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword);
+    IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword,
+                                  String category, BigDecimal minPrice, BigDecimal maxPrice,
+                                  String origin);
+
+    /**
+     * 发布商品。仅农户可操作，新商品进入待审核队列且默认下架。
+     *
+     * @param sellerId 发布农户（取自登录态）
+     * @return 新商品主键
+     */
+    Long publishProduct(Long sellerId, ProductPublishDTO dto);
+
+    /**
+     * 编辑商品。仅商品归属农户可操作。
+     *
+     * <p>内容类字段（名称 / 品类 / 描述 / 产地 / 图片）任一变更会重新送审并下架；
+     * 只改价格、库存、单位不触发重新审核 —— 这几个是经营行为，不是内容变更。</p>
+     */
+    void updateProduct(Long sellerId, Long productId, ProductPublishDTO dto);
+
+    /**
+     * 商品上下架。仅商品归属农户可操作；未审核通过的商品不允许上架。
+     *
+     * @param status 1 上架，0 下架
+     */
+    void updateProductStatus(Long sellerId, Long productId, Integer status);
+
+    /**
+     * 分页查询我发布的商品（含待审核 / 未通过 / 已下架），供农户管理页使用。
+     *
+     * @param auditStatus 审核状态筛选，为空表示查全部
+     */
+    IPage<ProductVO> pageMyProducts(Long sellerId, long pageNum, long pageSize, String auditStatus);
 
     /**
      * 查询商品详情：商品全字段 + 库存 + 发布农户公开信息 + 已过审评论首页。

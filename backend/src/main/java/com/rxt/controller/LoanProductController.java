@@ -8,7 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/finance")
+// 注意：context-path 已是 /api，这里只写 /finance，写成 /api/finance 会变成 /api/api/finance
+@RequestMapping("/finance")
 public class LoanProductController {
 
     @Autowired
