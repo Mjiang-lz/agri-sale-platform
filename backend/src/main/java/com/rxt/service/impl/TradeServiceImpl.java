@@ -138,6 +138,10 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     public void updateProduct(Long sellerId, Long productId, ProductPublishDTO dto) {
+        // 与发布一致：本接口农户专用。归属校验虽然也能挡住非农户（必然 404），
+        // 但报「商品不存在」会让人误以为数据丢了，不如直接给「没有该操作的权限」
+        permissionChecker.requireRole(RoleConstant.FARMER);
+
         Product exist = requireOwnProduct(sellerId, productId);
 
         Product update = new Product();
@@ -156,6 +160,9 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     public void updateProductStatus(Long sellerId, Long productId, Integer status) {
+        // 同 updateProduct：农户专用，先卡角色再校验参数
+        permissionChecker.requireRole(RoleConstant.FARMER);
+
         if (status == null || (status != STATUS_ON && status != STATUS_OFF)) {
             throw new BizException(ResultCode.BAD_REQUEST.getCode(), "上下架状态只能是 1（上架）或 0（下架）");
         }
@@ -176,6 +183,9 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     public IPage<ProductVO> pageMyProducts(Long sellerId, long pageNum, long pageSize, String auditStatus) {
+        // 农户管理页专用。不卡角色的话采购方会拿到空列表，看起来像「商品丢了」
+        permissionChecker.requireRole(RoleConstant.FARMER);
+
         Page<Product> page = new Page<>(pageNum, pageSize);
 
         LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
@@ -224,14 +234,28 @@ public class TradeServiceImpl implements TradeService {
 
     /**
      * 内容类字段是否发生变更。价格、库存、单位属于经营信息，不算内容。
+     *
+     * <p>入参为 null 表示「本次不修改该字段」，不算变更 —— 口径必须与
+     * {@code productMapper.updateById}（MP 默认 NOT_NULL 策略，null 字段跳过不写库）一致。
+     * 否则前端只提交改动字段时会被判成「内容变更」，商品被无理由下架重审，但字段其实没改。</p>
      */
     private boolean isContentChanged(Product exist, ProductPublishDTO dto) {
-        return !Objects.equals(exist.getProductName(), dto.getProductName())
-                || !Objects.equals(exist.getCategory(), dto.getCategory())
-                || !Objects.equals(exist.getDescription(), dto.getDescription())
-                || !Objects.equals(exist.getOrigin(), dto.getOrigin())
-                || !Objects.equals(exist.getImageUrl(), dto.getImageUrl())
-                || !Objects.equals(exist.getImages(), dto.getImages());
+        return differs(dto.getProductName(), exist.getProductName())
+                || differs(dto.getCategory(), exist.getCategory())
+                || differs(dto.getDescription(), exist.getDescription())
+                || differs(dto.getOrigin(), exist.getOrigin())
+                || differs(dto.getImageUrl(), exist.getImageUrl())
+                || differs(dto.getImages(), exist.getImages());
+    }
+
+    /**
+     * 判断某个字段是否真的被本次请求修改了。
+     *
+     * @param incoming 入参值，{@code null} 表示本次不修改该字段
+     * @param existing 库中现值
+     */
+    private boolean differs(Object incoming, Object existing) {
+        return incoming != null && !Objects.equals(incoming, existing);
     }
 
     @Override
