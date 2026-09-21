@@ -12,6 +12,16 @@
       </div>
     </div>
 
+    <el-alert
+      v-if="demoMode"
+      class="demo-alert"
+      title="当前页面显示的是演示数据"
+      description="真实接口失败或返回空列表，且 VITE_USE_DEMO=true。请先检查后端和 rxt.t_knowledge 数据。"
+      type="warning"
+      :closable="false"
+      show-icon
+    />
+
     <el-card shadow="never" class="knowledge-card">
       <template #header>
         <div class="toolbar">
@@ -58,6 +68,7 @@
             <span>发布时间：{{ formatDateTime(detail.createTime) }}</span>
             <span>浏览：{{ detail.viewCount || 0 }}</span>
           </div>
+          <el-image v-if="detail.imageUrl" class="detail-image" :src="detail.imageUrl" fit="cover" />
           <el-divider />
           <div class="detail-content">{{ detail.content }}</div>
           <el-alert
@@ -76,8 +87,10 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { getKnowledgeDetail, getKnowledgeList } from '@/api/knowledgeP5'
+import { getKnowledgeDetail, getKnowledgeList } from '@/api/knowledge'
 
+const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
+const demoMode = ref(false)
 const loading = ref(false)
 const detailLoading = ref(false)
 const detailVisible = ref(false)
@@ -114,15 +127,25 @@ const pagedList = computed(() => {
   return filteredList.value.slice(start, start + pageSize.value)
 })
 
+/**
+ * 从本地后端读取 rxt.t_knowledge 数据。
+ * 分类筛选直接请求后端；页面再按审核状态过滤，只展示“已通过”的知识。
+ * 演示数据只有 VITE_USE_DEMO=true 时才会启用，并显示顶部提示。
+ */
 async function loadList() {
   loading.value = true
+  demoMode.value = false
   try {
-    const data = await getKnowledgeList()
+    const data = await getKnowledgeList(category.value)
     const list = Array.isArray(data) ? data : data?.records || []
-    knowledgeList.value = list.filter((item) => !item.auditStatus || item.auditStatus === '已通过')
-    if (!knowledgeList.value.length) knowledgeList.value = demoKnowledge()
+    knowledgeList.value = list.filter((item) => item.auditStatus === '已通过')
+    if (!knowledgeList.value.length && useDemo) {
+      knowledgeList.value = demoKnowledge()
+      demoMode.value = true
+    }
   } catch {
-    knowledgeList.value = demoKnowledge()
+    knowledgeList.value = useDemo ? demoKnowledge() : []
+    if (useDemo) demoMode.value = true
   } finally {
     loading.value = false
   }
@@ -130,6 +153,8 @@ async function loadList() {
 
 function handleCategoryChange() {
   page.value = 1
+  demoMode.value = false
+  loadList()
 }
 
 async function openDetail(item) {
@@ -140,6 +165,7 @@ async function openDetail(item) {
     const data = await getKnowledgeDetail(item.knowledgeId)
     if (data) detail.value = data
   } catch {
+    // 详情接口失败时保留列表行中的标题和摘要，不再切换到假数据。
   } finally {
     detailLoading.value = false
   }
@@ -170,6 +196,7 @@ onMounted(loadList)
 .hero-stat strong, .hero-stat span { display: block; }
 .hero-stat strong { font-size: 28px; }
 .hero-stat span { margin-top: 4px; color: rgba(255,255,255,.65); font-size: 12px; }
+.demo-alert { margin-bottom: 16px; }
 .knowledge-card { border-radius: 15px; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .knowledge-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; min-height: 280px; }
@@ -189,6 +216,7 @@ onMounted(loadList)
 .pagination { display: flex; justify-content: center; padding-top: 22px; }
 .detail-title { margin: 14px 0 10px; line-height: 1.45; }
 .detail-meta { display: flex; gap: 20px; color: var(--el-text-color-secondary); font-size: 13px; }
+.detail-image { width: 100%; max-height: 300px; margin-top: 18px; border-radius: 12px; }
 .detail-content { white-space: pre-wrap; line-height: 2; font-size: 16px; color: #35443b; }
 .content-tip { margin-top: 28px; }
 @media (max-width: 980px) { .knowledge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
