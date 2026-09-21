@@ -49,8 +49,13 @@ public class UserServiceImpl implements UserService {
         vo.setRealName(user.getRealName());
         vo.setAvatarUrl(user.getAvatarUrl());
         vo.setStatus(user.getStatus());
-        // 角色名从库里取而不是抄登录态：管理员调整角色后能立即反映
-        vo.setRoleName(resolveRoleName(user.getRoleId()));
+        // 角色从库里取而不是抄登录态：管理员调整角色后能立即反映
+        Role role = user.getRoleId() == null ? null : roleMapper.selectById(user.getRoleId());
+        if (role != null) {
+            vo.setRoleId(role.getRoleId());
+            vo.setRoleName(role.getRoleName());
+            vo.setMenuPerms(role.getMenuPerms());
+        }
 
         // 经营档案仅农户有
         if (RoleConstant.FARMER.equals(vo.getRoleName())) {
@@ -122,17 +127,6 @@ public class UserServiceImpl implements UserService {
             throw new BizException("没有需要修改的内容");
         }
         farmerProfileMapper.updateById(exist);
-    }
-
-    /**
-     * 按角色主键取角色名；查不到返回 null，不阻断资料查询。
-     */
-    private String resolveRoleName(Long roleId) {
-        if (roleId == null) {
-            return null;
-        }
-        Role role = roleMapper.selectById(roleId);
-        return role == null ? null : role.getRoleName();
     }
 
     /**

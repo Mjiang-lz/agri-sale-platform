@@ -118,17 +118,39 @@ npm run dev
 骨架已就绪：目录结构、实体映射、建表脚本、统一返回与异常处理、JWT 认证链路均已打通，
 `service.impl` 中各业务方法留有 `TODO`，按功能点逐个补齐即可。
 
-**已完成**：M1 登录 / 注册后端（`AuthServiceImpl`：手机号唯一校验、BCrypt 加密入库、JWT 签发、
-角色白名单）；M2 农产品交易；M2 求购需求；M4 融资服务部分接口；
-**M1 鉴权白名单收口** —— 交易与求购模块的用户身份一律改由登录态（`UserContext`）获取，
-不再接受客户端传入的 `buyerId` / `publisherId`。
+**已完成**
 
-**未完成**：M1 个人资料（`UserServiceImpl.getProfile` 仍是 `TODO`）、M1 前端登录页、
-M1 角色权限校验（`PermissionChecker` 已实现但尚未接入，越权暂不返回 403）。
+| 模块 | 范围 | 状态 |
+| --- | --- | --- |
+| M0 项目基础设施 | 建表脚本、统一返回与异常、分页、字段填充、跨域、JWT 认证链路 | 已就绪 |
+| M1 用户与权限 | 注册 / 登录 / 登出、个人资料与农户经营档案、角色权限校验（`PermissionChecker`） | 已完成 |
+| M1 角色菜单 | 登录与资料接口返回 `menuPerms`（取自 `t_role.menu_perms`），供前端按角色渲染菜单 | 已完成 |
+| M2 农产品交易 | 商品、购物车、订单 | 部分完成（`TradeServiceImpl` 仍留 `TODO`） |
+| M2 求购需求 | 求购需求发布与检索 | 已完成 |
+| M4 融资服务 | 融资申请、我的融资、银行侧审批 | 接口在，路由有冲突，见下方「已知问题」 |
+| M5 专家助力 | 知识、问答、预约 | 部分完成 |
+| M6 平台治理 | 内容审核（商品 / 知识 / 评论） | 已完成 |
+| **M6 平台治理** | **用户管理**：分页检索、启停用、调整角色、角色下拉 | 已完成（P1） |
+| **M6 平台治理** | **融资管理**：银行侧待办与审批、管理员只读台账 | 已完成（P1） |
+| **M6 平台治理** | **数据看板**：总量、待办、分布、近 7 日趋势 | 已完成（P1） |
+
+**已知问题（未修，需对应模块负责人确认）**
+
+1. `FinanceApplyController` 的 `@RequestMapping("/api/finance")` 与 `application.yml` 的
+   `context-path: /api` 叠加后，实际路径变成 `/api/api/finance/**`，前端按 `/api/finance/**` 调不到。
+2. 同上，`FinanceController`（`/finance`）与 `FinanceApplyController` **覆盖同一组业务路径**：
+   `POST /api/finance/apply` 命中的是 `FinanceServiceImpl` 的空壳实现，返回 `data: null`，
+   前端会显示「提交成功」但库里没有落任何数据。两个类需要合并成一个。
+3. `FinanceApplyServiceImpl.bankApprove` 把申请状态直接写成「已放款」/「已驳回」，
+   与概要设计 3.4 数据字典的 `apply_status` 词表（审批通过 / 审批未通过 / 已放款）不一致，
+   且「已驳回」不是词表取值。银行侧审批请改用 `/api/loan-admin/**`。
 
 `config/WebMvcConfig.java` 当前仅放行无需身份的只读接口：
 `/auth/login`、`/auth/register`、`/home/**`、`/trade/products`、`/demand/list`、`/error`，
-**其余接口一律要求登录**。新增放行路径前请先确认该接口是否真的允许游客访问；
+**其余接口一律要求登录**（`/admin/**` 与 `/loan-admin/**` 均在其中，且服务层再判角色）。
+新增放行路径前请先确认该接口是否真的允许游客访问；
 联调请带 `Authorization: Bearer <token>`，不要往白名单里加。
+
+M6 新增接口的请求 / 响应结构见 `docs/接口约定-M6平台治理.md`。
 
 第三方支付与短信服务为**模拟通道**，不涉及真实资金。
