@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
 import com.rxt.dto.OrderCreateDTO;
+import com.rxt.dto.ProductPublishDTO;
 import com.rxt.entity.Cart;
 import com.rxt.entity.FarmerProfile;
 import com.rxt.entity.Order;
@@ -16,6 +17,8 @@ import com.rxt.mapper.FarmerProfileMapper;
 import com.rxt.mapper.OrderMapper;
 import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
+import com.rxt.security.PermissionChecker;
+import com.rxt.security.RoleConstant;
 import com.rxt.service.CommentService;
 import com.rxt.service.TradeService;
 import com.rxt.vo.CartVO;
@@ -48,6 +51,15 @@ public class TradeServiceImpl implements TradeService {
     /** 审核通过状态，取值与 t_product.audit_status 一致 */
     private static final String AUDIT_APPROVED = "已通过";
 
+    /** 待审核状态。新发布 / 内容变更后的商品都进这个队列 */
+    private static final String AUDIT_PENDING = "待审核";
+
+    /** 上架 */
+    private static final int STATUS_ON = 1;
+
+    /** 下架 */
+    private static final int STATUS_OFF = 0;
+
     /** 商品详情内嵌的评论条数。看更多走 GET /api/comment/product/list 翻页 */
     private static final int DETAIL_COMMENT_SIZE = 5;
 
@@ -57,31 +69,169 @@ public class TradeServiceImpl implements TradeService {
     private final UserMapper userMapper;
     private final FarmerProfileMapper farmerProfileMapper;
     private final CommentService commentService;
+    private final PermissionChecker permissionChecker;
 
     @Override
-    public IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword) {
-        // 1. 构造分页对象
+    public IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword,
+                                         String category, BigDecimal minPrice, BigDecimal maxPrice,
+                                         String origin) {
+        // 价格区间先做自洽校验：上下限传反了说明前端参数拼错，
+        // 直接报错比返回一个空列表更容易定位
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "价格区间不合法：最低价不能高于最高价");
+        }
+
         Page<Product> page = new Page<>(pageNum, pageSize);
 
-        // 2. 构造查询条件
         LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
-        // 只展示"已通过"且"上架"的商品
-        wrapper.eq(Product::getAuditStatus, "已通过")
-                .eq(Product::getStatus, 1);
+        // 只展示「已通过」且「上架」的商品。这两个条件放最前面，
+        // 能命中 idx_product_audit_status 的最左前缀
+        wrapper.eq(Product::getAuditStatus, AUDIT_APPROVED)
+                .eq(Product::getStatus, STATUS_ON);
 
-        // keyword 非空时按商品名称模糊匹配
         if (StringUtils.hasText(keyword)) {
             wrapper.like(Product::getProductName, keyword);
         }
+        if (StringUtils.hasText(category)) {
+            wrapper.eq(Product::getCategory, category);
+        }
+        // 产地用 like 而不是等值：库里存的是「江西赣州」，
+        // 前端既可能按省筛也可能按市筛，等值匹配会一个都命中不了
+        if (StringUtils.hasText(origin)) {
+            wrapper.like(Product::getOrigin, origin);
+        }
+        if (minPrice != null) {
+            wrapper.ge(Product::getPrice, minPrice);
+        }
+        if (maxPrice != null) {
+            wrapper.le(Product::getPrice, maxPrice);
+        }
 
-        // 3. 按创建时间倒序，最新的排前面
         wrapper.orderByDesc(Product::getCreateTime);
 
-        // 4. 执行分页查询
-        Page<Product> productPage = productMapper.selectPage(page, wrapper);
+        return productMapper.selectPage(page, wrapper).convert(this::convertToProductVO);
+    }
 
-        // 5. 把 Product 转成 ProductVO
-        return productPage.convert(this::convertToProductVO);
+    /**
+     * 发布商品。
+     *
+     * <p>权限校验放在这里而不是拦截器：WebMvcConfig 的白名单是按路径放行的
+     * （{@code /trade/products} 为公开的商品列表），路径相同、方法不同的
+     * POST 也会被一起放行，所以写操作必须在业务层把身份卡死。</p>
+     */
+    @Override
+    public Long publishProduct(Long sellerId, ProductPublishDTO dto) {
+        permissionChecker.requireRole(RoleConstant.FARMER);
+
+        Product product = new Product();
+        applyEditableFields(product, dto);
+        product.setSellerId(sellerId);
+
+        // 新发布的商品一律先进待审队列，且默认下架。
+        // 审核通过时由审核接口置 status=1（「通过即上架」），农户不必再手动上一次架
+        product.setAuditStatus(AUDIT_PENDING);
+        product.setStatus(STATUS_OFF);
+
+        productMapper.insert(product);
+        return product.getProductId();
+    }
+
+    @Override
+    public void updateProduct(Long sellerId, Long productId, ProductPublishDTO dto) {
+        Product exist = requireOwnProduct(sellerId, productId);
+
+        Product update = new Product();
+        update.setProductId(productId);
+        applyEditableFields(update, dto);
+
+        // 内容变更需要重新送审。判断依据是「改了什么」而不是「调了哪个接口」：
+        // 农户补库存、调价格不该被下架，但改了名称或描述就必须让管理员再看一眼
+        if (isContentChanged(exist, dto)) {
+            update.setAuditStatus(AUDIT_PENDING);
+            update.setStatus(STATUS_OFF);
+        }
+
+        productMapper.updateById(update);
+    }
+
+    @Override
+    public void updateProductStatus(Long sellerId, Long productId, Integer status) {
+        if (status == null || (status != STATUS_ON && status != STATUS_OFF)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "上下架状态只能是 1（上架）或 0（下架）");
+        }
+
+        Product exist = requireOwnProduct(sellerId, productId);
+
+        // 只有审核通过的商品才允许上架，否则拿一个未过审的 id 直接上架就绕开了审核
+        if (status == STATUS_ON && !AUDIT_APPROVED.equals(exist.getAuditStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "商品当前审核状态为「" + exist.getAuditStatus() + "」，通过审核后才能上架");
+        }
+
+        Product update = new Product();
+        update.setProductId(productId);
+        update.setStatus(status);
+        productMapper.updateById(update);
+    }
+
+    @Override
+    public IPage<ProductVO> pageMyProducts(Long sellerId, long pageNum, long pageSize, String auditStatus) {
+        Page<Product> page = new Page<>(pageNum, pageSize);
+
+        LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Product::getSellerId, sellerId);
+        // 农户管理页需要看到待审核和未通过的商品，这里不能像前台列表那样固定过滤「已通过」
+        if (StringUtils.hasText(auditStatus)) {
+            wrapper.eq(Product::getAuditStatus, auditStatus);
+        }
+        wrapper.orderByDesc(Product::getCreateTime);
+
+        return productMapper.selectPage(page, wrapper).convert(this::convertToProductVO);
+    }
+
+    /**
+     * 取商品并校验归属：不存在 404、非本人 403。
+     */
+    private Product requireOwnProduct(Long sellerId, Long productId) {
+        Product exist = productMapper.selectById(productId);
+        if (exist == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "商品不存在：" + productId);
+        }
+        // 用 Objects.equals 而不是 !=：两边都可能是 null，直接比较会踩拆箱 NPE
+        if (!Objects.equals(exist.getSellerId(), sellerId)) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "只能操作自己发布的商品");
+        }
+        return exist;
+    }
+
+    /**
+     * 把 DTO 里可编辑的字段搬到实体上。
+     *
+     * <p>只拷贝「发布/编辑表单能填」的字段，seller_id、audit_status、status
+     * 由业务流程决定，绝不能让入参覆盖。</p>
+     */
+    private void applyEditableFields(Product product, ProductPublishDTO dto) {
+        product.setProductName(dto.getProductName());
+        product.setCategory(dto.getCategory());
+        product.setPrice(dto.getPrice());
+        product.setStock(dto.getStock());
+        product.setUnit(dto.getUnit());
+        product.setDescription(dto.getDescription());
+        product.setOrigin(dto.getOrigin());
+        product.setImageUrl(dto.getImageUrl());
+        product.setImages(dto.getImages());
+    }
+
+    /**
+     * 内容类字段是否发生变更。价格、库存、单位属于经营信息，不算内容。
+     */
+    private boolean isContentChanged(Product exist, ProductPublishDTO dto) {
+        return !Objects.equals(exist.getProductName(), dto.getProductName())
+                || !Objects.equals(exist.getCategory(), dto.getCategory())
+                || !Objects.equals(exist.getDescription(), dto.getDescription())
+                || !Objects.equals(exist.getOrigin(), dto.getOrigin())
+                || !Objects.equals(exist.getImageUrl(), dto.getImageUrl())
+                || !Objects.equals(exist.getImages(), dto.getImages());
     }
 
     @Override
@@ -413,6 +563,7 @@ public class TradeServiceImpl implements TradeService {
         vo.setStock(product.getStock());
         vo.setUnit(product.getUnit());
         vo.setImageUrl(product.getImageUrl());
+        vo.setOrigin(product.getOrigin());
         vo.setSellerId(product.getSellerId());
         vo.setAuditStatus(product.getAuditStatus());
         vo.setStatus(product.getStatus());
