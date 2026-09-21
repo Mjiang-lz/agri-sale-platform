@@ -9,18 +9,18 @@
 --   二、演示业务数据：商品 / 求购 / 购物车 / 订单 / 评论 / 知识 / 问答 /
 --                     预约 / 联合贷款小组 / 融资申请 / 审批 / 审核记录
 --
--- ⚠ 密码说明（务必与后端实现对齐）：
+-- ✅ 密码说明（与后端实现一致，2026-09-21 复核）：
 --   所有演示账号的初始密码统一为 123456，password 字段存的是 BCrypt 哈希
 --   （$2a$10$…，60 字符，自带随机盐，符合"加盐哈希、不可逆"的安全要求）。
---   ⚠ AuthServiceImpl 目前是骨架（TODO），加密方案尚未落地。
---     若后端改用其他方案（如 SHA-256 + 盐），必须按新方案重新生成该字段，
---     否则所有账号都无法登录。
---   ⚠ 当前 pom.xml 未引入加密库。若采用 BCrypt，需补充依赖：
---     <dependency>
---       <groupId>org.springframework.security</groupId>
---       <artifactId>spring-security-crypto</artifactId>
---     </dependency>
---     （仅引入该 jar 使用 BCryptPasswordEncoder，不会启用 Spring Security 全套过滤器）
+--
+--   后端现状：AuthServiceImpl 使用
+--     private static final PasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
+--   登录走 PASSWORD_ENCODER.matches(明文, user.getPassword())，注册走 .encode(...)。
+--   依赖在 pom.xml：org.springframework.security:spring-security-crypto（版本由 BOM 管理）。
+--
+--   ⚠️ 切勿改成 spring-boot-starter-security —— 那个 starter 会接管全部请求并统统返回 401，
+--      与本项目 LoginInterceptor + UserContext 的手写鉴权会互相打架。
+--   ⚠️ 若将来更换加密方案，必须按新方案重新生成本字段，否则所有账号都无法登录。
 --
 -- 枚举取值严格遵循《概要设计说明书》3.4 数据字典约定，不得自定义同义异名取值。
 -- ===========================================================================
