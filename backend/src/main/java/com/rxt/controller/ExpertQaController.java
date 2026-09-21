@@ -9,7 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/expert/qa")
+// 注意：context-path 已是 /api，这里只写 /expert/qa，写成 /api/expert/qa 会变成 /api/api/expert/qa
+@RequestMapping("/expert/qa")
 public class ExpertQaController {
 
     @Autowired
