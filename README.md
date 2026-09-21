@@ -125,6 +125,7 @@ npm run dev
 | M0 项目基础设施 | 建表脚本、统一返回与异常、分页、字段填充、跨域、JWT 认证链路 | 已就绪 |
 | **M0 参数校验** | **全局参数校验**：路径不存在 404、缺必填参数 / 类型不匹配 400、分页下界拦截 | 已完成（P1） |
 | **M0 日志规范** | **链路标识**：每请求一个 traceId，写入 MDC 与 `X-Trace-Id` 响应头 | 已完成（P1） |
+| **M0 鉴权白名单** | 放行规则改为「**HTTP 方法 + 路径**」双条件，写接口不再被只读规则顺带放过 | 已完成（P1） |
 | M1 用户与权限 | 注册 / 登录 / 登出、个人资料与农户经营档案、角色权限校验（`PermissionChecker`） | 已完成 |
 | M1 角色菜单 | 登录与资料接口返回 `menuPerms`（取自 `t_role.menu_perms`），供前端按角色渲染菜单 | 已完成 |
 | M2 农产品交易 | 商品、购物车、订单 | 部分完成（`TradeServiceImpl` 仍留 `TODO`） |
@@ -147,11 +148,39 @@ npm run dev
    与概要设计 3.4 数据字典的 `apply_status` 词表（审批通过 / 审批未通过 / 已放款）不一致，
    且「已驳回」不是词表取值。银行侧审批请改用 `/api/loan-admin/**`。
 
-`config/WebMvcConfig.java` 当前仅放行无需身份的只读接口：
-`/auth/login`、`/auth/register`、`/home/**`、`/trade/products`、`/demand/list`、`/error`，
+`config/WebMvcConfig.java` 的放行规则已迁到 `security/PublicEndpoints`，
+按「**HTTP 方法 + 路径**」双条件判定，不再用 `excludePathPatterns`：
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| POST | `/auth/login`、`/auth/register` | 登录注册（写操作，不放 GET） |
+| GET | `/home/**` | 首页推荐商品、农业知识 |
+| GET | `/trade/products` | 商品货源列表 |
+| GET | `/demand/list` | 求购需求列表 |
+| 不限 | `/error` | 框架内部错误转发 |
+
 **其余接口一律要求登录**（`/admin/**` 与 `/loan-admin/**` 均在其中，且服务层再判角色）。
-新增放行路径前请先确认该接口是否真的允许游客访问；
+
+> **为什么不用 `excludePathPatterns`**：那个 API 只按路径匹配、**没有方法概念**。
+> 一旦为了放行商品详情写上 `/trade/products/**`，同前缀下的
+> `PUT /trade/products/{id}`（编辑）、`PUT /trade/products/{id}/status`（上下架）
+> 会被**一起放行** —— 写接口的登录校验被静默摘掉，而且从代码上一眼看不出。
+> 现在的规则表里每条都带方法，写接口不可能被只读规则顺带放过。
+>
+> 匹配用 `PathPatternParser`（不是 `AntPathMatcher`）：后者更宽松，
+> 会把尾斜杠 `/trade/products/` 也判为命中，于是出现「白名单放行了、
+> 路由其实匹配不上」的错位。用同一套 PathPattern 语义，
+> 白名单放行的请求集合正好等于「真能被公开接口接住」的请求集合。
+
+白名单**不等于忽略身份**：命中白名单的请求仍会尽力解析令牌，带且有效就写入 `UserContext`，
+没带或无效则当游客放行 —— 这样「游客能看的接口」在已登录用户手里也能拿到自己的身份。
+
+新增放行规则前请先确认该接口是否真的允许游客访问；
 联调请带 `Authorization: Bearer <token>`，不要往白名单里加。
+
+> **已修（2026-09-21）**：`LoanGroupController` 原本写了 `@RequestMapping("/api/finance")`，
+> 与 `context-path: /api` 叠加后三个接口全部落在 `/api/api/finance/group` 上。
+> 现已改为 `/finance`，并把字段注入换成构造器注入以对齐项目约定。
 
 ### 全局参数校验与链路标识（M0）
 
