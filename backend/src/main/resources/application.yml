@@ -37,11 +37,20 @@ rxt:
     expire-hours: 24
   obs:
     # 华为云对象存储，承载商品图片 / 知识配图 / 用户头像
+    # false = 文件写本地磁盘（演示环境默认，无需密钥即可跑通上传链路）
+    # true  = 转存 OBS（须先配好下面的 access-key / secret-key）
     enabled: false
     endpoint: obs.cn-north-4.myhuaweicloud.com
     bucket: rxt-oss
+    # 密钥不进版本库（《概要设计说明书》§8.3）：留空，改用环境变量或
+    # application-local.yml（已在 .gitignore 中）注入
     access-key: ""
     secret-key: ""
+    # 本地兜底存储目录，相对「进程启动时的工作目录」，不是相对 backend 模块：
+    #   IDEA 里直接 Run（工作目录 = 项目根）→ <项目根>/uploads
+    #   cd backend && mvn spring-boot:run        → backend/uploads
+    # 两种落点都在 .gitignore 的 uploads/ 规则覆盖内（该规则不带前导斜杠，匹配任意层级），不会误提交。
+    local-dir: uploads
 
 logging:
   level:
