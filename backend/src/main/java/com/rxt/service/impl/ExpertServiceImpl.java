@@ -37,17 +37,6 @@ public class ExpertServiceImpl implements ExpertService {
         return knowledgeMapper.selectList(wrapper);
     }
 
-    @Override
-    public Long askQuestion(Long askerId, Long expertId, String content) {
-        Question q = new Question();
-        q.setAskerId(askerId);
-        q.setExpertId(expertId);
-        q.setContent(content);
-        q.setStatus("待回复");
-        q.setAskTime(LocalDateTime.now());
-        questionMapper.insert(q);
-        return q.getQuestionId();
-    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)

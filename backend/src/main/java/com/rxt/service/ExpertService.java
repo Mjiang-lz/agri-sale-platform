@@ -17,10 +17,6 @@ public interface ExpertService {
      */
     List<Knowledge> listKnowledge(String category);
 
-    /**
-     * 向专家提问。
-     */
-    Long askQuestion(Long askerId, Long expertId, String content);
 
     /**
      * 预约专家。
