@@ -78,6 +78,10 @@ public interface TradeService {
 
     /**
      * 创建订单并生成订单编号。
+     *
+     * <p>扣减库存与写入订单在同一事务内完成；库存判断由
+     * {@code ProductMapper.deductStock} 的 WHERE 条件承担，并发下不会超卖。
+     * 库存在这里只做「扣减」，不做「补回」——补回只在取消订单时发生。</p>
      */
     Long createOrder(Long buyerId, OrderCreateDTO dto);
 
@@ -97,17 +101,49 @@ public interface TradeService {
     void removeCartItem(Long buyerId, Long cartId);
 
     /**
-     * 分页查询我的订单，可按订单状态筛选（status 为空表示查全部）。
+     * 分页查询我买到的订单（买家视角），可按订单状态筛选（orderStatus 为空表示查全部）。
      */
     IPage<OrderVO> pageOrders(Long buyerId, long pageNum, long pageSize, String orderStatus);
 
     /**
-     * 查询订单详情，只能查自己的订单。
+     * 分页查询我卖出的订单（农户视角），可按订单状态筛选（orderStatus 为空表示查全部）。
+     *
+     * <p>农户没有这个列表就无法看到待发货的订单，「发货」也就没有入口。
+     * 查询命中 {@code t_order} 的 {@code idx_order_seller_status} 索引。</p>
+     *
+     * @param sellerId 当前登录农户（取自登录态）
      */
-    OrderVO orderDetail(Long buyerId, Long orderId);
+    IPage<OrderVO> pageSoldOrders(Long sellerId, long pageNum, long pageSize, String orderStatus);
 
     /**
-     * 取消订单：仅"待支付/待发货"可取消，取消后回滚库存。
+     * 查询订单详情。订单的买家与卖家都可查看，其他用户一律「订单不存在」。
+     */
+    OrderVO orderDetail(Long userId, Long orderId);
+
+    /**
+     * 支付订单（模拟支付通道，不接入真实资金）。
+     *
+     * <p>状态跃迁：待支付 → 待发货，同时写入 {@code pay_time}。
+     * 只有订单买家本人可操作。</p>
+     */
+    void payOrder(Long buyerId, Long orderId);
+
+    /**
+     * 订单发货。只有订单的卖家（农户）可操作。
+     *
+     * <p>状态跃迁：待发货 → 待收货，同时写入 {@code deliver_time}。</p>
+     */
+    void deliverOrder(Long sellerId, Long orderId);
+
+    /**
+     * 订单收货。只有订单买家本人可操作，确认后订单完成。
+     *
+     * <p>状态跃迁：待收货 → 已完成，同时写入 {@code receive_time}。</p>
+     */
+    void receiveOrder(Long buyerId, Long orderId);
+
+    /**
+     * 取消订单：仅「待支付/待发货」可取消，取消后回滚库存。
      */
     void cancelOrder(Long buyerId, Long orderId);
 
