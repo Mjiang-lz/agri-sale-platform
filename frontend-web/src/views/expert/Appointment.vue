@@ -1,6 +1,16 @@
 <template>
   <div class="appointment-page">
     <!-- 页面用途：农户筛选专家、提交线下预约并查看当前浏览器中的最近提交记录。 -->
+    <el-alert
+      v-if="!canBookAppointment"
+      class="permission-alert"
+      type="warning"
+      :closable="false"
+      show-icon
+      title="当前账号不能提交专家预约"
+      description="只有农户账号可以提交预约；采购方仍可查看专家资料。若需要切换演示身份，请使用右上角身份切换。"
+    />
+
     <section class="appointment-hero">
       <div>
         <span class="eyebrow">线下专家服务</span>
@@ -27,7 +37,7 @@
         </div>
         <p>{{ expert.introduction }}</p>
         <div class="workload">{{ expert.workloadStat }}</div>
-        <el-button type="primary" style="width: 100%" @click="openDialog(expert)">预约该专家</el-button>
+        <el-button type="primary" style="width: 100%" :disabled="!canBookAppointment" @click="openDialog(expert)">预约该专家</el-button>
       </article>
       <el-empty v-if="!filteredExperts.length" description="没有找到符合条件的专家" />
     </section>
@@ -35,7 +45,7 @@
     <el-card shadow="never" class="recent-card">
       <template #header>
         <div class="recent-head">
-          <div><strong>最近提交</strong><span>预约提交接口已写入后端，这里保留当前浏览器的最近记录</span></div>
+          <div><strong>最近提交</strong><span>后端暂未提供“我的预约”查询接口；这里仅保留当前浏览器的最近提交记录，刷新后仍显示本地记录，不代表完整历史。</span></div>
           <el-button v-if="appointments.length" text type="danger" @click="clearAppointments">清空本地记录</el-button>
         </div>
       </template>
@@ -80,6 +90,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { submitAppointment } from '@/api/expert'
 import { expertOptions } from '@/constants/experts'
+import { useUserStore } from '@/store/user'
 
 /**
  * 页面用途：专家预约。
@@ -88,6 +99,8 @@ import { expertOptions } from '@/constants/experts'
  * - 后端暂未提供“我的预约”查询接口，最近提交记录保存在 localStorage。
  */
 const STORAGE_KEY = 'rxt_expert_appointments'
+const userStore = useUserStore()
+const canBookAppointment = computed(() => userStore.profile?.roleName === '农户')
 const experts = expertOptions
 const appointments = ref([])
 const dialogVisible = ref(false)
@@ -99,9 +112,20 @@ const formRef = ref()
 const domains = ['全部', '种植与植保', '畜牧与水产']
 const form = reactive({ expertId: null, apptTime: '', apptTopic: '', remark: '' })
 
+function validateFutureTime(rule, value, callback) {
+  if (!value || new Date(value).getTime() > Date.now()) {
+    callback()
+    return
+  }
+  callback(new Error('预约时间必须晚于当前时间'))
+}
+
 const rules = {
   expertId: [{ required: true, message: '请选择专家', trigger: 'change' }],
-  apptTime: [{ required: true, message: '请选择预约时间', trigger: 'change' }],
+  apptTime: [
+    { required: true, message: '请选择预约时间', trigger: 'change' },
+    { validator: validateFutureTime, trigger: 'change' }
+  ],
   apptTopic: [{ required: true, message: '请填写咨询主题', trigger: 'blur' }]
 }
 
@@ -118,6 +142,10 @@ function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(appointm
 function openDialog(expert) { selectedExpert.value = expert; form.expertId = expert.expertId; form.apptTime = ''; form.apptTopic = ''; form.remark = ''; dialogVisible.value = true }
 
 async function handleSubmit() {
+  if (!canBookAppointment.value) {
+    ElMessage.warning('只有农户账号可以提交专家预约')
+    return
+  }
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
   submitting.value = true
@@ -143,6 +171,7 @@ onMounted(() => { appointments.value = readLocal() })
 
 <style scoped>
 .appointment-page { color: var(--el-text-color-primary); }
+.permission-alert { margin-bottom: 16px; }
 .appointment-hero { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 30px; color: #fff; border-radius: 20px; background: linear-gradient(125deg, #4f3822, #9a6d38); box-shadow: 0 18px 36px rgba(79, 56, 34, .16); }
 .eyebrow { color: #f4dfbd; font-size: 13px; }
 .appointment-hero h2 { margin: 10px 0 8px; font-size: 30px; }

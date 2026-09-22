@@ -1,6 +1,6 @@
 <template>
   <div class="business-layout">
-    <!-- 业务端布局：农户、采购方、专家等用户使用顶部导航，不使用侧边栏。 -->
+    <!-- 业务端布局：业务角色使用顶部导航，不使用侧边栏。 -->
     <header class="business-header">
       <div class="header-inner">
         <button class="brand" type="button" @click="router.push('/home')">
@@ -10,25 +10,25 @@
 
         <el-menu class="top-nav" mode="horizontal" :default-active="activeMenu" :ellipsis="false" router>
           <el-menu-item index="/home">首页</el-menu-item>
-          <el-sub-menu index="trade">
+          <el-sub-menu v-if="canSeeTrade" index="trade">
             <template #title>农产品交易</template>
             <el-menu-item index="/trade/products">商品货源</el-menu-item>
             <el-menu-item index="/trade/demand">求购需求</el-menu-item>
             <el-menu-item index="/trade/cart">购物车</el-menu-item>
             <el-menu-item index="/trade/orders">我的订单</el-menu-item>
           </el-sub-menu>
-          <el-sub-menu v-if="activeRole === '农户'" index="finance">
+          <el-sub-menu v-if="canSeeFinance && activeRole === '农户'" index="finance">
             <template #title>融资服务</template>
             <el-menu-item index="/finance/apply">融资申请</el-menu-item>
             <el-menu-item index="/finance/my">我的融资</el-menu-item>
           </el-sub-menu>
-          <el-sub-menu index="expert">
+          <el-sub-menu v-if="canSeeExpert" index="expert">
             <template #title>专家助力</template>
             <el-menu-item index="/expert/knowledge">农业知识</el-menu-item>
             <el-menu-item index="/expert/qa">专家问答</el-menu-item>
-            <el-menu-item index="/expert/appointment">专家预约</el-menu-item>
+            <el-menu-item v-if="canBookAppointment" index="/expert/appointment">专家预约</el-menu-item>
           </el-sub-menu>
-          <el-menu-item index="/user/profile">个人中心</el-menu-item>
+          <el-menu-item v-if="canSeeUser" index="/user/profile">个人中心</el-menu-item>
         </el-menu>
 
         <el-dropdown trigger="click" @command="handleUserCommand">
@@ -38,10 +38,10 @@
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <!-- <el-dropdown-item disabled>切换业务端身份</el-dropdown-item> -->
-              <el-dropdown-item command="role:农户" :disabled="activeRole === '农户'">切换为农户</el-dropdown-item>
-              <el-dropdown-item command="role:采购方" :disabled="activeRole === '采购方'">切换为采购方</el-dropdown-item>
-              <!-- <el-dropdown-item disabled>仅切换前端导航，接口权限仍按登录账号</el-dropdown-item> -->
+              <el-dropdown-item disabled>登录角色：{{ actualRole || '未同步' }}</el-dropdown-item>
+              <el-dropdown-item v-if="canSwitchRole" command="role:农户" :disabled="activeRole === '农户'">切换为农户</el-dropdown-item>
+              <el-dropdown-item v-if="canSwitchRole" command="role:采购方" :disabled="activeRole === '采购方'">切换为采购方</el-dropdown-item>
+              <el-dropdown-item disabled>身份切换仅影响前端导航，接口权限仍按登录账号</el-dropdown-item>
               <el-dropdown-item divided command="profile">个人中心</el-dropdown-item>
               <el-dropdown-item command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
@@ -64,6 +64,14 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const activeRole = computed(() => userStore.activeRole)
+const actualRole = computed(() => userStore.profile?.roleName || '')
+const menuPerms = computed(() => String(userStore.menuPerms || '').split(',').filter(Boolean))
+const canSeeTrade = computed(() => menuPerms.value.includes('trade'))
+const canSeeFinance = computed(() => menuPerms.value.includes('finance'))
+const canSeeExpert = computed(() => menuPerms.value.includes('expert'))
+const canSeeUser = computed(() => menuPerms.value.includes('user'))
+const canSwitchRole = computed(() => ['农户', '采购方'].includes(actualRole.value))
+const canBookAppointment = computed(() => actualRole.value === '农户')
 
 const activeMenu = computed(() => {
   if (route.path.startsWith('/trade/product')) return '/trade/products'

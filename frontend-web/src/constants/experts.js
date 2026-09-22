@@ -14,7 +14,7 @@ export const expertOptions = [
     userId: 7,
     realName: '赵国强',
     expertDomain: '种植与植保',
-    introduction: '省农科院植保方向研究员，擅长柑橘、水稻等作物的病虫害绿色防控与施肥方案设计。',
+    introduction: '省农科院植保方向研究员，擅长柑橘、水稻等作物的病虫害绿色防控与施肥方案设计，累计服务农户 300 余户。',
     workloadStat: '已回复提问 42 条；受理预约 18 次'
   },
   {
