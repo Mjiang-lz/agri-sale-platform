@@ -42,3 +42,34 @@ export function getProductAuditStatistics() {
     params: { targetType: 'PRODUCT' }
   })
 }
+
+/** 知识审核页：查询待审核知识。 */
+export function getKnowledgePendingList(pageNum = 1, pageSize = 10) {
+  return request.get('/audit/pending', {
+    params: { targetType: 'KNOWLEDGE', pageNum, pageSize }
+  })
+}
+
+/** 知识审核页：按审核状态查询知识审核记录。 */
+export function getKnowledgeAuditList(auditStatus, pageNum = 1, pageSize = 10) {
+  return request.get('/audit/list', {
+    params: { targetType: 'KNOWLEDGE', auditStatus, pageNum, pageSize }
+  })
+}
+
+/** 知识审核页：查看知识正文。 */
+export function getKnowledgeAuditContent(targetId) {
+  return request.get(`/audit/content/KNOWLEDGE/${targetId}`)
+}
+
+/** 知识审核页：提交通过/驳回结论。 */
+export function submitKnowledgeAudit(targetId, payload) {
+  return request.post(`/audit/content/KNOWLEDGE/${targetId}`, payload)
+}
+
+/** 知识审核页：查询我的累计审核数和近 7 日审核趋势。 */
+export function getKnowledgeAuditStatistics() {
+  return request.get('/audit/statistics', {
+    params: { targetType: 'KNOWLEDGE' }
+  })
+}
