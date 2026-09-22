@@ -1,6 +1,9 @@
 package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.rxt.common.BizException;
+import com.rxt.common.ResultCode;
 import com.rxt.entity.Knowledge;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.service.KnowledgeService;
@@ -15,19 +18,36 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private KnowledgeMapper knowledgeMapper;
 
     @Override
-    public List<Knowledge> listByCategory(String category) {
+    public Page<Knowledge> pageQuery(String category, String keyword, Integer page, Integer size) {
         LambdaQueryWrapper<Knowledge> wrapper = new LambdaQueryWrapper<>();
         if (category != null && !category.isEmpty()) {
             wrapper.eq(Knowledge::getCategory, category);
         }
+        if (keyword != null && !keyword.isEmpty()) {
+            wrapper.and(w -> w.like(Knowledge::getTitle, keyword)
+                    .or().like(Knowledge::getContent, keyword));
+        }
+        wrapper.eq(Knowledge::getAuditStatus, "已通过")
+                .orderByDesc(Knowledge::getCreateTime);
 
-        wrapper.orderByDesc(Knowledge::getCreateTime);
-        return knowledgeMapper.selectList(wrapper);
+        // B2 修复：不传分页参数时返回全量，兼容前端内存切片
+        if (page == null || size == null) {
+            List<Knowledge> list = knowledgeMapper.selectList(wrapper);
+            Page<Knowledge> allPage = new Page<>(1, list.size());
+            allPage.setRecords(list);
+            return allPage;
+        }
+        return knowledgeMapper.selectPage(new Page<>(page, size), wrapper);
     }
 
     @Override
     public Knowledge getDetail(Long id) {
-
-        return knowledgeMapper.selectById(id);
+        Knowledge k = knowledgeMapper.selectOne(new LambdaQueryWrapper<Knowledge>()
+                .eq(Knowledge::getKnowledgeId, id)
+                .eq(Knowledge::getAuditStatus, "已通过"));
+        if (k == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在或未通过审核");
+        }
+        return k;
     }
 }
