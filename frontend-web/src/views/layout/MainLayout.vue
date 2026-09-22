@@ -17,7 +17,7 @@
             <el-menu-item index="/trade/cart">购物车</el-menu-item>
             <el-menu-item index="/trade/orders">我的订单</el-menu-item>
           </el-sub-menu>
-          <el-sub-menu index="finance">
+          <el-sub-menu v-if="activeRole === '农户'" index="finance">
             <template #title>融资服务</template>
             <el-menu-item index="/finance/apply">融资申请</el-menu-item>
             <el-menu-item index="/finance/my">我的融资</el-menu-item>
@@ -32,9 +32,19 @@
         </el-menu>
 
         <el-dropdown trigger="click" @command="handleUserCommand">
-          <button class="user-button" type="button"><el-avatar :size="34">农</el-avatar><span>融销通用户</span></button>
+          <button class="user-button" type="button">
+            <el-avatar :size="34">{{ activeRole.slice(0, 1) }}</el-avatar>
+            <span>当前身份：{{ activeRole }}</span>
+          </button>
           <template #dropdown>
-            <el-dropdown-menu><el-dropdown-item command="profile">个人中心</el-dropdown-item><el-dropdown-item divided command="logout">退出登录</el-dropdown-item></el-dropdown-menu>
+            <el-dropdown-menu>
+              <el-dropdown-item disabled>切换业务端身份</el-dropdown-item>
+              <el-dropdown-item command="role:农户" :disabled="activeRole === '农户'">切换为农户</el-dropdown-item>
+              <el-dropdown-item command="role:采购方" :disabled="activeRole === '采购方'">切换为采购方</el-dropdown-item>
+              <el-dropdown-item disabled>仅切换前端导航，接口权限仍按登录账号</el-dropdown-item>
+              <el-dropdown-item divided command="profile">个人中心</el-dropdown-item>
+              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+            </el-dropdown-menu>
           </template>
         </el-dropdown>
       </div>
@@ -53,6 +63,7 @@ import { useUserStore } from '@/store/user'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const activeRole = computed(() => userStore.activeRole)
 
 const activeMenu = computed(() => {
   if (route.path.startsWith('/trade/product')) return '/trade/products'
@@ -62,6 +73,10 @@ const activeMenu = computed(() => {
 })
 
 function handleUserCommand(command) {
+  if (command.startsWith('role:')) {
+    userStore.setActiveRole(command.slice(5))
+    return
+  }
   if (command === 'profile') {
     router.push('/user/profile')
     return
