@@ -102,7 +102,11 @@ CREATE TABLE `t_audit` (
   `audit_time`   DATETIME     NOT NULL                COMMENT '审核时间',
   PRIMARY KEY (`audit_id`),
   -- 审核记录回溯
-  KEY `idx_audit_target` (`target_type`, `target_id`)
+  KEY `idx_audit_target` (`target_type`, `target_id`),
+  -- 审核工作量统计：近 7 日趋势按审核时间做范围扫描
+  KEY `idx_audit_time` (`audit_time`),
+  -- 审核工作量统计：我的累计已审数（先按审核人定位，再按内容类型过滤）
+  KEY `idx_audit_auditor` (`auditor_id`, `target_type`)
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1
   DEFAULT CHARSET = utf8mb4
