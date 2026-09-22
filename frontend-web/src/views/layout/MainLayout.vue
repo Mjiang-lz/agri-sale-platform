@@ -38,10 +38,10 @@
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item disabled>切换业务端身份</el-dropdown-item>
+              <!-- <el-dropdown-item disabled>切换业务端身份</el-dropdown-item> -->
               <el-dropdown-item command="role:农户" :disabled="activeRole === '农户'">切换为农户</el-dropdown-item>
               <el-dropdown-item command="role:采购方" :disabled="activeRole === '采购方'">切换为采购方</el-dropdown-item>
-              <el-dropdown-item disabled>仅切换前端导航，接口权限仍按登录账号</el-dropdown-item>
+              <!-- <el-dropdown-item disabled>仅切换前端导航，接口权限仍按登录账号</el-dropdown-item> -->
               <el-dropdown-item divided command="profile">个人中心</el-dropdown-item>
               <el-dropdown-item command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
