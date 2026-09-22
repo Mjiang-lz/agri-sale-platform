@@ -1,6 +1,7 @@
 package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
@@ -62,6 +63,26 @@ public class TradeServiceImpl implements TradeService {
 
     /** 商品详情内嵌的评论条数。看更多走 GET /api/comment/product/list 翻页 */
     private static final int DETAIL_COMMENT_SIZE = 5;
+
+    // ---- 订单状态常量 ----
+    // 取值与 t_order.order_status 的列注释、data.sql 演示数据完全一致。
+    // 状态机：待支付 --pay--> 待发货 --deliver--> 待收货 --receive--> 已完成
+    //         待支付 / 待发货 可 --cancel--> 已取消（同时回滚库存）
+
+    /** 待支付（下单后的初始状态） */
+    private static final String ORDER_PENDING_PAY = "待支付";
+
+    /** 待发货（已付款，等待农户发货） */
+    private static final String ORDER_WAIT_DELIVER = "待发货";
+
+    /** 待收货（农户已发货，等待买家确认收货） */
+    private static final String ORDER_WAIT_RECEIVE = "待收货";
+
+    /** 已完成（买家已确认收货） */
+    private static final String ORDER_FINISHED = "已完成";
+
+    /** 已取消 */
+    private static final String ORDER_CANCELED = "已取消";
 
     private final ProductMapper productMapper;
     private final CartMapper cartMapper;
@@ -339,19 +360,33 @@ public class TradeServiceImpl implements TradeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createOrder(Long buyerId, OrderCreateDTO dto) {
-        // 1. 校验商品：存在、已通过、已上架
-        Product product = productMapper.selectById(dto.getProductId());
-        if (product == null || !"已通过".equals(product.getAuditStatus()) || product.getStatus() != 1) {
-            throw new BizException("商品不存在或已下架");
-        }
-        // 2. 校验库存
-        if (product.getStock() < dto.getQuantity()) {
-            throw new BizException("库存不足");
+        // 1. 参数兜底校验。@Min(1) 已在 Controller 层拦过一次，这里再挡一道：
+        //    Service 是模块对内的入口，将来别处直接调用时不至于绕过校验。
+        //    负数在这里是致命的 —— 扣库存的 SQL 形如 stock = stock - quantity，
+        //    传 -5 会让库存不减反增
+        if (dto.getQuantity() == null || dto.getQuantity() < 1) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "购买数量至少为 1");
         }
 
-        // 3. 扣减库存（在同一事务里，报错会自动回滚）
-        product.setStock(product.getStock() - dto.getQuantity());
-        productMapper.updateById(product);
+        // 2. 校验商品：存在、已通过、已上架
+        //    这两条与下面的库存不足都显式用 400：它们都是「调用方可以自行修正」的问题
+        //    （换商品、少买点），若用 BizException(String) 会落到 BIZ_ERROR(500)，
+        //    和真正的服务端故障混成同一类，误导日志排查与前端提示
+        Product product = productMapper.selectById(dto.getProductId());
+        if (product == null || !AUDIT_APPROVED.equals(product.getAuditStatus())
+                || product.getStatus() != STATUS_ON) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "商品不存在或已下架");
+        }
+
+        // 3. 原子扣减库存：判断「够不够」与扣减在同一条 UPDATE 里完成。
+        //    ⚠️ 不能改成「先读 stock 判断、再 updateById 回写」——那是读-改-写，
+        //    两个并发下单会读到同一个旧库存而双双通过，最终卖出的比库存还多（超卖）。
+        //    rows == 0 即表示库存不足（或商品刚被删），两者都按「库存不足」处理。
+        //    注意此处 product 对象里的 stock 是读取时的旧值，不可再用于写库。
+        int deducted = productMapper.deductStock(dto.getProductId(), dto.getQuantity());
+        if (deducted == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "库存不足");
+        }
 
         // 4. 生成唯一订单编号：RX + 年月日时分秒 + 4 位随机数
         String orderNo = generateOrderNo();
@@ -365,7 +400,7 @@ public class TradeServiceImpl implements TradeService {
         order.setQuantity(dto.getQuantity());
         order.setUnitPrice(product.getPrice());
         order.setOrderAmount(product.getPrice().multiply(BigDecimal.valueOf(dto.getQuantity())));
-        order.setOrderStatus("待支付");
+        order.setOrderStatus(ORDER_PENDING_PAY);
 
         // 6. 写入订单
         orderMapper.insert(order);
@@ -444,40 +479,166 @@ public class TradeServiceImpl implements TradeService {
     }
 
     @Override
-    public OrderVO orderDetail(Long buyerId, Long orderId) {
-        // 1. 校验归属：只能看自己的订单
+    public IPage<OrderVO> pageSoldOrders(Long sellerId, long pageNum, long pageSize, String orderStatus) {
+        // 农户视角的「我卖出的」。没有这个列表就找不到待发货的订单，发货也就没有入口。
+        // 查询条件 (seller_id, order_status) 正好命中 idx_order_seller_status
+        Page<Order> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Order::getSellerId, sellerId);
+        if (StringUtils.hasText(orderStatus)) {
+            wrapper.eq(Order::getOrderStatus, orderStatus);
+        }
+        wrapper.orderByDesc(Order::getCreateTime);
+
+        Page<Order> soldPage = orderMapper.selectPage(page, wrapper);
+        return soldPage.convert(this::convertToOrderVO);
+    }
+
+    @Override
+    public OrderVO orderDetail(Long userId, Long orderId) {
+        // 订单的买卖双方都能看详情：农户要看到订单内容才好安排发货，
+        // 只有「我卖出的」列表不足以支撑发货页。
+        // 非参与方一律报「订单不存在」，不泄露订单是否存在
         Order order = orderMapper.selectById(orderId);
-        if (order == null || !Objects.equals(order.getBuyerId(), buyerId)) {
-            throw new BizException("订单不存在");
+        if (order == null || !isParticipant(order, userId)) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "订单不存在");
         }
         return convertToOrderVO(order);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void payOrder(Long buyerId, Long orderId) {
+        Order order = requireBuyerOrder(buyerId, orderId);
+
+        // 先给友好文案（绝大多数失败是「状态本来就不对」，不是并发），
+        // 下面再用带条件的原子更新兜住并发重复提交
+        if (!ORDER_PENDING_PAY.equals(order.getOrderStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "当前订单状态为「" + order.getOrderStatus() + "」，只有「待支付」的订单可以支付");
+        }
+
+        // 模拟支付通道：按说明书「第三方支付为模拟通道，不接入真实资金」，
+        // 这里不做任何资金动作，只把状态推进到「待发货」并记下支付时间。
+        // WHERE 里带 order_status='待支付'：重复提交时后一次影响 0 行
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderId, orderId)
+                .eq(Order::getOrderStatus, ORDER_PENDING_PAY)
+                .set(Order::getOrderStatus, ORDER_WAIT_DELIVER)
+                .setSql("pay_time = NOW()"));
+        requireStatusChanged(rows, "支付");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deliverOrder(Long sellerId, Long orderId) {
+        // 发货是农户专属动作，显式声明角色意图（归属校验也会挡住，但报错更准确）
+        permissionChecker.requireRole(RoleConstant.FARMER);
+
+        Order order = requireSellerOrder(sellerId, orderId);
+
+        if (!ORDER_WAIT_DELIVER.equals(order.getOrderStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "当前订单状态为「" + order.getOrderStatus() + "」，只有「待发货」的订单可以发货");
+        }
+
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderId, orderId)
+                .eq(Order::getOrderStatus, ORDER_WAIT_DELIVER)
+                .set(Order::getOrderStatus, ORDER_WAIT_RECEIVE)
+                .setSql("deliver_time = NOW()"));
+        requireStatusChanged(rows, "发货");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void receiveOrder(Long buyerId, Long orderId) {
+        Order order = requireBuyerOrder(buyerId, orderId);
+
+        if (!ORDER_WAIT_RECEIVE.equals(order.getOrderStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "当前订单状态为「" + order.getOrderStatus() + "」，只有「待收货」的订单可以确认收货");
+        }
+
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderId, orderId)
+                .eq(Order::getOrderStatus, ORDER_WAIT_RECEIVE)
+                .set(Order::getOrderStatus, ORDER_FINISHED)
+                .setSql("receive_time = NOW()"));
+        requireStatusChanged(rows, "收货");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void cancelOrder(Long buyerId, Long orderId) {
         // 1. 校验归属：只能取消自己的订单
+        Order order = requireBuyerOrder(buyerId, orderId);
+
+        // 2. 状态提示：区分「重复取消」与「已发货不能取消」，让前端能给出准确文案
+        String status = order.getOrderStatus();
+        if (ORDER_CANCELED.equals(status)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "订单已取消，请勿重复操作");
+        }
+        if (!ORDER_PENDING_PAY.equals(status) && !ORDER_WAIT_DELIVER.equals(status)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "订单已发货，无法取消，请联系卖家");
+        }
+
+        // 3. 原子更新状态：把两个可取消状态写进 WHERE。
+        //    只有上面那段 if 是挡不住并发的 —— 两个请求同时读到「待支付」会双双通过，
+        //    随后库存被回滚两次。rows == 0 说明状态刚被别的请求改掉
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+                .eq(Order::getOrderId, orderId)
+                .in(Order::getOrderStatus, List.of(ORDER_PENDING_PAY, ORDER_WAIT_DELIVER))
+                .set(Order::getOrderStatus, ORDER_CANCELED));
+        requireStatusChanged(rows, "取消");
+
+        // 4. 回滚库存：下单时扣了多少就还多少。用原子加法，避免与并发下单互相覆盖
+        productMapper.restoreStock(order.getProductId(), order.getQuantity());
+    }
+
+    /**
+     * 判断用户是否为订单的参与方（买家或卖家）。
+     */
+    private boolean isParticipant(Order order, Long userId) {
+        return Objects.equals(order.getBuyerId(), userId)
+                || Objects.equals(order.getSellerId(), userId);
+    }
+
+    /**
+     * 取出订单并要求当前用户是买家。
+     *
+     * <p>越权时**故意不区分**「这不是你的订单」与「订单不存在」——
+     * 区分开就等于提供了一个按订单号探测他人订单是否存在的接口。</p>
+     */
+    private Order requireBuyerOrder(Long buyerId, Long orderId) {
         Order order = orderMapper.selectById(orderId);
         if (order == null || !Objects.equals(order.getBuyerId(), buyerId)) {
-            throw new BizException("订单不存在");
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "订单不存在");
         }
-        // 2. 校验状态：已发货/已收货/已完成/已取消都不能再取消
-        String status = order.getOrderStatus();
-        if ("已取消".equals(status)) {
-            throw new BizException("订单已取消，请勿重复操作");
+        return order;
+    }
+
+    /**
+     * 取出订单并要求当前用户是该订单的卖家（农户）。
+     */
+    private Order requireSellerOrder(Long sellerId, Long orderId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null || !Objects.equals(order.getSellerId(), sellerId)) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "订单不存在");
         }
-        if ("待收货".equals(status) || "已完成".equals(status)) {
-            throw new BizException("订单已发货，无法取消，请联系卖家");
+        return order;
+    }
+
+    /**
+     * 状态流转的并发兜底：受影响行数为 0 说明前置状态已不成立，即状态被别的请求改掉了。
+     *
+     * <p>与审核模块 {@code applyProductAudit} 的「商品状态已变更，请刷新后重试」同一套处理方式。</p>
+     */
+    private void requireStatusChanged(int rows, String action) {
+        if (rows == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "订单状态已变更，" + action + "未生效，请刷新后重试");
         }
-        // 3. 回滚库存（下单时扣了多少就还多少，与状态更新在同一事务里）
-        Product product = productMapper.selectById(order.getProductId());
-        if (product != null) {
-            product.setStock(product.getStock() + order.getQuantity());
-            productMapper.updateById(product);
-        }
-        // 4. 更新订单状态
-        order.setOrderStatus("已取消");
-        orderMapper.updateById(order);
     }
 
     /**
