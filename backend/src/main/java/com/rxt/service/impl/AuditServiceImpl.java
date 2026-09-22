@@ -9,11 +9,13 @@ import com.rxt.common.ResultCode;
 import com.rxt.dto.AuditActionDTO;
 import com.rxt.entity.AuditRecord;
 import com.rxt.entity.Comment;
+import com.rxt.entity.ExpertInfo;
 import com.rxt.entity.Knowledge;
 import com.rxt.entity.Product;
 import com.rxt.entity.User;
 import com.rxt.mapper.AuditRecordMapper;
 import com.rxt.mapper.CommentMapper;
+import com.rxt.mapper.ExpertInfoMapper;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
@@ -36,6 +38,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -87,6 +90,8 @@ public class AuditServiceImpl implements AuditService {
     private final CommentMapper commentMapper;
     private final AuditRecordMapper auditRecordMapper;
     private final UserMapper userMapper;
+    /** 知识作者 ID 换算用：t_knowledge.author_id 存的是 expert_id，不是 user_id */
+    private final ExpertInfoMapper expertInfoMapper;
     private final PermissionChecker permissionChecker;
 
     // =====================================================================
@@ -158,7 +163,10 @@ public class AuditServiceImpl implements AuditService {
                 LambdaQueryWrapper<Knowledge> wrapper = new LambdaQueryWrapper<>();
                 wrapper.eq(Knowledge::getAuditStatus, STATUS_PENDING)
                         .orderByDesc(Knowledge::getCreateTime);
-                yield knowledgeMapper.selectPage(page, wrapper).convert(this::pendingKnowledgeVO);
+                Page<Knowledge> knowledgePage = knowledgeMapper.selectPage(page, wrapper);
+                // author_id 是专家 ID，先整页批量换算成用户 ID，再逐行转 VO
+                Map<Long, Long> expertUserMap = knowledgeAuthorUserIdMap(knowledgePage.getRecords());
+                yield knowledgePage.convert(item -> pendingKnowledgeVO(item, expertUserMap));
             }
             case TYPE_COMMENT -> {
                 Page<Comment> page = new Page<>(pageNum, pageSize);
@@ -197,14 +205,15 @@ public class AuditServiceImpl implements AuditService {
         total += productPage.getTotal();
         productPage.getRecords().forEach(item -> merged.add(pendingProductVO(item)));
 
-        // 2) 知识
+        // 2) 知识（author_id 存的是专家 ID，先批量换算成用户 ID，再转 VO）
         Page<Knowledge> knowledgePage = knowledgeMapper.selectPage(
                 new Page<>(1, fetchSize),
                 new LambdaQueryWrapper<Knowledge>()
                         .eq(Knowledge::getAuditStatus, STATUS_PENDING)
                         .orderByDesc(Knowledge::getCreateTime));
         total += knowledgePage.getTotal();
-        knowledgePage.getRecords().forEach(item -> merged.add(pendingKnowledgeVO(item)));
+        Map<Long, Long> expertUserMap = knowledgeAuthorUserIdMap(knowledgePage.getRecords());
+        knowledgePage.getRecords().forEach(item -> merged.add(pendingKnowledgeVO(item, expertUserMap)));
 
         // 3) 评论
         Page<Comment> commentPage = commentMapper.selectPage(
@@ -359,7 +368,8 @@ public class AuditServiceImpl implements AuditService {
                     throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在：" + targetId);
                 }
                 AuditTaskVO item = newPendingVO(TYPE_KNOWLEDGE, knowledge.getKnowledgeId(),
-                        knowledge.getTitle(), knowledge.getAuthorId(), knowledge.getCreateTime());
+                        knowledge.getTitle(), toUserIdByExpertId(knowledge.getAuthorId()),
+                        knowledge.getCreateTime());
                 item.setContent(knowledge.getContent());
                 item.setAuditStatus(knowledge.getAuditStatus());
                 yield item;
@@ -626,10 +636,20 @@ public class AuditServiceImpl implements AuditService {
                 product.getSellerId(), product.getCreateTime());
     }
 
-    /** 知识 → 待审视图：标题取 title，提交人取 author_id */
-    private AuditTaskVO pendingKnowledgeVO(Knowledge knowledge) {
+    /**
+     * 知识 → 待审视图：标题取 title，提交人取 author_id 换算后的<b>用户 ID</b>。
+     *
+     * <p>⚠️ {@code t_knowledge.author_id} 的外键指向 <b>{@code t_expert.expert_id}</b>（专家表主键），
+     * <b>不是 {@code t_user.user_id}</b>。而 {@code AuditTaskVO.submitterId} 全类统一语义是
+     * 「用户 ID」—— {@link #fillNames(List)} 正是拿它去查 {@code t_user.real_name} 的。
+     * 不做换算，审核台就会显示成「user_id 恰好等于 expert_id 的那个人」，也就是<b>名字张冠李戴</b>。</p>
+     *
+     * @param expertUserMap 专家 ID → 用户 ID 映射，由调用方按整页/整组批量查好（避免逐行查库）
+     */
+    private AuditTaskVO pendingKnowledgeVO(Knowledge knowledge, Map<Long, Long> expertUserMap) {
+        // HashMap.get(null) 返回 null，作者为空时 submitterId 自然为 null，不必先判空
         return newPendingVO(TYPE_KNOWLEDGE, knowledge.getKnowledgeId(), knowledge.getTitle(),
-                knowledge.getAuthorId(), knowledge.getCreateTime());
+                expertUserMap.get(knowledge.getAuthorId()), knowledge.getCreateTime());
     }
 
     /** 评论 → 待审视图：没有标题，用内容摘要代替；提交人取 user_id */
@@ -652,6 +672,57 @@ public class AuditServiceImpl implements AuditService {
         // 待审队列里的内容状态恒为"待审核"；auditId 等审核结论字段保持 null
         vo.setAuditStatus(STATUS_PENDING);
         return vo;
+    }
+
+    // =====================================================================
+    // 五之二、知识作者 ID 换算（expert_id → user_id）
+    //
+    // 只有知识这一类的"作者/提交人"存在表间语义差：t_knowledge.author_id 存的是
+    // t_expert.expert_id，而商品取 seller_id、评论取 user_id，本来就是用户 ID。
+    // 所以换算逻辑集中在这三个方法里，别的地方不许再直接拿 author_id 当提交人。
+    // =====================================================================
+
+    /**
+     * 批量查「专家 ID → 用户 ID」映射：一次 IN 查询替代逐行查询（N+1 的解法）。
+     *
+     * <p>换算不到的专家（已被删除、或 author_id 是脏数据）不会出现在返回的 Map 里，
+     * 调用方 {@code map.get(...)} 拿到 null —— 前端显示为空，总好过显示成错误的人。</p>
+     */
+    private Map<Long, Long> loadExpertUserIdMap(Collection<Long> expertIds) {
+        if (expertIds == null || expertIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        // 只查两列主键；t_user 那边才是姓名来源，这里只做 ID 映射
+        List<ExpertInfo> experts = expertInfoMapper.selectList(new LambdaQueryWrapper<ExpertInfo>()
+                .select(ExpertInfo::getExpertId, ExpertInfo::getUserId)
+                .in(ExpertInfo::getExpertId, expertIds));
+
+        Map<Long, Long> map = new HashMap<>(experts.size());
+        for (ExpertInfo expert : experts) {
+            map.put(expert.getExpertId(), expert.getUserId());
+        }
+        return map;
+    }
+
+    /** 从一批知识记录里提取 author_id（专家 ID）并批量换算成用户 ID。 */
+    private Map<Long, Long> knowledgeAuthorUserIdMap(List<Knowledge> knowledgeList) {
+        if (knowledgeList == null || knowledgeList.isEmpty()) {
+            return new HashMap<>();
+        }
+        Set<Long> expertIds = knowledgeList.stream()
+                .map(Knowledge::getAuthorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return loadExpertUserIdMap(expertIds);
+    }
+
+    /** 单条换算：expert_id → user_id；作者为空时返回 null（详情接口只查一条，单查即可）。 */
+    private Long toUserIdByExpertId(Long expertId) {
+        if (expertId == null) {
+            return null;
+        }
+        return loadExpertUserIdMap(List.of(expertId)).get(expertId);
     }
 
     // =====================================================================
@@ -714,11 +785,13 @@ public class AuditServiceImpl implements AuditService {
                                     .in(Knowledge::getKnowledgeId, targetIds));
                     Map<Long, Knowledge> map = knowledgeList.stream()
                             .collect(Collectors.toMap(Knowledge::getKnowledgeId, k -> k));
+                    // ⚠️ author_id 是专家 ID，不是用户 ID，整组批量换算一次后才能当"提交人"
+                    Map<Long, Long> expertUserMap = knowledgeAuthorUserIdMap(knowledgeList);
                     for (AuditTaskVO vo : group) {
                         Knowledge knowledge = map.get(vo.getTargetId());
                         if (knowledge != null) {
                             vo.setTargetTitle(knowledge.getTitle());
-                            vo.setSubmitterId(knowledge.getAuthorId());
+                            vo.setSubmitterId(expertUserMap.get(knowledge.getAuthorId()));
                             vo.setSubmitTime(knowledge.getCreateTime());
                         }
                     }
