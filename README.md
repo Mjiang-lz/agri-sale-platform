@@ -121,7 +121,8 @@ npm run dev
 ## 当前状态
 
 骨架已就绪：目录结构、实体映射、建表脚本、统一返回与异常处理、JWT 认证链路均已打通，
-`service.impl` 中各业务方法留有 `TODO`，按功能点逐个补齐即可。
+主要业务模块已按功能点逐个补齐；仅首页聚合（`HomeServiceImpl`）与智能推荐
+（`RecommendServiceImpl`）仍为待实现骨架。
 
 **已完成**
 
@@ -133,25 +134,29 @@ npm run dev
 | **M0 鉴权白名单** | 放行规则改为「**HTTP 方法 + 路径**」双条件，写接口不再被只读规则顺带放过 | 已完成（P1） |
 | M1 用户与权限 | 注册 / 登录 / 登出、个人资料与农户经营档案、角色权限校验（`PermissionChecker`） | 已完成 |
 | M1 角色菜单 | 登录与资料接口返回 `menuPerms`（取自 `t_role.menu_perms`），供前端按角色渲染菜单 | 已完成 |
-| M2 农产品交易 | 商品、购物车、订单 | 部分完成（`TradeServiceImpl` 仍留 `TODO`） |
+| M2 农产品交易 | 商品、购物车、订单（含支付 / 发货 / 收货状态流转） | 已完成 |
 | M2 求购需求 | 求购需求发布与检索 | 已完成 |
-| M4 融资服务 | 融资申请、我的融资、银行侧审批 | 接口在，路由有冲突，见下方「已知问题」 |
+| M4 融资服务 | 融资申请、我的融资、银行侧审批 | 接口在（原路由冲突已修，见下方「已修记录」） |
 | M5 专家助力 | 知识、问答、预约 | 部分完成 |
 | M6 平台治理 | 内容审核（商品 / 知识 / 评论） | 已完成 |
 | **M6 平台治理** | **用户管理**：分页检索、启停用、调整角色、角色下拉 | 已完成（P1） |
 | **M6 平台治理** | **融资管理**：银行侧待办与审批、管理员只读台账 | 已完成（P1） |
 | **M6 平台治理** | **数据看板**：总量、待办、分布、近 7 日趋势 | 已完成（P1） |
 
+**已修记录（2026-09-22 核对）**
+
+- 原「已知问题 1」：`FinanceApplyController` 的 `@RequestMapping` 与 `context-path: /api`
+  叠加成 `/api/api/finance/**` —— **已修**，现为 `@RequestMapping("/finance")`，
+  实际路径 `/api/finance/**`。
+- 原「已知问题 2」：`FinanceController` 与 `FinanceApplyController` 覆盖同一组业务路径，
+  `POST /api/finance/apply` 命中空壳实现返回 `data: null` —— **已修**，
+  重复的 `FinanceController` 已删除，现由 `FinanceApplyController` 单独承接。
+
 **已知问题（未修，需对应模块负责人确认）**
 
-1. `FinanceApplyController` 的 `@RequestMapping("/api/finance")` 与 `application.yml` 的
-   `context-path: /api` 叠加后，实际路径变成 `/api/api/finance/**`，前端按 `/api/finance/**` 调不到。
-2. 同上，`FinanceController`（`/finance`）与 `FinanceApplyController` **覆盖同一组业务路径**：
-   `POST /api/finance/apply` 命中的是 `FinanceServiceImpl` 的空壳实现，返回 `data: null`，
-   前端会显示「提交成功」但库里没有落任何数据。两个类需要合并成一个。
-3. `FinanceApplyServiceImpl.bankApprove` 把申请状态直接写成「已放款」/「已驳回」，
-   与概要设计 3.4 数据字典的 `apply_status` 词表（审批通过 / 审批未通过 / 已放款）不一致，
-   且「已驳回」不是词表取值。银行侧审批请改用 `/api/loan-admin/**`。
+1. `FinanceApplyServiceImpl.bankApprove` 把申请状态写成「已放款」/「审批未通过」，
+   与概要设计 3.4 数据字典的 `apply_status` 词表（审批通过 / 审批未通过 / 已放款）的
+   对应关系需确认（「审批通过」这一中间态是否保留）。银行侧审批请走 `/api/loan-admin/**`。
 
 `config/WebMvcConfig.java` 的放行规则已迁到 `security/PublicEndpoints`，
 按「**HTTP 方法 + 路径**」双条件判定，不再用 `excludePathPatterns`：
@@ -214,6 +219,8 @@ npm run dev
 2026-09-21 10:07:56.439 INFO  [m0d3verify0001] [http-nio-127.0.0.1-18080-exec-3] c.rxt.service.impl.AuthServiceImpl - 登录成功 userId=1 phone=13800000001 role=管理员
 ```
 
-M6 新增接口的请求 / 响应结构见 `docs/接口约定-M6平台治理.md`。
+M6 新增接口的请求 / 响应结构见 `docs/接口约定-M6平台治理.md`；
+内容审核与审核统计见 `docs/接口约定-M6内容审核.md`；
+订单状态流转见 `docs/接口约定-M2订单流转.md`。
 
 第三方支付与短信服务为**模拟通道**，不涉及真实资金。
