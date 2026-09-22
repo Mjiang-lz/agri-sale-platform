@@ -19,12 +19,15 @@ import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
 import com.rxt.security.PermissionChecker;
 import com.rxt.service.AuditService;
+import com.rxt.vo.AuditDailyStatVO;
+import com.rxt.vo.AuditStatisticsVO;
 import com.rxt.vo.AuditTaskVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -72,6 +75,9 @@ public class AuditServiceImpl implements AuditService {
     /** 评论摘要最大长度，超出截断 */
     private static final int COMMENT_SUMMARY_LENGTH = 50;
 
+    /** 审核统计的趋势窗口：近 7 日（含今天），与看板趋势口径保持一致（看板为 TREND_DAYS = 7） */
+    private static final int STATISTICS_DAYS = 7;
+
     /** t_product.status 上下架取值：1 上架、0 下架 */
     private static final int SHELF_ON = 1;
     private static final int SHELF_OFF = 0;
@@ -94,9 +100,7 @@ public class AuditServiceImpl implements AuditService {
 
         // 0) 类型白名单校验：传了就必须是本模块管辖的三种内容类型之一
         //    （不校验的话，前端传 EXPERT 会查出一批没有标题的流水，看着像 bug）
-        if (StringUtils.hasText(targetType) && !CONTENT_TYPES.contains(targetType)) {
-            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "内容类型不合法：" + targetType);
-        }
+        requireValidTargetType(targetType);
 
         // 1) 状态兜底：不传状态时按"待审核"处理（审核后台首屏就是待办队列）
         String status = StringUtils.hasText(auditStatus) ? auditStatus : STATUS_PENDING;
@@ -793,5 +797,84 @@ public class AuditServiceImpl implements AuditService {
             nameMap.put(user.getUserId(), user.getRealName());
         }
         return nameMap;
+    }
+
+    // =====================================================================
+    // 七、审核工作量统计
+    // 数据源是 t_audit 流水（统计"审核动作发生了多少"），与看板统计"内容现在是什么状态"
+    // （待审总数、状态分布）互补，两者不重复。口径见 docs/接口约定-M6内容审核.md 第八节，
+    // 字段形状由前端确定，不要随手改名。
+    // =====================================================================
+
+    @Override
+    public AuditStatisticsVO statistics(Long auditorId, String targetType) {
+        permissionChecker.requireAdmin();
+        List<String> types = resolveContentTypes(targetType);
+
+        AuditStatisticsVO vo = new AuditStatisticsVO();
+        // 1) 我的累计已审数：不限时间。它不随日期波动，适合当主卡
+        //    （按天口径一旦当天还没审过就是 0，演示时看着像接口坏了）
+        vo.setMyReviewedTotal(auditRecordMapper.countByAuditor(auditorId, types));
+        // 2) 近 7 日趋势：一次分组查询 + Java 补 0，详见 dailyTrend
+        vo.setLast7Days(dailyTrend(types));
+        return vo;
+    }
+
+    /**
+     * 内容类型白名单校验：不传允许（表示不限类型），传了必须是三种内容类型之一。
+     * 列表接口与统计接口共用同一套校验，避免两处规则漂移。
+     */
+    private void requireValidTargetType(String targetType) {
+        if (StringUtils.hasText(targetType) && !CONTENT_TYPES.contains(targetType)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "内容类型不合法：" + targetType);
+        }
+    }
+
+    /**
+     * 统计口径的内容类型集合：不传 = 三类内容合计，传了 = 只统计该类型。
+     *
+     * <p>这个集合是所有统计 SQL 的过滤条件，任何情况下都不会为空 ——
+     * 漏掉它，t_audit 里的 USER / EXPERT 主体审核（属 M1）就会被算成内容审核量。</p>
+     */
+    private List<String> resolveContentTypes(String targetType) {
+        requireValidTargetType(targetType);
+        return StringUtils.hasText(targetType) ? List.of(targetType) : CONTENT_TYPES;
+    }
+
+    /**
+     * 近 {@value #STATISTICS_DAYS} 日按天统计，返回固定 7 个元素：含今天、按日期升序。
+     *
+     * <p>两步走：先让数据库按天分组拿到<b>有记录</b>的日期，再在 Java 里把窗口内缺失的
+     * 日期补 0。之所以不按天逐个发查询（看板的 dailyTrend 就是按天发 7 次），
+     * 是因为这里每天要两个计数，按天发就是 14 条 SQL，分组查询一条就够。</p>
+     *
+     * <p>补 0 而不是留 null：前端按固定 7 个点画折线，缺项会让折线断掉；
+     * 而且本项目的 Jackson 配了 non_null，返回 null 时字段会整个从 JSON 里消失，
+     * 前端拿不到 key 比拿到 0 更糟。</p>
+     */
+    private List<AuditDailyStatVO> dailyTrend(List<String> types) {
+        LocalDate today = LocalDate.now();
+        LocalDate windowStart = today.minusDays(STATISTICS_DAYS - 1L);
+
+        List<AuditDailyStatVO> rows = auditRecordMapper.selectDailyStats(
+                windowStart.atStartOfDay(),
+                // 半开区间 [今天 00:00, 明天 00:00)：写 "<= 今天 23:59:59" 会漏掉当天最后一秒
+                today.plusDays(1).atStartOfDay(),
+                types,
+                RESULT_PASS,
+                RESULT_REJECT);
+
+        // 按日期索引，便于下面按窗口逐日取用；GROUP BY 已保证日期不重复，合并函数仅为防御
+        Map<String, AuditDailyStatVO> byDate = rows.stream()
+                .collect(Collectors.toMap(AuditDailyStatVO::getDate, row -> row, (first, second) -> first));
+
+        List<AuditDailyStatVO> trend = new ArrayList<>(STATISTICS_DAYS);
+        for (int i = 0; i < STATISTICS_DAYS; i++) {
+            // LocalDate.toString() 是 ISO 的 yyyy-MM-dd，与 SQL 里 DATE_FORMAT(..., '%Y-%m-%d') 一致
+            String date = windowStart.plusDays(i).toString();
+            AuditDailyStatVO hit = byDate.get(date);
+            trend.add(hit != null ? hit : new AuditDailyStatVO(date, 0L, 0L));
+        }
+        return trend;
     }
 }

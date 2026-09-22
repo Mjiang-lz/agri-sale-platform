@@ -2,6 +2,7 @@ package com.rxt.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.dto.AuditActionDTO;
+import com.rxt.vo.AuditStatisticsVO;
 import com.rxt.vo.AuditTaskVO;
 
 import java.util.List;
@@ -96,5 +97,22 @@ public interface AuditService {
      * @return 审核后的内容视图（含本次审核流水），前端可直接用它刷新当前行
      */
     AuditTaskVO auditContent(String targetType, Long targetId, Long auditorId, AuditActionDTO action);
+
+    /**
+     * 审核工作量统计：当前审核员的累计已审数 + 近 7 日审核趋势。
+     *
+     * <p>数据源是审核流水 t_audit（统计「审核动作发生了多少」），
+     * 与看板统计「内容当前是什么状态」互补，两者不重复 —— 见
+     * {@code docs/接口约定-M6内容审核.md} 第八节。</p>
+     *
+     * <p>严格限定内容类型（PRODUCT / KNOWLEDGE / COMMENT）：t_audit 同时记录
+     * USER / EXPERT 主体审核（属 M1），不限定类型会把它们算进来。</p>
+     *
+     * @param auditorId  「我的已审数」的口径来源，取自登录态（UserContext.currentUserId()），
+     *                   不接受客户端传入 —— 否则任何登录用户都能查别人的工作量
+     * @param targetType 可选：PRODUCT / KNOWLEDGE / COMMENT；为空表示三类内容合计
+     * @return 统计视图；{@code last7Days} 固定 7 个元素、含今天、无数据的日期补 0
+     */
+    AuditStatisticsVO statistics(Long auditorId, String targetType);
 
 }

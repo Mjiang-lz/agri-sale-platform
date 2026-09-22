@@ -5,6 +5,7 @@ import com.rxt.common.Result;
 import com.rxt.dto.AuditActionDTO;
 import com.rxt.security.UserContext;
 import com.rxt.service.AuditService;
+import com.rxt.vo.AuditStatisticsVO;
 import com.rxt.vo.AuditTaskVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -102,6 +103,23 @@ public class AuditController {
                                             @RequestBody @Valid AuditActionDTO action) {
         return Result.success(auditService.auditContent(
                 targetType, targetId, UserContext.currentUserId(), action));
+    }
+
+    /**
+     * 审核工作量统计：我的累计已审数 + 近 7 日审核趋势。
+     *
+     * <p>与看板 {@code /admin/dashboard/statistics} 分工：看板给「内容当前状态」
+     * （待审总数、状态分布），本接口给「审核动作量」。两者不重复，见
+     * docs/接口约定-M6内容审核.md 第八节。</p>
+     *
+     * <p>路径是字面量，声明在 {@code /{auditId}} 之前更清晰（Spring 也会优先匹配字面量路径）。</p>
+     *
+     * @param targetType 可选：PRODUCT / KNOWLEDGE / COMMENT；为空表示三类内容合计
+     */
+    @GetMapping("/statistics")
+    public Result<AuditStatisticsVO> statistics(@RequestParam(required = false) String targetType) {
+        // 「我的已审数」的口径来源是登录态，不接受客户端传 auditorId
+        return Result.success(auditService.statistics(UserContext.currentUserId(), targetType));
     }
 
     /**
