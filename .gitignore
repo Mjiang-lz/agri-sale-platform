@@ -17,6 +17,18 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# 锁文件不入库。
+# 现状：仓库从未跟踪过任何锁文件，`frontend-web` / `frontend-admin` 只提交 package.json，
+# 装依赖时按 `^` 范围解析。这样做的好处是不会出现几百行的锁文件冲突；
+# 代价是不同机器可能装到不同的补丁版本。
+#
+# ⚠️ 这几个文件是本地 `npm install` 自动生成的，**不是**要提交的产物。
+# 想改成"锁定版本"（对交付/答辩更稳），删掉下面三行、各前端目录提交自己的
+# package-lock.json，并在群里通知全组重装依赖 —— 属独立决策，别顺手做。
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
 # ---------------------- IDE ----------------------
 .idea/
 *.iml

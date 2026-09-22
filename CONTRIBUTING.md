@@ -142,4 +142,6 @@ feat(trade): 新增商品发布/编辑/上下架接口
 ```
 
 `.gitignore` 已覆盖 `target/`、`node_modules/`、`dist/`、`.DS_Store`、
-`application-local.yml`、数据库导出文件等，正常情况下不会误提交。
+`application-local.yml`、数据库导出文件、以及各前端目录的**锁文件**
+（`package-lock.json` / `yarn.lock` / `pnpm-lock.yaml`，本项目不跟踪锁文件），
+正常情况下不会误提交。
