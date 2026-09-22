@@ -1,9 +1,14 @@
 package com.rxt.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class QuestionDTO {
-    private String content;    // 提问内容
-    private Long expertId;     // 指定专家（可为空，为空表示公开提问）
+    @NotBlank(message = "提问内容不能为空")
+    @Size(min = 2, max = 500, message = "提问内容需 2~500 字")
+    private String content;
+
+    private Long expertId;
 }

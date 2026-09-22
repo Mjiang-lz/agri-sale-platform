@@ -1,8 +1,6 @@
 package com.rxt.service;
 
-import com.rxt.entity.Knowledge;
-import java.time.LocalDateTime;
-import java.util.List;
+import com.rxt.dto.AppointmentDTO;
 
 /**
  * 专家助力模块业务接口。
@@ -11,19 +9,10 @@ import java.util.List;
  */
 public interface ExpertService {
 
-    /**
-     * 按分类查询农业知识。
-     */
-    List<Knowledge> listKnowledge(String category);
-
-    /**
-     * 向专家提问。
-     */
-    Long askQuestion(Long askerId, Long expertId, String content);
 
     /**
      * 预约专家。
      */
-    Long makeAppointment(Long farmerId, Long expertId, LocalDateTime apptTime, String topic);
+    Long makeAppointment(Long farmerId, AppointmentDTO dto);
 
 }
