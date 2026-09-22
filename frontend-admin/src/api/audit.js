@@ -73,3 +73,34 @@ export function getKnowledgeAuditStatistics() {
     params: { targetType: 'KNOWLEDGE' }
   })
 }
+
+/** 评论审核页：查询待审核评论。 */
+export function getCommentPendingList(pageNum = 1, pageSize = 10) {
+  return request.get('/audit/pending', {
+    params: { targetType: 'COMMENT', pageNum, pageSize }
+  })
+}
+
+/** 评论审核页：按审核状态查询评论审核记录。 */
+export function getCommentAuditList(auditStatus, pageNum = 1, pageSize = 10) {
+  return request.get('/audit/list', {
+    params: { targetType: 'COMMENT', auditStatus, pageNum, pageSize }
+  })
+}
+
+/** 评论审核页：查看评论全文。 */
+export function getCommentAuditContent(targetId) {
+  return request.get(`/audit/content/COMMENT/${targetId}`)
+}
+
+/** 评论审核页：提交通过/驳回结论。 */
+export function submitCommentAudit(targetId, payload) {
+  return request.post(`/audit/content/COMMENT/${targetId}`, payload)
+}
+
+/** 评论审核页：查询我的累计审核数和近 7 日审核趋势。 */
+export function getCommentAuditStatistics() {
+  return request.get('/audit/statistics', {
+    params: { targetType: 'COMMENT' }
+  })
+}
