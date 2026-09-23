@@ -375,9 +375,12 @@ async function loadProducts() {
     }
   } catch (err) {
     console.error('金融产品加载失败：', err)
-    ElMessage.warning('金融产品加载失败，已显示演示数据')
-    productList.value = mapDemoProducts(DEMO_PRODUCTS)
-    setDemo('product', true)
+    productList.value = []
+    if (useDemo) {
+      ElMessage.warning('金融产品加载失败，已显示演示数据')
+      productList.value = mapDemoProducts(DEMO_PRODUCTS)
+      setDemo('product', true)
+    }
   } finally {
     loading.product = false
   }
@@ -446,9 +449,12 @@ async function loadExperts() {
     }
   } catch (err) {
     console.error('专家列表加载失败：', err)
-    ElMessage.warning('专家列表加载失败，已显示演示数据')
-    raw = DEMO_EXPERTS_RAW
-    setDemo('expert', true)
+    raw = []
+    if (useDemo) {
+      ElMessage.warning('专家列表加载失败，已显示演示数据')
+      raw = DEMO_EXPERTS_RAW
+      setDemo('expert', true)
+    }
   }
 
   // 姓名/头像用 /user/{userId}/brief 批量补全
@@ -513,9 +519,12 @@ async function loadExpertKnowledge() {
     }
   } catch (err) {
     console.error('专家知识加载失败：', err)
-    ElMessage.warning('专家知识加载失败，已显示演示数据')
-    raw = DEMO_EXPERT_KNOWLEDGE
-    setDemo('expertKnowledge', true)
+    raw = []
+    if (useDemo) {
+      ElMessage.warning('专家知识加载失败，已显示演示数据')
+      raw = DEMO_EXPERT_KNOWLEDGE
+      setDemo('expertKnowledge', true)
+    }
   }
 
   // 过滤：authorId 在专家列表里；isReadable 避开 17/18 那种乱码记录
@@ -587,9 +596,12 @@ async function loadAgriKnowledge() {
     }
   } catch (err) {
     console.error('农业知识加载失败：', err)
-    ElMessage.warning('农业知识加载失败，已显示演示数据')
-    allAgriKnowledge.value = DEMO_AGRI_KNOWLEDGE
-    setDemo('agriKnowledge', true)
+    allAgriKnowledge.value = []
+    if (useDemo) {
+      ElMessage.warning('农业知识加载失败，已显示演示数据')
+      allAgriKnowledge.value = DEMO_AGRI_KNOWLEDGE
+      setDemo('agriKnowledge', true)
+    }
   } finally {
     loading.agriKnowledge = false
   }
