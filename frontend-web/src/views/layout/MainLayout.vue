@@ -26,7 +26,7 @@
             <template #title>专家助力</template>
             <el-menu-item index="/expert/knowledge">农业知识</el-menu-item>
             <el-menu-item index="/expert/qa">专家问答</el-menu-item>
-            <el-menu-item v-if="canBookAppointment" index="/expert/appointment">专家预约</el-menu-item>
+            <el-menu-item v-if="canAccessAppointment" index="/expert/appointment">专家预约</el-menu-item>
           </el-sub-menu>
           <el-menu-item v-if="canSeeUser" index="/user/profile">个人中心</el-menu-item>
         </el-menu>
@@ -71,7 +71,7 @@ const canSeeFinance = computed(() => menuPerms.value.includes('finance'))
 const canSeeExpert = computed(() => menuPerms.value.includes('expert'))
 const canSeeUser = computed(() => menuPerms.value.includes('user'))
 const canSwitchRole = computed(() => ['农户', '采购方'].includes(actualRole.value))
-const canBookAppointment = computed(() => actualRole.value === '农户')
+const canAccessAppointment = computed(() => ['农户', '专家'].includes(actualRole.value))
 
 const activeMenu = computed(() => {
   if (route.path.startsWith('/trade/product')) return '/trade/products'
