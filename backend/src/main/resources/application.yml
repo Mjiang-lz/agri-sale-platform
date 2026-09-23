@@ -79,6 +79,12 @@ springdoc:
     operations-sorter: method
     # 默认展开第一个接口列表，省掉一次点击；但**不**默认展开具体接口（会把页面撑得很长）。
     doc-expansion: list
+    # 把 Authorize 里填的 token 记住，刷新页面后不用重填。
+    # 默认 false 时 Swagger UI 既不落盘也不回填（swagger-ui bundle 里
+    # persistAuthorizationIfNeeded 直接 return，loaded 钩子也不 restore），
+    # 表现为「每次刷新都要重填 token，漏填就一路 401」——排查时极易被误当成
+    # Authorize 坏了。只是把 token 存在浏览器本地，不涉及服务端，安全面不变。
+    persist-authorization: true
 
 logging:
   level:
