@@ -1,23 +1,28 @@
 package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
 import com.rxt.dto.AuditActionDTO;
 import com.rxt.entity.AuditRecord;
 import com.rxt.entity.Comment;
+import com.rxt.entity.ExpertInfo;
 import com.rxt.entity.Knowledge;
 import com.rxt.entity.Product;
 import com.rxt.entity.User;
 import com.rxt.mapper.AuditRecordMapper;
 import com.rxt.mapper.CommentMapper;
+import com.rxt.mapper.ExpertInfoMapper;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
 import com.rxt.security.PermissionChecker;
 import com.rxt.vo.AuditDailyStatVO;
 import com.rxt.vo.AuditStatisticsVO;
+import com.rxt.vo.AuditTaskVO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +38,7 @@ import org.apache.ibatis.builder.MapperBuilderAssistant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,7 +84,7 @@ class AuditServiceImplTest {
     static {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
         for (Class<?> entity : List.of(Product.class, Knowledge.class, Comment.class,
-                AuditRecord.class, User.class)) {
+                AuditRecord.class, User.class, ExpertInfo.class)) {
             TableInfoHelper.initTableInfo(assistant, entity);
         }
     }
@@ -93,6 +99,9 @@ class AuditServiceImplTest {
     private AuditRecordMapper auditRecordMapper;
     @Mock
     private UserMapper userMapper;
+    /** 知识作者换算用（t_knowledge.author_id → t_expert.user_id） */
+    @Mock
+    private ExpertInfoMapper expertInfoMapper;
     @Mock
     private PermissionChecker permissionChecker;
 
@@ -274,6 +283,151 @@ class AuditServiceImplTest {
         verify(auditRecordMapper).insert(captor.capture());
         assertEquals(RESULT_REJECT, captor.getValue().getAuditResult());
         assertEquals("COMMENT", captor.getValue().getTargetType());
+    }
+
+    // =====================================================================
+    // 三之二、知识作者 ID 换算（回归用例）
+    //
+    // 背景：t_knowledge.author_id 的外键指向 t_expert.expert_id，不是 t_user.user_id，
+    // 而 AuditTaskVO.submitterId 全类统一按「用户 ID」用 —— fillNames 正是拿它去查
+    // t_user.real_name 的。曾经漏了换算，审核台就把作者显示成「user_id 恰好等于
+    // expert_id 的那个人」：演示库里 author_id=1 的知识显示成「平台管理员」、
+    // author_id=2 的显示成「李官杏（农户）」，而真正的作者其实是赵国强 / 孙丽华。
+    // 本组用例守住「提交人必须是换算后的用户 ID」，三条读取路径各一个，外加一条脏数据兜底。
+    // =====================================================================
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("知识待审队列：提交人取 author_id 换算后的用户 ID（不是 expert_id 本身）")
+    void pendingKnowledgeSubmitterShouldBeConvertedUserId() {
+        // author_id=1 是「专家 1 号」，持有该专家身份的账号才是 user_id=7（赵国强）
+        Knowledge knowledge = new Knowledge();
+        knowledge.setKnowledgeId(31L);
+        knowledge.setTitle("水稻稻瘟病的识别与绿色防控");
+        knowledge.setAuthorId(1L);          // ← expert_id，不是 user_id
+        knowledge.setAuditStatus(STATUS_PENDING);
+        knowledge.setCreateTime(LocalDateTime.now());
+
+        Page<Knowledge> knowledgePage = new Page<>(1, 10);
+        knowledgePage.setRecords(List.of(knowledge));
+        knowledgePage.setTotal(1);
+        when(knowledgeMapper.selectPage(any(), any())).thenReturn(knowledgePage);
+
+        ExpertInfo expert = new ExpertInfo();
+        expert.setExpertId(1L);
+        expert.setUserId(7L);               // ← 真正持有该专家的账号 ID
+        when(expertInfoMapper.selectList(any())).thenReturn(List.of(expert));
+
+        User author = new User();
+        author.setUserId(7L);
+        author.setRealName("赵国强");
+        when(userMapper.selectList(any())).thenReturn(List.of(author));
+
+        IPage<AuditTaskVO> page = auditService.pageAudits("KNOWLEDGE", STATUS_PENDING, 1, 10);
+
+        AuditTaskVO vo = page.getRecords().get(0);
+        assertEquals(7L, vo.getSubmitterId(),
+                "提交人必须是 t_expert.user_id；直接透传 author_id 会把作者显示成别人");
+        assertEquals("赵国强", vo.getSubmitterName());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("知识已审列表：提交人同样换算（已审记录来自 t_audit，作者要回 t_knowledge 补）")
+    void auditedKnowledgeSubmitterShouldBeConvertedUserId() {
+        AuditRecord record = new AuditRecord();
+        record.setAuditId(101L);
+        record.setTargetType("KNOWLEDGE");
+        record.setTargetId(32L);
+        record.setAuditResult(RESULT_PASS);
+        record.setAuditorId(AUDITOR_ID);
+        record.setAuditTime(LocalDateTime.now());
+
+        Page<AuditRecord> recordPage = new Page<>(1, 10);
+        recordPage.setRecords(List.of(record));
+        recordPage.setTotal(1);
+        when(auditRecordMapper.selectPage(any(), any())).thenReturn(recordPage);
+
+        Knowledge knowledge = new Knowledge();
+        knowledge.setKnowledgeId(32L);
+        knowledge.setTitle("冬季肉牛育肥要点");
+        knowledge.setAuthorId(2L);          // ← expert_id
+        knowledge.setCreateTime(LocalDateTime.now());
+        when(knowledgeMapper.selectList(any())).thenReturn(List.of(knowledge));
+
+        ExpertInfo expert = new ExpertInfo();
+        expert.setExpertId(2L);
+        expert.setUserId(8L);
+        when(expertInfoMapper.selectList(any())).thenReturn(List.of(expert));
+
+        User author = new User();
+        author.setUserId(8L);
+        author.setRealName("孙丽华");
+        when(userMapper.selectList(any())).thenReturn(List.of(author));
+
+        IPage<AuditTaskVO> page = auditService.pageAudits("KNOWLEDGE", STATUS_PASSED, 1, 10);
+
+        assertEquals(8L, page.getRecords().get(0).getSubmitterId());
+        assertEquals("孙丽华", page.getRecords().get(0).getSubmitterName());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("知识详情：提交人换算（详情只查一条，未审过的内容没有流水属正常）")
+    void knowledgeDetailSubmitterShouldBeConvertedUserId() {
+        Knowledge knowledge = new Knowledge();
+        knowledge.setKnowledgeId(33L);
+        knowledge.setTitle("柑橘黄龙病防治");
+        knowledge.setContent("苗木检疫与木虱防治要点……");
+        knowledge.setAuthorId(1L);
+        knowledge.setAuditStatus(STATUS_PASSED);
+        knowledge.setCreateTime(LocalDateTime.now());
+        when(knowledgeMapper.selectById(33L)).thenReturn(knowledge);
+        when(auditRecordMapper.selectOne(any())).thenReturn(null);
+
+        ExpertInfo expert = new ExpertInfo();
+        expert.setExpertId(1L);
+        expert.setUserId(7L);
+        when(expertInfoMapper.selectList(any())).thenReturn(List.of(expert));
+
+        User author = new User();
+        author.setUserId(7L);
+        author.setRealName("赵国强");
+        when(userMapper.selectList(any())).thenReturn(List.of(author));
+
+        AuditTaskVO vo = auditService.contentDetail("KNOWLEDGE", 33L);
+
+        assertEquals(7L, vo.getSubmitterId());
+        assertEquals("赵国强", vo.getSubmitterName());
+        assertEquals("柑橘黄龙病防治", vo.getTargetTitle());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("知识作者在 t_expert 里查不到（脏数据）→ 提交人为 null，不报错、不显示错人")
+    void knowledgeWithUnknownExpertShouldNotFail() {
+        Knowledge knowledge = new Knowledge();
+        knowledge.setKnowledgeId(34L);
+        knowledge.setTitle("来源不明的知识");
+        knowledge.setAuthorId(999L);        // ← 指向一个不存在的专家
+        knowledge.setAuditStatus(STATUS_PENDING);
+        knowledge.setCreateTime(LocalDateTime.now());
+
+        Page<Knowledge> knowledgePage = new Page<>(1, 10);
+        knowledgePage.setRecords(List.of(knowledge));
+        knowledgePage.setTotal(1);
+        when(knowledgeMapper.selectPage(any(), any())).thenReturn(knowledgePage);
+        // 换算查不到人 → 返回空表（换算失败不是异常）
+        when(expertInfoMapper.selectList(any())).thenReturn(List.of());
+
+        IPage<AuditTaskVO> page = auditService.pageAudits("KNOWLEDGE", STATUS_PENDING, 1, 10);
+
+        AuditTaskVO vo = page.getRecords().get(0);
+        assertEquals(34L, vo.getTargetId(), "查不到作者也不能把整条记录丢掉");
+        assertNull(vo.getSubmitterId(), "查不到就显空，好过显示成错误的人");
+        assertNull(vo.getSubmitterName());
+        // 没有提交人，就不该再去查用户表（白跑一次 SQL）
+        verify(userMapper, never()).selectList(any());
     }
 
     // =====================================================================
