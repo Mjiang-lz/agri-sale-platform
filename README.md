@@ -163,7 +163,16 @@ npm run dev
 - 层间单向依赖：`controller → service → mapper → entity`，禁止跨层调用与反向依赖
 - 层间以 DTO 传递入参、以 VO 返回前端、Entity 与数据库表一一映射
 - `common` / `config` / `security` 为公共支撑层，被各层共用
-- 所有 Controller 统一返回 `Result<T>`，分页返回 `Result<PageResult<T>>`
+- 所有 Controller 统一返回 `Result<T>`
+- 分页接口返回 `Result<IPage<T>>` —— **响应体里分页字段是 `current` / `size` / `total` / `records`**
+  （`IPage` 的序列化结果），前端取列表要用 `data.records`、总条数用 `data.total`。
+  现行 15 个分页接口中 13 个是 `Result<IPage<XxxVO>>`（参数 `pageNum` / `pageSize`），
+  另有 2 个（`KnowledgeController` 的 `/knowledge/list`、`LoanProductController` 的
+  `/finance/loan-products` —— 注意后者类级前缀是 `/finance`，不是 `/loan-products`）
+  直接用 MyBatis-Plus 的具体类 `Result<Page<实体>>`，**参数名是 `page` / `size` 而不是
+  `pageNum` / `pageSize`，返回的也是实体而非 VO**（`PageParamInterceptor` 两种写法都认，
+  所以校验不会报错，但前端会拿错字段）。
+  ⚠️ `common/PageResult` 这个类目前**没有任何接口在用**（历史遗留），别照它的字段名写前端。
 
 ## 当前状态
 
@@ -276,6 +285,8 @@ npm run dev
 
 M6 新增接口的请求 / 响应结构见 `docs/接口约定-M6平台治理.md`；
 内容审核与审核统计见 `docs/接口约定-M6内容审核.md`；
-订单状态流转见 `docs/接口约定-M2订单流转.md`。
+订单状态流转见 `docs/接口约定-M2订单流转.md`；
+图片上传（三类图片共用一个接口，靠 `bizType` 区分，含类型白名单与存储实现差异）见
+`docs/接口约定-公共文件上传.md`。
 
 第三方支付与短信服务为**模拟通道**，不涉及真实资金。
