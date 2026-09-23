@@ -1,5 +1,6 @@
 package com.rxt.security;
 
+import com.rxt.config.ApiDocsProperties;
 import com.rxt.config.FileStorageProperties;
 import com.rxt.storage.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,6 +35,15 @@ import org.springframework.web.util.pattern.PathPatternParser;
  *
  * <p><b>新增规则前先自问：这个接口真的允许游客访问吗？</b>
  * 若只是为了「联调方便」，请勿加进来 —— 白名单是攻击面，不是便利开关。</p>
+ *
+ * <p><b>接口文档（Swagger）是这条原则的唯一例外，而且是被明确收口的例外：</b>
+ * 放行 {@code /v3/api-docs**} 与 {@code /swagger-ui**} 确实只为「联调方便」，
+ * 所以做了三件事把它约束住 ——
+ * ① 跟着 {@code rxt.api-docs.enabled} 开关（代码默认关，只有 dev profile 打开）；
+ * ② 只放行 GET，文档前缀下不存在任何写接口；
+ * ③ 与 springdoc 自身的启停共用同一个开关值，关了文档就没有这两个端点，
+ * 白名单里也不会留下"放行了却没内容"的规则。
+ * 换句话说：它不是"放宽了原则"，而是"把这份便利限定在开发环境、可一键关掉"。</p>
  *
  * @see LoginInterceptor 规则的唯一消费方
  */
@@ -84,7 +94,9 @@ public class PublicEndpoints {
             rule(null, "/error")
     );
 
-    /** 实际生效的规则表 = 上面那张固定表 + 随存储实现启用的规则 */
+    /**
+     * 实际生效的规则表 = 上面那张固定表 + 随存储实现启用的规则 + 随接口文档开关启用的规则
+     */
     private final List<Rule> rules;
 
     /**
@@ -98,8 +110,15 @@ public class PublicEndpoints {
      * 也就不会出现「放行了却没内容」或「有内容却访问不了」的错位。</p>
      *
      * <p><b>只放行 GET：</b>上传走 {@code POST /common/upload}，是写操作，仍然要求登录。</p>
+     *
+     * <p><b>接口文档（Swagger UI）的放行同理，跟着 {@code rxt.api-docs.enabled} 开关：</b>
+     * 文档页要能打开，页面本身和它拉取的 OpenAPI 描述就必须免登录 ——
+     * 否则打开页面只拿到一个 401 的 JSON，表现为白屏。而这个"能打开"是有代价的：
+     * 一个可交互的接口清单 + 调用台，等于把全部接口连同试调入口一起交出去，
+     * 所以只在开了文档时才放行，并且**同样只放 GET**
+     * （{@code /v3/api-docs} 是读描述，没有任何写操作需要走这两个前缀）。</p>
      */
-    public PublicEndpoints(FileStorageProperties fileStorageProperties) {
+    public PublicEndpoints(FileStorageProperties fileStorageProperties, ApiDocsProperties apiDocsProperties) {
         List<Rule> merged = new ArrayList<>(BASE_RULES);
         if (!fileStorageProperties.isEnabled()) {
             // 上传产物（商品图片 / 知识配图 / 头像）是公开内容：游客本就能浏览商品列表
@@ -107,6 +126,20 @@ public class PublicEndpoints {
             // OBS 模式下图片 URL 直接指向对象存储、同样公网可读；
             // 本地兜底保持一致的可见性，两种环境的行为才不会分裂。
             merged.add(rule(HttpMethod.GET.name(), FileStorageService.LOCAL_PATH_PATTERN + "/**"));
+        }
+        if (apiDocsProperties.isEnabled()) {
+            // ① OpenAPI 描述本身（Swagger UI 打开后先去拉它）
+            //    /v3/api-docs 是 JSON、/v3/api-docs.yaml 是 YAML，两者是并列的路径而不是
+            //    「目录与文件」的关系，所以 /v3/api-docs/** 匹配不到 .yaml，必须各写一条。
+            merged.add(rule(HttpMethod.GET.name(), "/v3/api-docs"));
+            merged.add(rule(HttpMethod.GET.name(), "/v3/api-docs.yaml"));
+            merged.add(rule(HttpMethod.GET.name(), "/v3/api-docs/**"));
+
+            // ② Swagger UI 页面与它的静态资源（JS / CSS / swagger-config）
+            //    /swagger-ui.html 是 springdoc 注册的入口，会跳到 /swagger-ui/index.html；
+            //    资源本体都在 /swagger-ui/** 下，两条都要。
+            merged.add(rule(HttpMethod.GET.name(), "/swagger-ui.html"));
+            merged.add(rule(HttpMethod.GET.name(), "/swagger-ui/**"));
         }
         this.rules = List.copyOf(merged);
     }

@@ -52,6 +52,34 @@ rxt:
     # 两种落点都在 .gitignore 的 uploads/ 规则覆盖内（该规则不带前导斜杠，匹配任意层级），不会误提交。
     local-dir: uploads
 
+  api-docs:
+    # 接口文档（OpenAPI + Swagger UI）总开关。
+    # 默认关：它需要把 /v3/api-docs** 与 /swagger-ui** 加进免登录白名单，
+    # 等于对外公开完整接口清单和一个可交互调用台，所以不能"默认就开着"。
+    # 开发/答辩环境由 application-dev.yml 打开；换到别的 profile 自动不暴露。
+    # 临时关闭：RXT_API_DOCS_ENABLED=false mvn spring-boot:run
+    enabled: ${RXT_API_DOCS_ENABLED:false}
+    title: 融销通（rxt）平台 · 后端接口
+    version: 1.0.0
+
+# 接口文档的启停与上面的 rxt.api-docs.enabled 共用同一个值（单一开关）：
+# 只关白名单不关端点，会出现「白名单没放行、但端点在」的假死（页面 401）；
+# 只关端点不关白名单，白名单里就会长期挂着一条永不命中的规则。
+# 两处引用同一个属性，任何一边都不可能单独漂移。
+springdoc:
+  api-docs:
+    enabled: ${rxt.api-docs.enabled}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${rxt.api-docs.enabled}
+    path: /swagger-ui.html
+    # 标签（= 控制器类名）按字母序、接口按 HTTP 方法排序，页面顺序稳定下来，
+    # 才不会每次刷新都在找"刚才那个接口跑哪去了"。
+    tags-sorter: alpha
+    operations-sorter: method
+    # 默认展开第一个接口列表，省掉一次点击；但**不**默认展开具体接口（会把页面撑得很长）。
+    doc-expansion: list
+
 logging:
   level:
     com.rxt: debug

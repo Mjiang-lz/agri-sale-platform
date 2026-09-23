@@ -28,11 +28,29 @@
 | 持久层 | MyBatis-Plus | 3.5.16 |
 | 数据库 | MySQL | 8.0（utf8mb4） |
 | 对象存储 | 华为云 OBS | — |
+| 接口文档 | springdoc-openapi（Swagger UI） | 3.0.1 |
 | 代码托管与构建 | 华为云 CodeArts | — |
 
 > **持久层依赖注意**：Spring Boot 4 必须使用 `mybatis-plus-spring-boot4-starter`（3.5.15 起提供）。
 > 旧的 `mybatis-plus-spring-boot3-starter` 在 Boot 4 下自动配置类路径已变更，启动会直接失败。
 > 分页插件另需引入 `mybatis-plus-jsqlparser`（3.5.9 起 JSqlParser 被拆为独立模块）。
+
+> **接口文档依赖注意**：Swagger 用 `springdoc-openapi-starter-webmvc-ui`，版本在 `pom.xml` 的
+> `<springdoc.version>` 里单独钉住（当前 `3.0.1`）。Spring Boot 4 必须用 springdoc **3.x**
+> （2.x 只支持 Boot 3）；而 3.x 各小版本是分别针对不同 Boot 打出来的，
+> **换 Boot 版本时必须回头核对这一项**，否则会出现 jar 编译期 API 与运行时不一致、
+> 启动直接 `NoSuchMethodError`。已实测的对应关系：
+>
+> | springdoc | 编译时对齐的 Boot |
+> | --- | --- |
+> | 3.0.0 | 4.0.0 |
+> | **3.0.1（本项目）** | **4.0.1** |
+> | 3.0.2 | 4.0.3 |
+> | 3.0.3 | 4.0.5 |
+> | 3.1.x | 4.1.0 |
+>
+> 另：**不要**为了 Swagger 引入 `spring-boot-starter-security` —— 本项目鉴权是自实现的
+> JWT 拦截器，引入 Security 会让所有接口直接 401。
 
 ## 目录结构
 
@@ -100,6 +118,35 @@ mvn spring-boot:run
 （若本机 8080 已被别的项目占用，可加 `-Dspring-boot.run.arguments=--server.port=18080` 换端口，
 注意同时改 `frontend-web/vite.config.*` 里的代理地址。）
 
+### 接口文档（Swagger）
+
+后端起来之后，`dev` 环境可以直接打开交互式接口文档：
+
+| 地址 | 用途 |
+| --- | --- |
+| `http://localhost:8080/api/swagger-ui.html` | 交互式页面，可直接「Try it out」发请求 |
+| `http://localhost:8080/api/v3/api-docs` | OpenAPI JSON（可导入 Postman / Apifox） |
+| `http://localhost:8080/api/v3/api-docs.yaml` | 同一份描述的 YAML 版 |
+
+> 前缀是 `/api/swagger-ui.html`，不是 `/swagger-ui.html` —— 全局 `context-path: /api` 对静态资源一样生效。
+> 注意 `/v3/api-docs` 与 `/v3/api-docs.yaml` 是**并列**的两个路径，不是 `/v3/api-docs/**` 的子路径。
+
+**用之前先看页面最上面那段说明**，尤其这两条最容易误判：本项目一律返回 HTTP 200，
+成败看响应体里的 `code`；除免登录接口外都要带 JWT —— 点右上角 **Authorize**，
+把 `POST /auth/login` 返回的 `data.token` 填进去（**只填 token 本身，不要带 `Bearer ` 前缀**）。
+演示账号见 `backend/src/main/resources/db/data.sql`。
+
+**开关与安全**：文档默认关闭，仅 `dev` 环境默认打开，由单一开关 `rxt.api-docs.enabled`
+（环境变量 `RXT_API_DOCS_ENABLED`）控制。这个开关同时管两件事 —— springdoc 是否注册端点、
+`PublicEndpoints` 是否放行文档路径 —— 所以不会出现「白名单放行了、端点却不存在」这种错位。
+一个交互式接口控制台等于把全部接口的请求构造能力公开出去，**不要在对外部署的 profile 里打开**；
+关掉时这些地址会退回普通受保护路径（`code: 401`），而不是变成匿名可读。
+
+```bash
+# 本地临时关掉（比如排查「是不是文档影响了别的接口」）
+RXT_API_DOCS_ENABLED=false mvn spring-boot:run
+```
+
 ### 前端
 
 ```bash
@@ -132,6 +179,7 @@ npm run dev
 | **M0 参数校验** | **全局参数校验**：路径不存在 404、缺必填参数 / 类型不匹配 400、分页下界拦截 | 已完成（P1） |
 | **M0 日志规范** | **链路标识**：每请求一个 traceId，写入 MDC 与 `X-Trace-Id` 响应头 | 已完成（P1） |
 | **M0 鉴权白名单** | 放行规则改为「**HTTP 方法 + 路径**」双条件，写接口不再被只读规则顺带放过 | 已完成（P1） |
+| **M0 接口文档** | **Swagger / OpenAPI**：dev 环境可交互调试，非 dev 默认关闭（单一开关） | 已完成（P1） |
 | M1 用户与权限 | 注册 / 登录 / 登出、个人资料与农户经营档案、角色权限校验（`PermissionChecker`） | 已完成 |
 | M1 角色菜单 | 登录与资料接口返回 `menuPerms`（取自 `t_role.menu_perms`），供前端按角色渲染菜单 | 已完成 |
 | M2 农产品交易 | 商品、购物车、订单（含支付 / 发货 / 收货状态流转） | 已完成 |
@@ -168,8 +216,15 @@ npm run dev
 | GET | `/trade/products` | 商品货源列表 |
 | GET | `/demand/list` | 求购需求列表 |
 | 不限 | `/error` | 框架内部错误转发 |
+| GET | `/v3/api-docs`、`/v3/api-docs.yaml`、`/v3/api-docs/**` | Swagger 描述（**仅 `rxt.api-docs.enabled=true` 时存在**） |
+| GET | `/swagger-ui.html`、`/swagger-ui/**` | Swagger UI 页面与静态资源（同上） |
 
 **其余接口一律要求登录**（`/admin/**` 与 `/loan-admin/**` 均在其中，且服务层再判角色）。
+
+> 表格最后两行的文档规则**不是常量**：它们由 `rxt.api-docs.enabled` 决定 ——
+> 关掉时既不在白名单里、端点也不注册，请求会退回普通受保护路径。做成条件而非固定放行，
+> 是为了让「白名单放行的集合」在任何环境下都正好等于「真的能被匿名接住的集合」，
+> 同时不给生产环境留一条常驻的匿名接口。改这两行请连同上面的开关说明一起改。
 
 > **为什么不用 `excludePathPatterns`**：那个 API 只按路径匹配、**没有方法概念**。
 > 一旦为了放行商品详情写上 `/trade/products/**`，同前缀下的
