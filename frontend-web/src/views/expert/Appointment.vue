@@ -1,5 +1,7 @@
 <template>
-  <div class="appointment-page">
+  <ExpertAppointmentPanel v-if="isExpert" />
+
+  <div v-else class="appointment-page">
     <!-- 页面用途：农户筛选专家、提交线下预约并查看当前浏览器中的最近提交记录。 -->
     <el-alert
       v-if="!canBookAppointment"
@@ -88,6 +90,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import ExpertAppointmentPanel from '@/components/expert/ExpertAppointmentPanel.vue'
 import { submitAppointment } from '@/api/expert'
 import { expertOptions } from '@/constants/experts'
 import { useUserStore } from '@/store/user'
@@ -101,6 +104,7 @@ import { useUserStore } from '@/store/user'
 const STORAGE_KEY = 'rxt_expert_appointments'
 const userStore = useUserStore()
 const canBookAppointment = computed(() => userStore.profile?.roleName === '农户')
+const isExpert = computed(() => userStore.profile?.roleName === '专家')
 const experts = expertOptions
 const appointments = ref([])
 const dialogVisible = ref(false)

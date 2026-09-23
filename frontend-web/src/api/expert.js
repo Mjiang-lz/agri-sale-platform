@@ -33,3 +33,13 @@ export function getQuestionAnswers(questionId) {
 export function submitAppointment(payload) {
   return request.post('/expert/appointment/submit', payload)
 }
+
+/** 专家工作台：查询当前专家可回复的待处理问题。 */
+export function getExpertPendingQuestions() {
+  return request.get('/expert/qa/pending')
+}
+
+/** 专家工作台：提交专家回答。 */
+export function submitExpertAnswer(payload) {
+  return request.post('/expert/qa/answer', payload)
+}
