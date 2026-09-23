@@ -1,5 +1,7 @@
 <template>
-  <div class="qa-page">
+  <ExpertAnswerPanel v-if="isExpert" />
+
+  <div v-else class="qa-page">
     <!-- 页面用途：农户查看自己的历史提问，选择平台专家并提交新的农业问题。 -->
     <section class="qa-hero">
       <div>
@@ -96,14 +98,18 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import ExpertAnswerPanel from '@/components/expert/ExpertAnswerPanel.vue'
 import { askQuestion, getMyQuestions, getQuestionAnswers } from '@/api/expert'
 import { expertOptions, getExpertName } from '@/constants/experts'
+import { useUserStore } from '@/store/user'
 
 /**
  * 页面用途：专家问答。
  * 接口文件：frontend-web/src/api/expert.js
  * 数据来源：登录农户自己的 t_question 记录和对应的 t_answer 回答。
  */
+const userStore = useUserStore()
+const isExpert = computed(() => userStore.profile?.roleName === '专家')
 const formRef = ref()
 const loading = ref(false)
 const submitting = ref(false)
