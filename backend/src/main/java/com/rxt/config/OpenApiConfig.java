@@ -3,6 +3,7 @@ package com.rxt.config;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,15 +24,28 @@ import org.springframework.context.annotation.Configuration;
  *   <li><b>本项目不用 HTTP 状态码表达业务结果</b> —— 一律 HTTP 200，真实状态在响应体的
  *       {@code code} 字段里。看 Swagger 页面上"200 OK"就以为成功了，是这里最容易踩的坑。</li>
  *   <li><b>鉴权是自实现的 JWT</b>（{@code LoginInterceptor} 解析 {@code Authorization} 头），
- *       不是 Spring Security。所以这里只声明一个 bearer 安全方案供页面上的
- *       <b>Authorize</b> 按钮用，让调试带写接口时不必手写请求头。</li>
+ *       不是 Spring Security。所以这里要同时做两件事：声明一个 bearer 安全方案，
+ *       并把文档级 {@code security} 指向它 —— 缺任何一件，页面上的
+ *       <b>Authorize</b> 都不会把 token 附到请求上（详见下面那段）。</li>
  * </ol>
  *
- * <p><b>为什么不把安全方案设成全局必需（{@code addSecurityItem}）：</b>
- * 设成全局后每个接口（含 {@code POST /auth/login} 这种本来就免登录的）都会被画上锁图标，
- * 想精确就得给免登录接口逐个挂 {@code @SecurityRequirements}，等于又要改一批控制器。
- * 只声明方案不设全局，页面右上角照样有 Authorize 按钮，代价是接口上的小锁图标不显示 ——
- * 用文档里的文字说明来补，比改代码便宜。</p>
+ * <p><b>安全方案必须连「安全要求」一起声明，否则 Authorize 是个摆设（已踩过一次）。</b>
+ * Swagger UI / swagger-client 决定"要不要把 token 附到请求上"的规则是：
+ * <b>先看 operation 级 {@code security}，再回落到文档级 {@code security}；
+ * 两处都没有，就视为该操作无需鉴权</b> —— 此时即使页面上的 Authorize 已经填好值，
+ * 请求里也不会出现 {@code Authorization} 头。所以「只声明方案、不声明要求」的后果
+ * <b>不是"少画一个小锁图标"，而是所有需要登录的接口在页面里试都返回 401</b>。
+ * 本类第一版就漏了 {@code addSecurityItem}（提交 f0eb3a2），
+ * 由李东阳的缺陷报告指出，{@code OpenApiConfigTest} 现已把这一行钉住。</p>
+ *
+ * <p><b>已知代价（可接受）：</b>文档级 security 会让 {@code POST /auth/login} 这类免登录接口
+ * 也被画上小锁图标 —— 纯观感问题，实测无副作用：
+ * {@link com.rxt.security.LoginInterceptor} 对白名单路径是"尽力解析令牌、
+ * 识别不出当游客放行"，多带一个 token 不会导致 401。
+ * 想把图标也做精确，需要给免登录接口逐个置 {@code security: []}
+ * （可用 {@code OperationCustomizer} 从 {@code PublicEndpoints} 推导）——
+ * 但那要多一层"由 HandlerMethod 反推真实路径"的逻辑，而一旦推错，
+ * 就会在<b>文档上</b>把一个需要鉴权的接口标成免鉴权（比多画一个锁图标危险得多），故暂不做。</p>
  *
  * @see ApiDocsProperties 开关与标题
  */
@@ -67,6 +81,8 @@ public class OpenApiConfig {
                                 （**只填 token 本身，不要带 `Bearer ` 前缀**，页面会自己加）。
                                 仅以下接口免登录：`/auth/login`、`/auth/register`、
                                 `GET /home/**`、`GET /trade/products`、`GET /demand/list`。
+                                （这几个接口在这个页面上也会显示小锁图标 —— 那是文档级
+                                security 的副作用，**可以忽略**；给它们带上 token 也不会出错。）
                                 演示账号：管理员 `13800000001`，密码统一 `123456`。
 
                                 **3）分页：请求参数是 `pageNum` / `pageSize`（从 1 开始），
@@ -83,6 +99,11 @@ public class OpenApiConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT")
-                                .description("登录接口返回的 data.token（不要带 Bearer 前缀）")));
+                                .description("登录接口返回的 data.token（不要带 Bearer 前缀）")))
+
+                // ★ 这一行不能省。只声明方案（上面那段）只够让 Authorize 弹框里出现 bearerAuth，
+                //   但 swagger-client 要在「operation 级 security」或「文档级 security」里
+                //   找到要求，才会把 token 附到请求上；两处都没有就当作无需鉴权。
+                .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME));
     }
 }
