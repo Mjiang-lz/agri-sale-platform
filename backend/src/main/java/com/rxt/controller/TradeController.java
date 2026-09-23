@@ -173,11 +173,55 @@ public class TradeController {
     }
 
     /**
-     * 查询订单详情，只能查自己的订单。
+     * 查询我卖出的订单（农户视角，分页），可按订单状态筛选。发货的入口。
+     *
+     * <p>路径 {@code /order/sold} 是字面量段，与下面的 {@code /order/{orderId}} 不冲突 ——
+     * Spring 的 PathPattern 按「字面量优先于路径变量」排序匹配，
+     * {@code /order/sold} 不会被 {@code /order/{orderId}} 抢走。</p>
+     */
+    @GetMapping("/order/sold")
+    public Result<IPage<OrderVO>> pageSoldOrders(@RequestParam(defaultValue = "1") long pageNum,
+                                                 @RequestParam(defaultValue = "10") long pageSize,
+                                                 @RequestParam(required = false) String orderStatus) {
+        return Result.success(tradeService.pageSoldOrders(UserContext.currentUserId(), pageNum, pageSize, orderStatus));
+    }
+
+    /**
+     * 查询订单详情。订单的买家与卖家都能查看，其他用户返回「订单不存在」。
      */
     @GetMapping("/order/{orderId}")
     public Result<OrderVO> orderDetail(@PathVariable Long orderId) {
         return Result.success(tradeService.orderDetail(UserContext.currentUserId(), orderId));
+    }
+
+    /**
+     * 支付订单（模拟支付通道，不接入真实资金）。
+     *
+     * <p>状态流转：待支付 → 待发货，写入 pay_time。仅订单买家本人可操作。
+     * 无请求体 —— 「支付」这个动作本身就是全部语义，目标状态由当前状态推得。</p>
+     */
+    @PostMapping("/order/{orderId}/pay")
+    public Result<Void> payOrder(@PathVariable Long orderId) {
+        tradeService.payOrder(UserContext.currentUserId(), orderId);
+        return Result.success();
+    }
+
+    /**
+     * 订单发货。状态流转：待发货 → 待收货，写入 deliver_time。仅订单的农户可操作。
+     */
+    @PostMapping("/order/{orderId}/deliver")
+    public Result<Void> deliverOrder(@PathVariable Long orderId) {
+        tradeService.deliverOrder(UserContext.currentUserId(), orderId);
+        return Result.success();
+    }
+
+    /**
+     * 确认收货。状态流转：待收货 → 已完成，写入 receive_time。仅订单买家本人可操作。
+     */
+    @PostMapping("/order/{orderId}/receive")
+    public Result<Void> receiveOrder(@PathVariable Long orderId) {
+        tradeService.receiveOrder(UserContext.currentUserId(), orderId);
+        return Result.success();
     }
 
     /**

@@ -2,24 +2,60 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 
+const ACTIVE_ROLE_KEY = 'rxt_active_role'
+const PROFILE_KEY = 'rxt_user_profile'
+const SWITCHABLE_ROLES = ['农户', '采购方']
+
+function readProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+
 /**
- * 登录态与当前用户信息。
+ * 登录态、当前用户信息、后端菜单权限和业务端当前身份。
+ *
+ * menuPerms 来自后端 LoginVO，是菜单展示的权威数据源。
+ * activeRole 只用于农户/采购方演示切换，不改变 JWT 或接口权限。
  */
 export const useUserStore = defineStore('user', () => {
   const token = ref(getToken() || '')
-  const profile = ref(null)
+  const profile = ref(readProfile())
+  const menuPerms = ref(profile.value?.menuPerms || '')
+  const activeRole = ref(localStorage.getItem(ACTIVE_ROLE_KEY) || profile.value?.roleName || '农户')
+
+  function setMenuPerms(value) {
+    menuPerms.value = value || ''
+    localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...(profile.value || {}), menuPerms: menuPerms.value }))
+  }
+
+  function setActiveRole(role) {
+    if (!SWITCHABLE_ROLES.includes(role)) return
+    activeRole.value = role
+    localStorage.setItem(ACTIVE_ROLE_KEY, role)
+  }
 
   function saveLogin(data) {
     token.value = data.token
     setToken(data.token)
     profile.value = data
+    menuPerms.value = data.menuPerms || ''
+    activeRole.value = data.roleName || '农户'
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(data))
+    localStorage.setItem(ACTIVE_ROLE_KEY, activeRole.value)
   }
 
   function logout() {
     token.value = ''
     profile.value = null
+    menuPerms.value = ''
+    activeRole.value = '农户'
+    localStorage.removeItem(PROFILE_KEY)
+    localStorage.removeItem(ACTIVE_ROLE_KEY)
     removeToken()
   }
 
-  return { token, profile, saveLogin, logout }
+  return { token, profile, menuPerms, activeRole, setMenuPerms, setActiveRole, saveLogin, logout }
 })

@@ -1,15 +1,19 @@
 package com.rxt.controller;
 
 import com.rxt.common.Result;
-import com.rxt.dto.QuestionDTO;
 import com.rxt.dto.AnswerDTO;
-import com.rxt.service.ExpertQaService;
+import com.rxt.dto.QuestionDTO;
+import com.rxt.entity.Answer;
+import com.rxt.entity.Question;
 import com.rxt.security.UserContext;
+import com.rxt.service.ExpertQaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
-// 注意：context-path 已是 /api，这里只写 /expert/qa，写成 /api/expert/qa 会变成 /api/api/expert/qa
 @RequestMapping("/expert/qa")
 public class ExpertQaController {
 
@@ -17,16 +21,31 @@ public class ExpertQaController {
     private ExpertQaService expertQaService;
 
     @PostMapping("/ask")
-    public Result<Void> ask(@RequestBody QuestionDTO dto) {
+    public Result<Void> ask(@RequestBody @Valid QuestionDTO dto) {
         Long askerId = UserContext.currentUserId();
         expertQaService.askQuestion(askerId, dto);
         return Result.success();
     }
 
     @PostMapping("/answer")
-    public Result<Void> answer(@RequestBody AnswerDTO dto) {
-        Long expertId = UserContext.currentUserId();
-        expertQaService.answerQuestion(expertId, dto);
+    public Result<Void> answer(@RequestBody @Valid AnswerDTO dto) {
+        Long userId = UserContext.currentUserId();
+        expertQaService.answerQuestion(userId, dto);
         return Result.success();
+    }
+
+    @GetMapping("/my")
+    public Result<List<Question>> myQuestions() {
+        return Result.success(expertQaService.listMyQuestions(UserContext.currentUserId()));
+    }
+
+    @GetMapping("/pending")
+    public Result<List<Question>> pending() {
+        return Result.success(expertQaService.listPendingQuestions(UserContext.currentUserId()));
+    }
+
+    @GetMapping("/list")
+    public Result<List<Answer>> listByQuestion(@RequestParam Long questionId) {
+        return Result.success(expertQaService.listAnswersByQuestionId(questionId));
     }
 }

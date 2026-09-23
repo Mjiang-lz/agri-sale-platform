@@ -9,22 +9,27 @@ import com.rxt.common.ResultCode;
 import com.rxt.dto.AuditActionDTO;
 import com.rxt.entity.AuditRecord;
 import com.rxt.entity.Comment;
+import com.rxt.entity.ExpertInfo;
 import com.rxt.entity.Knowledge;
 import com.rxt.entity.Product;
 import com.rxt.entity.User;
 import com.rxt.mapper.AuditRecordMapper;
 import com.rxt.mapper.CommentMapper;
+import com.rxt.mapper.ExpertInfoMapper;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
 import com.rxt.security.PermissionChecker;
 import com.rxt.service.AuditService;
+import com.rxt.vo.AuditDailyStatVO;
+import com.rxt.vo.AuditStatisticsVO;
 import com.rxt.vo.AuditTaskVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +38,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -72,6 +78,9 @@ public class AuditServiceImpl implements AuditService {
     /** 评论摘要最大长度，超出截断 */
     private static final int COMMENT_SUMMARY_LENGTH = 50;
 
+    /** 审核统计的趋势窗口：近 7 日（含今天），与看板趋势口径保持一致（看板为 TREND_DAYS = 7） */
+    private static final int STATISTICS_DAYS = 7;
+
     /** t_product.status 上下架取值：1 上架、0 下架 */
     private static final int SHELF_ON = 1;
     private static final int SHELF_OFF = 0;
@@ -81,6 +90,8 @@ public class AuditServiceImpl implements AuditService {
     private final CommentMapper commentMapper;
     private final AuditRecordMapper auditRecordMapper;
     private final UserMapper userMapper;
+    /** 知识作者 ID 换算用：t_knowledge.author_id 存的是 expert_id，不是 user_id */
+    private final ExpertInfoMapper expertInfoMapper;
     private final PermissionChecker permissionChecker;
 
     // =====================================================================
@@ -94,9 +105,7 @@ public class AuditServiceImpl implements AuditService {
 
         // 0) 类型白名单校验：传了就必须是本模块管辖的三种内容类型之一
         //    （不校验的话，前端传 EXPERT 会查出一批没有标题的流水，看着像 bug）
-        if (StringUtils.hasText(targetType) && !CONTENT_TYPES.contains(targetType)) {
-            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "内容类型不合法：" + targetType);
-        }
+        requireValidTargetType(targetType);
 
         // 1) 状态兜底：不传状态时按"待审核"处理（审核后台首屏就是待办队列）
         String status = StringUtils.hasText(auditStatus) ? auditStatus : STATUS_PENDING;
@@ -154,7 +163,10 @@ public class AuditServiceImpl implements AuditService {
                 LambdaQueryWrapper<Knowledge> wrapper = new LambdaQueryWrapper<>();
                 wrapper.eq(Knowledge::getAuditStatus, STATUS_PENDING)
                         .orderByDesc(Knowledge::getCreateTime);
-                yield knowledgeMapper.selectPage(page, wrapper).convert(this::pendingKnowledgeVO);
+                Page<Knowledge> knowledgePage = knowledgeMapper.selectPage(page, wrapper);
+                // author_id 是专家 ID，先整页批量换算成用户 ID，再逐行转 VO
+                Map<Long, Long> expertUserMap = knowledgeAuthorUserIdMap(knowledgePage.getRecords());
+                yield knowledgePage.convert(item -> pendingKnowledgeVO(item, expertUserMap));
             }
             case TYPE_COMMENT -> {
                 Page<Comment> page = new Page<>(pageNum, pageSize);
@@ -193,14 +205,15 @@ public class AuditServiceImpl implements AuditService {
         total += productPage.getTotal();
         productPage.getRecords().forEach(item -> merged.add(pendingProductVO(item)));
 
-        // 2) 知识
+        // 2) 知识（author_id 存的是专家 ID，先批量换算成用户 ID，再转 VO）
         Page<Knowledge> knowledgePage = knowledgeMapper.selectPage(
                 new Page<>(1, fetchSize),
                 new LambdaQueryWrapper<Knowledge>()
                         .eq(Knowledge::getAuditStatus, STATUS_PENDING)
                         .orderByDesc(Knowledge::getCreateTime));
         total += knowledgePage.getTotal();
-        knowledgePage.getRecords().forEach(item -> merged.add(pendingKnowledgeVO(item)));
+        Map<Long, Long> expertUserMap = knowledgeAuthorUserIdMap(knowledgePage.getRecords());
+        knowledgePage.getRecords().forEach(item -> merged.add(pendingKnowledgeVO(item, expertUserMap)));
 
         // 3) 评论
         Page<Comment> commentPage = commentMapper.selectPage(
@@ -355,7 +368,8 @@ public class AuditServiceImpl implements AuditService {
                     throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在：" + targetId);
                 }
                 AuditTaskVO item = newPendingVO(TYPE_KNOWLEDGE, knowledge.getKnowledgeId(),
-                        knowledge.getTitle(), knowledge.getAuthorId(), knowledge.getCreateTime());
+                        knowledge.getTitle(), toUserIdByExpertId(knowledge.getAuthorId()),
+                        knowledge.getCreateTime());
                 item.setContent(knowledge.getContent());
                 item.setAuditStatus(knowledge.getAuditStatus());
                 yield item;
@@ -622,10 +636,20 @@ public class AuditServiceImpl implements AuditService {
                 product.getSellerId(), product.getCreateTime());
     }
 
-    /** 知识 → 待审视图：标题取 title，提交人取 author_id */
-    private AuditTaskVO pendingKnowledgeVO(Knowledge knowledge) {
+    /**
+     * 知识 → 待审视图：标题取 title，提交人取 author_id 换算后的<b>用户 ID</b>。
+     *
+     * <p>⚠️ {@code t_knowledge.author_id} 的外键指向 <b>{@code t_expert.expert_id}</b>（专家表主键），
+     * <b>不是 {@code t_user.user_id}</b>。而 {@code AuditTaskVO.submitterId} 全类统一语义是
+     * 「用户 ID」—— {@link #fillNames(List)} 正是拿它去查 {@code t_user.real_name} 的。
+     * 不做换算，审核台就会显示成「user_id 恰好等于 expert_id 的那个人」，也就是<b>名字张冠李戴</b>。</p>
+     *
+     * @param expertUserMap 专家 ID → 用户 ID 映射，由调用方按整页/整组批量查好（避免逐行查库）
+     */
+    private AuditTaskVO pendingKnowledgeVO(Knowledge knowledge, Map<Long, Long> expertUserMap) {
+        // HashMap.get(null) 返回 null，作者为空时 submitterId 自然为 null，不必先判空
         return newPendingVO(TYPE_KNOWLEDGE, knowledge.getKnowledgeId(), knowledge.getTitle(),
-                knowledge.getAuthorId(), knowledge.getCreateTime());
+                expertUserMap.get(knowledge.getAuthorId()), knowledge.getCreateTime());
     }
 
     /** 评论 → 待审视图：没有标题，用内容摘要代替；提交人取 user_id */
@@ -648,6 +672,57 @@ public class AuditServiceImpl implements AuditService {
         // 待审队列里的内容状态恒为"待审核"；auditId 等审核结论字段保持 null
         vo.setAuditStatus(STATUS_PENDING);
         return vo;
+    }
+
+    // =====================================================================
+    // 五之二、知识作者 ID 换算（expert_id → user_id）
+    //
+    // 只有知识这一类的"作者/提交人"存在表间语义差：t_knowledge.author_id 存的是
+    // t_expert.expert_id，而商品取 seller_id、评论取 user_id，本来就是用户 ID。
+    // 所以换算逻辑集中在这三个方法里，别的地方不许再直接拿 author_id 当提交人。
+    // =====================================================================
+
+    /**
+     * 批量查「专家 ID → 用户 ID」映射：一次 IN 查询替代逐行查询（N+1 的解法）。
+     *
+     * <p>换算不到的专家（已被删除、或 author_id 是脏数据）不会出现在返回的 Map 里，
+     * 调用方 {@code map.get(...)} 拿到 null —— 前端显示为空，总好过显示成错误的人。</p>
+     */
+    private Map<Long, Long> loadExpertUserIdMap(Collection<Long> expertIds) {
+        if (expertIds == null || expertIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        // 只查两列主键；t_user 那边才是姓名来源，这里只做 ID 映射
+        List<ExpertInfo> experts = expertInfoMapper.selectList(new LambdaQueryWrapper<ExpertInfo>()
+                .select(ExpertInfo::getExpertId, ExpertInfo::getUserId)
+                .in(ExpertInfo::getExpertId, expertIds));
+
+        Map<Long, Long> map = new HashMap<>(experts.size());
+        for (ExpertInfo expert : experts) {
+            map.put(expert.getExpertId(), expert.getUserId());
+        }
+        return map;
+    }
+
+    /** 从一批知识记录里提取 author_id（专家 ID）并批量换算成用户 ID。 */
+    private Map<Long, Long> knowledgeAuthorUserIdMap(List<Knowledge> knowledgeList) {
+        if (knowledgeList == null || knowledgeList.isEmpty()) {
+            return new HashMap<>();
+        }
+        Set<Long> expertIds = knowledgeList.stream()
+                .map(Knowledge::getAuthorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return loadExpertUserIdMap(expertIds);
+    }
+
+    /** 单条换算：expert_id → user_id；作者为空时返回 null（详情接口只查一条，单查即可）。 */
+    private Long toUserIdByExpertId(Long expertId) {
+        if (expertId == null) {
+            return null;
+        }
+        return loadExpertUserIdMap(List.of(expertId)).get(expertId);
     }
 
     // =====================================================================
@@ -710,11 +785,13 @@ public class AuditServiceImpl implements AuditService {
                                     .in(Knowledge::getKnowledgeId, targetIds));
                     Map<Long, Knowledge> map = knowledgeList.stream()
                             .collect(Collectors.toMap(Knowledge::getKnowledgeId, k -> k));
+                    // ⚠️ author_id 是专家 ID，不是用户 ID，整组批量换算一次后才能当"提交人"
+                    Map<Long, Long> expertUserMap = knowledgeAuthorUserIdMap(knowledgeList);
                     for (AuditTaskVO vo : group) {
                         Knowledge knowledge = map.get(vo.getTargetId());
                         if (knowledge != null) {
                             vo.setTargetTitle(knowledge.getTitle());
-                            vo.setSubmitterId(knowledge.getAuthorId());
+                            vo.setSubmitterId(expertUserMap.get(knowledge.getAuthorId()));
                             vo.setSubmitTime(knowledge.getCreateTime());
                         }
                     }
@@ -793,5 +870,84 @@ public class AuditServiceImpl implements AuditService {
             nameMap.put(user.getUserId(), user.getRealName());
         }
         return nameMap;
+    }
+
+    // =====================================================================
+    // 七、审核工作量统计
+    // 数据源是 t_audit 流水（统计"审核动作发生了多少"），与看板统计"内容现在是什么状态"
+    // （待审总数、状态分布）互补，两者不重复。口径见 docs/接口约定-M6内容审核.md 第八节，
+    // 字段形状由前端确定，不要随手改名。
+    // =====================================================================
+
+    @Override
+    public AuditStatisticsVO statistics(Long auditorId, String targetType) {
+        permissionChecker.requireAdmin();
+        List<String> types = resolveContentTypes(targetType);
+
+        AuditStatisticsVO vo = new AuditStatisticsVO();
+        // 1) 我的累计已审数：不限时间。它不随日期波动，适合当主卡
+        //    （按天口径一旦当天还没审过就是 0，演示时看着像接口坏了）
+        vo.setMyReviewedTotal(auditRecordMapper.countByAuditor(auditorId, types));
+        // 2) 近 7 日趋势：一次分组查询 + Java 补 0，详见 dailyTrend
+        vo.setLast7Days(dailyTrend(types));
+        return vo;
+    }
+
+    /**
+     * 内容类型白名单校验：不传允许（表示不限类型），传了必须是三种内容类型之一。
+     * 列表接口与统计接口共用同一套校验，避免两处规则漂移。
+     */
+    private void requireValidTargetType(String targetType) {
+        if (StringUtils.hasText(targetType) && !CONTENT_TYPES.contains(targetType)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "内容类型不合法：" + targetType);
+        }
+    }
+
+    /**
+     * 统计口径的内容类型集合：不传 = 三类内容合计，传了 = 只统计该类型。
+     *
+     * <p>这个集合是所有统计 SQL 的过滤条件，任何情况下都不会为空 ——
+     * 漏掉它，t_audit 里的 USER / EXPERT 主体审核（属 M1）就会被算成内容审核量。</p>
+     */
+    private List<String> resolveContentTypes(String targetType) {
+        requireValidTargetType(targetType);
+        return StringUtils.hasText(targetType) ? List.of(targetType) : CONTENT_TYPES;
+    }
+
+    /**
+     * 近 {@value #STATISTICS_DAYS} 日按天统计，返回固定 7 个元素：含今天、按日期升序。
+     *
+     * <p>两步走：先让数据库按天分组拿到<b>有记录</b>的日期，再在 Java 里把窗口内缺失的
+     * 日期补 0。之所以不按天逐个发查询（看板的 dailyTrend 就是按天发 7 次），
+     * 是因为这里每天要两个计数，按天发就是 14 条 SQL，分组查询一条就够。</p>
+     *
+     * <p>补 0 而不是留 null：前端按固定 7 个点画折线，缺项会让折线断掉；
+     * 而且本项目的 Jackson 配了 non_null，返回 null 时字段会整个从 JSON 里消失，
+     * 前端拿不到 key 比拿到 0 更糟。</p>
+     */
+    private List<AuditDailyStatVO> dailyTrend(List<String> types) {
+        LocalDate today = LocalDate.now();
+        LocalDate windowStart = today.minusDays(STATISTICS_DAYS - 1L);
+
+        List<AuditDailyStatVO> rows = auditRecordMapper.selectDailyStats(
+                windowStart.atStartOfDay(),
+                // 半开区间 [今天 00:00, 明天 00:00)：写 "<= 今天 23:59:59" 会漏掉当天最后一秒
+                today.plusDays(1).atStartOfDay(),
+                types,
+                RESULT_PASS,
+                RESULT_REJECT);
+
+        // 按日期索引，便于下面按窗口逐日取用；GROUP BY 已保证日期不重复，合并函数仅为防御
+        Map<String, AuditDailyStatVO> byDate = rows.stream()
+                .collect(Collectors.toMap(AuditDailyStatVO::getDate, row -> row, (first, second) -> first));
+
+        List<AuditDailyStatVO> trend = new ArrayList<>(STATISTICS_DAYS);
+        for (int i = 0; i < STATISTICS_DAYS; i++) {
+            // LocalDate.toString() 是 ISO 的 yyyy-MM-dd，与 SQL 里 DATE_FORMAT(..., '%Y-%m-%d') 一致
+            String date = windowStart.plusDays(i).toString();
+            AuditDailyStatVO hit = byDate.get(date);
+            trend.add(hit != null ? hit : new AuditDailyStatVO(date, 0L, 0L));
+        }
+        return trend;
     }
 }

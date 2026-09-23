@@ -20,8 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 融资申请业务实现。
@@ -45,7 +47,7 @@ public class FinanceApplyServiceImpl extends ServiceImpl<FinanceApplyMapper, Fin
         permissionChecker.requireRole(RoleConstant.FARMER);
 
         FinanceApply apply = new FinanceApply();
-
+        apply.setApplyNo(generateApplyNo());
         // ⚠️ 极其关键：完全按照 FinanceApply.java 里的真实字段名修改！
         apply.setFarmerId(userId);                        // 实体类里叫 farmerId，不是 userId
         apply.setLoanProductId(dto.getLoanProductId());   // 实体类里叫 loanProductId
@@ -53,7 +55,7 @@ public class FinanceApplyServiceImpl extends ServiceImpl<FinanceApplyMapper, Fin
         apply.setApplyTerm(dto.getApplyTerm());           // 实体类里叫 applyTerm
         apply.setApplyPurpose(dto.getApplyPurpose());     // 实体类里叫 applyPurpose
 
-        apply.setApplyStatus("待审核");                    // 实体类里叫 applyStatus
+        apply.setApplyStatus("待匹配");                   // 实体类里叫 applyStatus
         apply.setCreateTime(LocalDateTime.now());
         this.save(apply);
     }
@@ -85,7 +87,7 @@ public class FinanceApplyServiceImpl extends ServiceImpl<FinanceApplyMapper, Fin
             throw new RuntimeException("融资申请不存在");
         }
 
-        apply.setApplyStatus("通过".equals(approvalResult) ? "已放款" : "已驳回");
+        apply.setApplyStatus("通过".equals(approvalResult) ? "已放款" : "审批未通过");
         this.updateById(apply);
 
         Approval approval = new Approval();
@@ -97,5 +99,9 @@ public class FinanceApplyServiceImpl extends ServiceImpl<FinanceApplyMapper, Fin
         approval.setApprovalTime(LocalDateTime.now());
 
         approvalMapper.insert(approval);
+    }
+    private String generateApplyNo() {
+        return "FA" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + String.format("%04d", ThreadLocalRandom.current().nextInt(10000));
     }
 }
