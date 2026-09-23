@@ -2,8 +2,11 @@ package com.rxt.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.Result;
+import com.rxt.dto.KnowledgeCreateDTO;
 import com.rxt.entity.Knowledge;
+import com.rxt.security.UserContext;
 import com.rxt.service.KnowledgeService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -29,5 +32,14 @@ public class KnowledgeController {
     @GetMapping("/{id}")
     public Result<Knowledge> detail(@PathVariable Long id) {
         return Result.success(knowledgeService.getDetail(id));
+    }
+
+    /**
+     * 专家新增农业知识。
+     * 新内容写入 t_knowledge，审核状态固定为“待审核”，通过管理端知识审核后才会公开。
+     */
+    @PostMapping
+    public Result<Long> create(@RequestBody @Valid KnowledgeCreateDTO dto) {
+        return Result.success(knowledgeService.createKnowledge(UserContext.currentUserId(), dto));
     }
 }

@@ -4,11 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
+import com.rxt.dto.KnowledgeCreateDTO;
+import com.rxt.entity.ExpertInfo;
 import com.rxt.entity.Knowledge;
+import com.rxt.mapper.ExpertInfoMapper;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.service.KnowledgeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
@@ -16,6 +20,9 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Autowired
     private KnowledgeMapper knowledgeMapper;
+
+    @Autowired
+    private ExpertInfoMapper expertInfoMapper;
 
     @Override
     public Page<Knowledge> pageQuery(String category, String keyword, Integer page, Integer size) {
@@ -38,6 +45,27 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             return allPage;
         }
         return knowledgeMapper.selectPage(new Page<>(page, size), wrapper);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createKnowledge(Long userId, KnowledgeCreateDTO dto) {
+        ExpertInfo expert = expertInfoMapper.selectOne(new LambdaQueryWrapper<ExpertInfo>()
+                .eq(ExpertInfo::getUserId, userId));
+        if (expert == null) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可发布农业知识");
+        }
+
+        Knowledge knowledge = new Knowledge();
+        knowledge.setTitle(dto.getTitle().trim());
+        knowledge.setCategory(dto.getCategory().trim());
+        knowledge.setContent(dto.getContent().trim());
+        knowledge.setImageUrl(dto.getImageUrl());
+        knowledge.setAuthorId(expert.getExpertId());
+        knowledge.setAuditStatus("待审核");
+        knowledge.setViewCount(0);
+        knowledgeMapper.insert(knowledge);
+        return knowledge.getKnowledgeId();
     }
 
     @Override

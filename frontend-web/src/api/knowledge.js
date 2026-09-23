@@ -22,3 +22,11 @@ export function getKnowledgeList(category) {
 export function getKnowledgeDetail(id) {
   return request.get(`/knowledge/${id}`)
 }
+
+/**
+ * 农业知识页：专家新增知识。
+ * 新知识由后端以“待审核”状态写入 t_knowledge，审核通过后才会公开。
+ */
+export function createKnowledge(payload) {
+  return request.post('/knowledge', payload)
+}

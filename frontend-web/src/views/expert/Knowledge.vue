@@ -12,6 +12,8 @@
       </div>
     </div>
 
+    <ExpertKnowledgeEditor v-if="isExpert" :submissions="mySubmissions" @created="handleKnowledgeCreated" />
+
     <el-alert
       v-if="demoMode"
       class="demo-alert"
@@ -85,9 +87,15 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import ExpertKnowledgeEditor from '@/components/expert/ExpertKnowledgeEditor.vue'
 import { getKnowledgeDetail, getKnowledgeList } from '@/api/knowledge'
+import { useUserStore } from '@/store/user'
 
 const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
+const userStore = useUserStore()
+const isExpert = computed(() => userStore.profile?.roleName === '专家')
+const mySubmissions = ref([])
+const mySubmissionKey = 'rxt_expert_knowledge_submissions'
 const demoMode = ref(false)
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -191,7 +199,20 @@ function formatDateTime(value) {
   return String(value).replace('T', ' ').slice(0, 16)
 }
 
-onMounted(loadList)
+function handleKnowledgeCreated(item) {
+  mySubmissions.value.unshift(item)
+  localStorage.setItem(mySubmissionKey, JSON.stringify(mySubmissions.value))
+  loadList()
+}
+
+onMounted(() => {
+  try {
+    mySubmissions.value = JSON.parse(localStorage.getItem(mySubmissionKey) || '[]')
+  } catch {
+    mySubmissions.value = []
+  }
+  loadList()
+})
 </script>
 
 <style scoped>

@@ -22,7 +22,12 @@
             <el-menu-item index="/finance/apply">融资申请</el-menu-item>
             <el-menu-item index="/finance/my">我的融资</el-menu-item>
           </el-sub-menu>
-          <el-sub-menu v-if="canSeeExpert" index="expert">
+          <template v-if="canSeeExpert && actualRole === '专家'">
+            <el-menu-item index="/expert/knowledge">农业知识</el-menu-item>
+            <el-menu-item index="/expert/qa">专家问答</el-menu-item>
+            <el-menu-item v-if="canAccessAppointment" index="/expert/appointment">专家预约</el-menu-item>
+          </template>
+          <el-sub-menu v-else-if="canSeeExpert" index="expert">
             <template #title>专家助力</template>
             <el-menu-item index="/expert/knowledge">农业知识</el-menu-item>
             <el-menu-item index="/expert/qa">专家问答</el-menu-item>
