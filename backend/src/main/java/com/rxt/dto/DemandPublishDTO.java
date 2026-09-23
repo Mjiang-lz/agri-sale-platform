@@ -1,7 +1,10 @@
 package com.rxt.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -69,12 +72,46 @@ public class DemandPublishDTO {
     @Size(max = 50, message = "收货地区不能超过 50 字")
     private String region;
 
-    /** 需求有效期。DDL：{@code valid_until DATETIME} */
+    /**
+     * 需求有效期。DDL：{@code valid_until DATETIME}（NOT NULL）
+     *
+     * <p><b>为什么这里要拦"必须是未来时间"和"不超过 90 天"</b>：
+     * 需求 §2.7.3 UC-TRD-02 的约束条件写明「期望价格为正数；有效期不超过 90 天」，
+     * 扩展流程又要求「需求超过有效期后系统自动置为失效」。若允许填一个过去的时间，
+     * 发布接口会返回成功，但这条需求立刻被列表的 {@code valid_until >= NOW()}
+     * 过滤掉 —— 用户看到"发布成功"却在列表里找不到，看起来像发布失败
+     * （契约文档 §1.2 推论 2 记过这个坑）。所以要在发布时拦住，而不是等读取时消失。</p>
+     *
+     * <p><b>为什么不能写在 DDL 里</b>：MySQL 对 {@code CHECK} 约束在 8.0.16 之前
+     * 是「解析但不生效」，5.7.x 上即使写了也不会拦任何数据（本项目目标库为 5.7.x），
+     * 实测 {@code t_demand} 上 CHECK 约束数为 0。因此这条约束只能落在应用层。</p>
+     */
     @NotNull(message = "请填写需求有效期")
+    @Future(message = "需求有效期必须晚于当前时间")
     private LocalDateTime validUntil;
 
     /** 联系方式。DDL：{@code contact VARCHAR(50)} */
     @NotBlank(message = "请填写联系方式")
     @Size(max = 50, message = "联系方式不能超过 50 字")
     private String contact;
+
+    /**
+     * 有效期上限 90 天（需求 §2.7.3 UC-TRD-02 约束条件）。
+     *
+     * <p>{@code validUntil} 为 {@code null} 时返回 {@code true}，把"必填"交给
+     * {@link NotNull} 单独报错 —— 避免同一个字段同时抛出「请填写需求有效期」和
+     * 「不能超过 90 天」两条互相矛盾的提示。</p>
+     *
+     * <p>{@code @JsonIgnore} 是必需的：方法名符合 JavaBean getter 命名规则，
+     * 不加这个注解会被 Jackson 当成一个名为 {@code validUntilWithin90Days}
+     * 的属性参与序列化，从而多出一个调用方看不懂的字段。</p>
+     */
+    @JsonIgnore
+    @AssertTrue(message = "需求有效期不能超过 90 天")
+    public boolean isValidUntilWithin90Days() {
+        if (validUntil == null) {
+            return true;
+        }
+        return !validUntil.isAfter(LocalDateTime.now().plusDays(90));
+    }
 }
