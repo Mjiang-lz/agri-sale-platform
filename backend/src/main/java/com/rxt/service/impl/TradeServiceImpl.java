@@ -326,11 +326,11 @@ public class TradeServiceImpl implements TradeService {
         // 1. 校验商品：必须存在、已通过审核、已上架
         Product product = productMapper.selectById(productId);
         if (product == null || !"已通过".equals(product.getAuditStatus()) || product.getStatus() != 1) {
-            throw new BizException("商品不存在或已下架");
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "商品不存在或已下架");
         }
         // 2. 校验库存是否足够
         if (product.getStock() < quantity) {
-            throw new BizException("库存不足");
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "库存不足");
         }
         // 3. 计算本条购物车的金额（单价 × 数量，用 BigDecimal 避免精度丢失）
         BigDecimal unitPrice = product.getPrice();
@@ -424,12 +424,15 @@ public class TradeServiceImpl implements TradeService {
     public void updateCartQuantity(Long buyerId, Long cartId, Integer quantity) {
         // 1. 参数校验
         if (quantity == null || quantity < 0) {
-            throw new BizException("数量不能为负数");
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "数量不能为负数");
         }
         // 2. 校验条目归属：只能改自己的购物车
+        //    「不存在」与「不是你的」合并为 404、不区分 —— 区分开就等于提供了一个
+        //    按 cartId 探测他人购物车是否存在（以及是否存在该条目）的接口。
+        //    与订单侧「非买家也非卖家一律 404」是同一条原则。
         Cart cart = cartMapper.selectById(cartId);
         if (cart == null || !Objects.equals(cart.getBuyerId(), buyerId)) {
-            throw new BizException("购物车条目不存在");
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "购物车条目不存在");
         }
         // 3. 数量为 0 视为删除该条目
         if (quantity == 0) {
@@ -439,10 +442,10 @@ public class TradeServiceImpl implements TradeService {
         // 4. 校验商品状态与库存
         Product product = productMapper.selectById(cart.getProductId());
         if (product == null || !"已通过".equals(product.getAuditStatus()) || product.getStatus() != 1) {
-            throw new BizException("商品不存在或已下架");
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "商品不存在或已下架");
         }
         if (product.getStock() < quantity) {
-            throw new BizException("库存不足，当前仅剩 " + product.getStock());
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "库存不足，当前仅剩 " + product.getStock());
         }
         // 5. 更新数量并按商品当前价重算小计（价格以商品表为准，购物车不锁价）
         cart.setQuantity(quantity);
@@ -455,7 +458,7 @@ public class TradeServiceImpl implements TradeService {
         // 1. 校验归属：只能删自己的购物车条目
         Cart cart = cartMapper.selectById(cartId);
         if (cart == null || !Objects.equals(cart.getBuyerId(), buyerId)) {
-            throw new BizException("购物车条目不存在");
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "购物车条目不存在");
         }
         // 2. 删除
         cartMapper.deleteById(cartId);
