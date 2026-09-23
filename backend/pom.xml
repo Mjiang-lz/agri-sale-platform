@@ -22,6 +22,8 @@
         <mybatis-plus.version>3.5.16</mybatis-plus.version>
         <jjwt.version>0.12.6</jjwt.version>
         <obs.sdk.version>3.26.6</obs.sdk.version>
+        <!-- 与 parent 的 Boot 小版本对齐，见下面该依赖处的说明 -->
+        <springdoc.version>3.0.1</springdoc.version>
     </properties>
 
     <dependencies>
@@ -97,6 +99,37 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!--
+            接口文档与在线调试（OpenAPI 3 + Swagger UI）。
+
+            ① 版本必须落在 3.0.x，且**优先选与 Boot 版本号对齐的那个**：
+               springdoc 2.x 只支持 Spring Boot 3；支持 Boot 4 的是 3.x 线。各 3.x 版本编译时
+               依赖的 Boot 版本并不相同（实测各版本 pom 的 parent）：
+                   springdoc 3.0.0 → Boot 4.0.0
+                   springdoc 3.0.1 → Boot 4.0.1   ← 与本项目 parent 完全一致
+                   springdoc 3.0.2 → Boot 4.0.3
+                   springdoc 3.0.3 → Boot 4.0.5
+                   springdoc 3.1.0 / 3.1.1 → Boot 4.1.0
+               本项目 parent 是 4.0.1。选 3.1.x 会拿到「按 Boot 4.1 的 API 编译、却在 4.0.1 上运行」
+               的 jar —— 依赖版本会被本项目的 BOM 压回 4.0.1，但 springdoc 自己那几个 class 是编译
+               期就定型的，届时若调用到 4.1 才有的方法，表现是启动期或请求期的 NoSuchMethodError。
+               跟着 Boot 小版本走最省事，升级 Boot 时一起升这里。
+
+            ② 不要额外引 spring-boot-starter-security 或 swagger 的独立 webjar：
+               -ui 这个 starter 已经把 swagger-ui 静态资源打进来了；安全模块本项目用手写拦截器，
+               引进来会接管全部请求并统统返回 401（见上面 spring-security-crypto 处的说明）。
+
+            ③ 与 Jackson 的关系：Spring Boot 4 用 Jackson 3（tools.jackson），而 swagger-core 仍是
+               Jackson 2。两者可以共存 —— Boot 4 保留了 Jackson 2 的依赖管理，且 jackson-annotations
+               在 2/3 之间是同一个包（com.fasterxml.jackson.annotation），所以 swagger-core 的注解不会
+               和新序列化器打架。这一点已实测：/v3/api-docs 正常出 JSON。
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
 
         <!--
