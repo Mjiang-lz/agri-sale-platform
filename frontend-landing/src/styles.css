@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #1b1b1b;
+  color: #ffffff;
+  font-family: "Inter Tight", "PingFang SC", "Noto Sans SC", sans-serif;
+  font-weight: 400;
+  overflow-x: hidden;
+}
+
+/* Page-wide Inter Tight coverage: every text element, no exceptions */
+button,
+input,
+select,
+textarea,
+a,
+span,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+li,
+ul,
+ol,
+div,
+footer,
+header,
+nav,
+section,
+video,
+img {
+  font-family: "Inter Tight", "PingFang SC", "Noto Sans SC", sans-serif;
+}
+
+/* 中文可读性：CJK 字形比拉丁字母更满，行高稍放松、字距不再收紧 */
+:lang(zh), [lang="zh"] {
+  line-height: 1.55;
+}

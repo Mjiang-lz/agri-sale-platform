@@ -1,0 +1,16 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+__unconfig*
+todos.json
+# 大文件留档区：视频源素材（原片/备选档）+ 原始验收截图 PNG。
+# 发布用的是 public/ 里的成片和 verify/shots/ 里的 JPEG，这些留档不进版本库。
+media-src/

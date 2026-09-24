@@ -1,0 +1,17 @@
+<svg width="36" height="36" viewBox="20 20 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="融销通">
+  <!--
+    融销通品牌标 v2 · 反白版（2026-09-24 定版）
+    构成：开口圆环=融 / 三粒麦穗=农 / 暖橙节点=通
+    适用：深色底。Hero 顶栏为黑色视频 + 黑渐变遮罩，故此处用反白版；
+          浅色底请改用 logo-color.svg。
+    几何：200 网格，外环 R62 线宽 14，缺口 60° 朝右上 45°，
+          麦粒 rx12.5/10.5 间距 26，节点 R7.5 落缺口正中。
+    注意：viewBox 留了 10px 内边距，使图形占满边长的 87.5%，
+          与原 35×35 方框标的视觉占比（87.4%）一致 —— 替换后顶栏尺寸不变。
+  -->
+  <path d="M159.9 83.95 A62 62 0 1 1 116.05 40.1" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+  <ellipse cx="100" cy="126" rx="10.5" ry="12.5" fill="#FFFFFF"/>
+  <ellipse cx="100" cy="100" rx="12.5" ry="13.5" fill="#FFFFFF"/>
+  <ellipse cx="100" cy="74" rx="10.5" ry="12.5" fill="#FFFFFF"/>
+  <circle cx="143.8" cy="56.2" r="7.5" fill="#F5A524"/>
+</svg>
