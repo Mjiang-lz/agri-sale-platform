@@ -202,18 +202,25 @@ CREATE TABLE `t_order` (
   COLLATE = utf8mb4_general_ci COMMENT = '订单';
 
 -- 表 3-8　t_demand 求购需求表（对应 REQ-04）
+-- 可空性说明（与 DemandPublishDTO 的校验逐字段对齐，依据需求 §2.7.3 UC-TRD-02）：
+--   `category` / `quantity` / `region` / `valid_until` / `contact` 五列在 DTO 里是
+--   必填（@NotBlank / @NotNull），本表同样按 NOT NULL 定义 —— 任何一列可空都会
+--   出现"某一层说必填、另一层允许空"的裂缝：通过接口发布不会产生 NULL，但手工
+--   写 SQL 造数会，而 DDL 不拦就只能在业务读取时静默丢数据（valid_until 为空会被
+--   `valid_until >= NOW()` 静默排除；region 为空会导致按地区检索不到该行）。
+--   `unit` / `expect_price` / `description` 业务上非必填，保持可空。
 DROP TABLE IF EXISTS `t_demand`;
 CREATE TABLE `t_demand` (
   `demand_id`    BIGINT        NOT NULL AUTO_INCREMENT             COMMENT '求购需求主键',
   `publisher_id` BIGINT        NOT NULL                            COMMENT '发布人（采购方或农户）',
-  `category`     VARCHAR(30)       NULL                            COMMENT '求购品类',
-  `quantity`     INT               NULL                            COMMENT '求购数量',
+  `category`     VARCHAR(30)   NOT NULL                            COMMENT '求购品类',
+  `quantity`     INT           NOT NULL                            COMMENT '求购数量',
   `unit`         VARCHAR(10)       NULL                            COMMENT '计量单位',
   `expect_price` DECIMAL(12,2)     NULL                            COMMENT '期望单价',
   `description`  TEXT              NULL                            COMMENT '需求补充说明',
-  `region`       VARCHAR(50)       NULL                            COMMENT '收货地区',
-  `valid_until`  DATETIME          NULL                            COMMENT '需求有效期',
-  `contact`      VARCHAR(50)       NULL                            COMMENT '联系方式',
+  `region`       VARCHAR(50)   NOT NULL                            COMMENT '收货地区',
+  `valid_until`  DATETIME      NOT NULL                            COMMENT '需求有效期',
+  `contact`      VARCHAR(50)   NOT NULL                            COMMENT '联系方式',
   `status`       TINYINT       NOT NULL DEFAULT 1                  COMMENT '状态：1 有效，0 已关闭',
   `create_time`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP  COMMENT '发布时间',
   `update_time`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
