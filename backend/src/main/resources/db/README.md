@@ -55,6 +55,43 @@ mysql -u root -p rxt < backend/src/main/resources/db/migrations/2026-09-25_01_xx
 > 注意：`schema.sql` 是破坏性脚本，执行前确认本地没有不能丢的东西。
 > 一旦你录了准备演示的数据，就不要再跑它了 —— 走场景二。
 
+## ⚠️ 演示数据的有效期（到期后「看起来像 bug」）
+
+`data.sql` 里 `t_demand` 的 `valid_until` 用的是 `DATE_ADD(NOW(), INTERVAL 89 DAY)`，
+它在**导入那一刻就固化成固定时间戳**，之后不再变化 ——
+所以它是「导入后 89 天的跑道」，**不是「永久有效」**。
+
+导入满 89 天后，求购列表（口径 `status = 1 AND valid_until >= NOW()`）会返回 0 条：
+**大厅一条都没有、不报错、不打日志，表现与 2026-09-23 修掉的那个 bug 一模一样。**
+
+到期后怎么恢复（注意：重跑迁移脚本、或只重跑 `data.sql` 都救不了 ——
+前者只处理仍有 NULL 的行，后者会撞 `1062 Duplicate entry`）：
+
+```sql
+-- 最轻，只影响已经过期的行
+UPDATE `t_demand` SET `valid_until` = DATE_ADD(NOW(), INTERVAL 89 DAY)
+ WHERE `valid_until` < NOW();
+```
+
+如果想「现在就把跑道从 30 天换成 89 天」（库里值还没过期时，上面那条是空操作），
+按主键限定范围改，别一把梭全表（各家手工造数的行不一样）：
+
+```sql
+SELECT `demand_id`, `publisher_id`, `valid_until` FROM `t_demand` ORDER BY `demand_id`;  -- 先看清范围
+UPDATE `t_demand` SET `valid_until` = DATE_ADD(NOW(), INTERVAL 89 DAY) WHERE `demand_id` <= 8;
+```
+
+演示前自检：
+
+```sql
+SELECT COUNT(*) FROM `t_demand` WHERE `status` = 1 AND `valid_until` >= NOW();
+-- 期望 = 库里 status = 1 的行数（纯种子态 7；各家人工造数不同，数值会不一样）
+```
+
+> 为什么是 89 而不是 90：给「导入时刻」与「90 天上限判定时刻」之间留一天余量，
+> 免得以后有人纠结「正好 90 天到底算不算」。见
+> `migrations/2026-09-23_01_demand_not_null.sql`。
+
 ## 命名与写法
 
 文件名格式：`YYYY-MM-DD_NN_简短描述.sql`，`NN` 是当天第几个变更。

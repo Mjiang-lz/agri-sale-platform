@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
  * 排查方式是"比对行数"——因为没有任何检测点。这个测试就是那个缺失的检测点。</p>
  *
  * <p><b>为什么不直接在库里造一行 NULL 来测</b>：修复后 DDL 已把该列收紧为
- * {@code NOT NULL}（见 {@code migrations/2026-09-24_01_demand_not_null.sql}），
+ * {@code NOT NULL}（见 {@code migrations/2026-09-23_01_demand_not_null.sql}），
  * 库里已经不可能存在 NULL 行，测试也就无从构造。因此这里改为断言
  * **过滤条件本身存在**：只要有人把 {@code valid_until >= ?} 从查询里去掉，
  * 本测试立即变红。</p>
