@@ -77,8 +77,9 @@ agri-sale-platform/
 │           └── mapper/         # MyBatis XML
 ├── frontend-web/               # rxt-web：业务端（农户 / 采购方 / 专家 / 银行用户）
 ├── frontend-admin/             # rxt-admin：管理后台（平台管理员）
+├── frontend-landing/           # rxt-landing：官网落地页（React 19 + TanStack Router，独立静态站点）
 └── docs/
-    ├── 交付文档/                # 可行性研究报告、软件需求规格说明书、概要设计说明书
+    ├── 交付文档/                # 可行性研究报告、软件需求规格说明书、概要设计说明书、详细设计说明书
     ├── 设计图/                  # 架构分层图、组件图、部署图、包图、类图、顺序图
     └── 接口约定-*.md            # 各模块接口契约（路径、字段约束、错误码、实现权衡）
 ```
