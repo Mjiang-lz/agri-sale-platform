@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>融销通落地页 · 数据对接验收报告</title>
+<style>
+  :root{
+    --bg:#141414; --panel:#1e1e1e; --panel2:#252525; --line:#333;
+    --fg:#ededed; --fg2:#a5a5a5; --fg3:#7a7a7a;
+    --ok:#3fa96a; --warn:#d98a2b; --bad:#d9534f; --accent:#DE7D4D; --info:#4a8fd9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.7 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 28px 96px}
+  h1{font-size:30px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em}
+  .sub{color:var(--fg2);margin:0 0 6px}
+  .meta{color:var(--fg3);font-size:13px;margin:0 0 40px}
+  h2{font-size:20px;font-weight:600;margin:52px 0 16px;padding-bottom:10px;
+    border-bottom:1px solid var(--line)}
+  h3{font-size:16px;font-weight:600;margin:28px 0 10px;color:#fff}
+  p{margin:10px 0}
+  code{background:#2b2b2b;padding:1px 6px;border-radius:4px;font-size:13px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#e0b48a}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);font-weight:600;color:#fff}
+  td.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:#c9c9c9}
+  .tag{display:inline-block;padding:1px 8px;border-radius:4px;font-size:12px;line-height:1.7;
+    white-space:nowrap}
+  .t-ok{background:rgba(63,169,106,.16);color:#6fd394}
+  .t-warn{background:rgba(217,138,43,.16);color:#e8ac5f}
+  .t-bad{background:rgba(217,83,79,.16);color:#e88580}
+  .t-info{background:rgba(74,143,217,.16);color:#84b6e8}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:16px 20px;margin:16px 0}
+  .box.warn{border-left:3px solid var(--warn)}
+  .box.bad{border-left:3px solid var(--bad)}
+  .box.ok{border-left:3px solid var(--ok)}
+  .box h4{margin:0 0 8px;font-size:15px;font-weight:600}
+  figure{margin:20px 0}
+  figure img{width:100%;border:1px solid var(--line);border-radius:8px;display:block}
+  figcaption{color:var(--fg3);font-size:13px;margin-top:8px}
+  ul{margin:8px 0;padding-left:22px}
+  li{margin:5px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .kpi{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+  .kpi div{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:14px 18px;min-width:132px}
+  .kpi b{display:block;font-size:24px;font-weight:600;color:#fff;line-height:1.3}
+  .kpi span{color:var(--fg3);font-size:12.5px}
+  footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);
+    color:var(--fg3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>融销通落地页 · 数据对接验收报告</h1>
+  <p class="sub">落地页从「纯静态复刻」升级为「接口优先、静态兜底」：真实数据取自 agri-sale-platform 后端的公开只读接口。</p>
+  <p class="meta">验收时间 2026-09-22 · 环境 无头 Chrome 153 + CDP（1440×1000）· 后端 Spring Boot :8080 · 落地页 Vite dev :5221</p>
+
+  <div class="kpi">
+    <div><b>4</b><span>绑定接口的页面区块</span></div>
+    <div><b>2/2</b><span>实测路径（后端通 / 后端断）</span></div>
+    <div><b>24</b><span>商城页真实货源</span></div>
+    <div><b>0</b><span>破图（滚到底复测）</span></div>
+  </div>
+
+  <h2>一、接口绑定与实测结果</h2>
+
+  <table>
+    <thead>
+      <tr><th style="width:15%">页面区块</th><th style="width:27%">调用接口</th>
+      <th style="width:26%">实测回显</th><th style="width:12%">结论</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>§2 商品拼贴</td>
+        <td class="mono">GET /api/home/products?limit=6<br>↑空则改调<br>GET /api/trade/products</td>
+        <td class="mono">数据源：平台接口<br>菜籽油 5L｜莲藕｜老母鸡｜小龙虾｜生态草鱼｜农家腊肉</td>
+        <td><span class="tag t-ok">通过</span></td>
+      </tr>
+      <tr>
+        <td>§4 四类角色 tab</td>
+        <td>纯前端状态切换 + <code>platformUrl()</code></td>
+        <td class="mono">找货源 / 找销路 / 找资金 / 找专家<br>CTA → http://localhost:5173/trade/products</td>
+        <td><span class="tag t-ok">通过</span></td>
+      </tr>
+      <tr>
+        <td>§5 农户影像墙</td>
+        <td>本地实拍素材（20 张）</td>
+        <td class="mono">CTA → /register</td>
+        <td><span class="tag t-ok">通过</span></td>
+      </tr>
+      <tr>
+        <td>§6 平台资讯</td>
+        <td class="mono">GET /api/home/knowledge?limit=6</td>
+        <td class="mono">数据源：本地演示（后端返回 []）</td>
+        <td><span class="tag t-warn">降级</span></td>
+      </tr>
+      <tr>
+        <td>Hero 主视觉</td>
+        <td>本地 1080p 田间视频 + <code>platformUrl()</code></td>
+        <td class="mono">/hero-field.mp4 1920×1080<br>登录 → /login ｜ 免费入驻 → /register</td>
+        <td><span class="tag t-ok">通过</span></td>
+      </tr>
+      <tr>
+        <td>/shop 商城页</td>
+        <td class="mono">GET /api/trade/products<br>?pageNum=1&amp;pageSize=50</td>
+        <td class="mono">共 24 条在售货源 · 数据源：平台接口<br>分类：全部/粮油/蔬菜/畜禽产品/水产/干货/水果</td>
+        <td><span class="tag t-ok">通过</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <figure>
+    <img src="shots/d-di-home.jpg" alt="落地页 Hero 与田间视频">
+    <figcaption>落地页：Hero 已换成 1080p 田间实拍视频（原为鱼群素材）。</figcaption>
+  </figure>
+
+  <figure>
+    <img src="shots/d-di-shop.jpg" alt="商城页展示 24 条真实货源">
+    <figcaption>商城页：24 条真实货源，分类由数据推导（不再写死），商品名与配图按品类逐一对齐。</figcaption>
+  </figure>
+
+  <h2>二、两次路径都要实测</h2>
+
+  <div class="grid2">
+    <div class="box ok">
+      <h4>① 后端在跑（:8080 通）</h4>
+      <ul>
+        <li>§2 标签 → <b>数据源：平台接口</b></li>
+        <li>§2 六张卡显示真实货源名（菜籽油、莲藕…）</li>
+        <li>商城页 24 条 · 7 个分类</li>
+      </ul>
+    </div>
+    <div class="box warn">
+      <h4>② 后端不可用（代理指向死端口）</h4>
+      <ul>
+        <li>§2 标签 → <b>数据源：本地演示</b></li>
+        <li>§2 回落 6 张演示卡，页面不白屏</li>
+        <li>商城页 10 条演示货 + 7 个分类，破图 0</li>
+      </ul>
+    </div>
+  </div>
+
+  <p>兜底路径是把 dev server 的 <code>/api</code> 代理指向死端口 <code>127.0.0.1:1</code> 实测的
+  （<code>VITE_API_TARGET</code>），<b>没有停掉正在运行的后端进程</b>。</p>
+
+  <h2>三、商品配图策略</h2>
+
+  <p>后端 24 件货源的 <code>imageUrl</code> <b>全部为空</b>（后台还没传实拍图）。若按顺序拿本地图顶上，
+  会出现「老母鸡配苹果图」这类硬伤，因此改成三级匹配：</p>
+
+  <table>
+    <thead><tr><th style="width:8%">优先级</th><th style="width:30%">规则</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="mono">resolveImage(row.imageUrl)</td><td>后端补上实拍图后自动生效，兜底全部失效</td></tr>
+      <tr><td>2</td><td class="mono">NAME_PHOTO（去空格精确匹配）</td><td>现有 24 件货源逐一人工对齐实拍图</td></tr>
+      <tr><td>3</td><td class="mono">KEYWORD_PHOTO（正则，顺序即优先级）</td><td>后端上新货时的兜底；<code>鸡蛋</code> 必须先于 <code>鸡</code></td></tr>
+      <tr><td>4</td><td class="mono">CATEGORY_PHOTOS（品类轮取）</td><td>只认得品类时的最后兜底</td></tr>
+      <tr><td>5</td><td class="mono">null → 中性占位块</td><td>宁可不放图，也不放错图</td></tr>
+    </tbody>
+  </table>
+
+  <p>素材全部来自 Pexels（免费可商用），已下载到 <code>public/products/</code>（27 张），
+  答辩现场不依赖外网。已下载的图逐张用 PIL 校验过完整性 —— 期间有 2 个 Pexels ID 在 CDN 上
+  <code>404 Source image is unreachable</code>，已换成备选图。</p>
+
+  <h2>四、已知缺口（不阻塞演示，但要知道）</h2>
+
+  <div class="box bad">
+    <h4>① §6 资讯永远显示演示数据 —— 后端空实现</h4>
+    <p><code>HomeServiceImpl.listHotProducts()</code> 与 <code>listLatestKnowledge()</code>
+    目前仍是骨架阶段留下的 <code>// TODO 待实现</code>，直接 <code>return Collections.emptyList()</code>。
+    所以 <code>/api/home/products</code> 和 <code>/api/home/knowledge</code> <b>结构性地永远返回空数组</b>。</p>
+    <ul>
+      <li>§2 已靠「空了就改调 <code>/trade/products</code>」绕开，能拿到真数据；</li>
+      <li>§6 没有等价的公开接口可替代 —— <code>GET /api/knowledge/list</code> 实测 <b>401</b>，
+      不在 <code>PublicEndpoints</code> 白名单里（白名单只放行 <code>/home/**</code>、
+      <code>/trade/products</code>、<code>/demand/list</code>，且都为 GET）。</li>
+    </ul>
+    <p><b>要修的两条路，任选其一：</b>实现 <code>HomeServiceImpl</code> 的两个方法（推荐，§2 也就用上真正的推荐位了）；
+  或把 <code>GET /knowledge/list</code> 加进白名单——但白名单是攻击面，得先确认这个接口真的允许游客访问。</p>
+  </div>
+
+  <div class="box warn">
+    <h4>② 平台前端有登录守卫，未登录点 CTA 会落到 /login</h4>
+    <p><code>frontend-web/src/router/index.js</code> 的 <code>beforeEach</code> 只放行
+    <code>meta.public</code> 的 <code>/login</code>、<code>/register</code>。因此
+    <code>/trade/products</code>、<code>/expert/knowledge</code>、<code>/finance/apply</code> 等
+    CTA 对游客会重定向到登录页。</p>
+    <p>这是平台自己的策略，落地页不做绕行；但演示时要预期到「点立即采购 → 跳到登录页」。
+    若要给评委看完整链路，<b>先用一个测试账号登录一次</b>再演示。</p>
+  </div>
+
+  <div class="box">
+    <h4>③ §4 曾把接口路径当成前端路由</h4>
+    <p>「找销路」原本指向 <code>/demand/list</code>（那是后端接口路径），已改为平台前端真实路由
+    <code>/trade/demand</code>。这类错位肉眼看不出来，只有点了才知道 —— 已逐个与
+    <code>frontend-web/src/router/index.js</code> 核对过。</p>
+  </div>
+
+  <h2>五、复跑方式</h2>
+  <p>验收脚本 <code>/tmp/verify-integration.mjs</code>（CDP 直读 DOM，不看截图猜结论）。
+  两个硬坑：<b>后台进程跨 Bash 调用会被回收</b>，dev server + Chrome + 验收脚本必须写进同一次调用；
+  <b><code>HTTP_PROXY</code> 会被注入</b>，Node 里 <code>fetch</code> 打 127.0.0.1 要
+  <code>env -u HTTP_PROXY</code> 或设 <code>NO_PROXY</code>，否则报 <code>fetch failed</code>。</p>
+  <p>另外：商城页商品图是 <code>loading="lazy"</code>，<b>不先滚到底就统计 <code>naturalWidth===0</code>
+  会把视口外的图误判成破图</b> —— 本文的「破图 0」是滚动触发后才测的。</p>
+
+  <footer>
+    融销通落地页数据对接验收 · 生成于 2026-09-22 · 截图目录 <code>verify/shots/</code>
+  </footer>
+
+</div>
+</body>
+</html>
