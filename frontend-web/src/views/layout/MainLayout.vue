@@ -4,36 +4,87 @@
     <header class="business-header">
       <div class="header-inner">
         <button class="brand" type="button" @click="router.push('/home')">
-          <span class="brand-mark">融</span>
+          <RxtLogo :size="38" />
           <span><strong>融销通</strong><small>农产品融销一体平台</small></span>
         </button>
 
         <el-menu class="top-nav" mode="horizontal" :default-active="activeMenu" :ellipsis="false" router>
-          <el-menu-item index="/home">首页</el-menu-item>
+          <el-menu-item index="/home">
+            <RxtIcon name="ico-home" />
+            <span>首页</span>
+          </el-menu-item>
           <el-sub-menu v-if="canSeeTrade" index="trade">
-            <template #title>农产品交易</template>
-            <el-menu-item index="/trade/products">商品货源</el-menu-item>
-            <el-menu-item index="/trade/demand">求购需求</el-menu-item>
-            <el-menu-item index="/trade/cart">购物车</el-menu-item>
-            <el-menu-item index="/trade/orders">我的订单</el-menu-item>
+            <template #title>
+              <RxtIcon name="ico-trade" />
+              <span>农产品交易</span>
+            </template>
+            <el-menu-item index="/trade/products">
+              <RxtIcon name="ico-source" />
+              <span>商品货源</span>
+            </el-menu-item>
+            <el-menu-item index="/trade/demand">
+              <RxtIcon name="ico-demand" />
+              <span>求购需求</span>
+            </el-menu-item>
+            <el-menu-item index="/trade/cart">
+              <RxtIcon name="ico-cart" />
+              <span>购物车</span>
+            </el-menu-item>
+            <el-menu-item index="/trade/orders">
+              <RxtIcon name="ico-order" />
+              <span>我的订单</span>
+            </el-menu-item>
           </el-sub-menu>
           <el-sub-menu v-if="canSeeFinance && activeRole === '农户'" index="finance">
-            <template #title>融资服务</template>
-            <el-menu-item index="/finance/apply">融资申请</el-menu-item>
-            <el-menu-item index="/finance/my">我的融资</el-menu-item>
+            <template #title>
+              <RxtIcon name="ico-finance" />
+              <span>融资服务</span>
+            </template>
+            <el-menu-item index="/finance/apply">
+              <RxtIcon name="ico-apply" />
+              <span>融资申请</span>
+            </el-menu-item>
+            <el-menu-item index="/finance/my">
+              <RxtIcon name="ico-ledger" />
+              <span>我的融资</span>
+            </el-menu-item>
           </el-sub-menu>
           <template v-if="canSeeExpert && actualRole === '专家'">
-            <el-menu-item index="/expert/knowledge">农业知识</el-menu-item>
-            <el-menu-item index="/expert/qa">专家问答</el-menu-item>
-            <el-menu-item v-if="canAccessAppointment" index="/expert/appointment">专家预约</el-menu-item>
+            <el-menu-item index="/expert/knowledge">
+              <RxtIcon name="ico-knowledge" />
+              <span>农业知识</span>
+            </el-menu-item>
+            <el-menu-item index="/expert/qa">
+              <RxtIcon name="ico-qa" />
+              <span>专家问答</span>
+            </el-menu-item>
+            <el-menu-item v-if="canAccessAppointment" index="/expert/appointment">
+              <RxtIcon name="ico-calendar" />
+              <span>专家预约</span>
+            </el-menu-item>
           </template>
           <el-sub-menu v-else-if="canSeeExpert" index="expert">
-            <template #title>专家助力</template>
-            <el-menu-item index="/expert/knowledge">农业知识</el-menu-item>
-            <el-menu-item index="/expert/qa">专家问答</el-menu-item>
-            <el-menu-item v-if="canAccessAppointment" index="/expert/appointment">专家预约</el-menu-item>
+            <template #title>
+              <RxtIcon name="ico-expert" />
+              <span>专家助力</span>
+            </template>
+            <el-menu-item index="/expert/knowledge">
+              <RxtIcon name="ico-knowledge" />
+              <span>农业知识</span>
+            </el-menu-item>
+            <el-menu-item index="/expert/qa">
+              <RxtIcon name="ico-qa" />
+              <span>专家问答</span>
+            </el-menu-item>
+            <el-menu-item v-if="canAccessAppointment" index="/expert/appointment">
+              <RxtIcon name="ico-calendar" />
+              <span>专家预约</span>
+            </el-menu-item>
           </el-sub-menu>
-          <el-menu-item v-if="canSeeUser" index="/user/profile">个人中心</el-menu-item>
+          <el-menu-item v-if="canSeeUser" index="/user/profile">
+            <RxtIcon name="ico-user" />
+            <span>个人中心</span>
+          </el-menu-item>
         </el-menu>
 
         <el-dropdown trigger="click" @command="handleUserCommand">
@@ -64,6 +115,8 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import RxtIcon from '@/components/RxtIcon.vue'
+import RxtLogo from '@/components/RxtLogo.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -105,13 +158,15 @@ function handleUserCommand(command) {
 .business-layout { min-height: 100vh; display: flex; flex-direction: column; background: #f4f7f4; }
 .business-header { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--el-border-color-light); backdrop-filter: blur(14px); }
 .header-inner { width: min(1420px, calc(100% - 36px)); height: 70px; margin: 0 auto; display: flex; align-items: center; gap: 26px; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: #194a30; cursor: pointer; white-space: nowrap; }
-.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: linear-gradient(145deg, #25734b, #4aa16d); font-weight: 700; box-shadow: 0 8px 18px rgba(37,115,75,.2); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: #14302B; cursor: pointer; white-space: nowrap; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 19px; letter-spacing: 1px; }
 .brand small { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 10px; }
 .top-nav { flex: 1; border-bottom: 0 !important; }
 .top-nav .el-menu-item, .top-nav :deep(.el-sub-menu__title) { font-weight: 600; }
+/* 菜单图标与文字间距。用 :deep() 是因为 RxtIcon 是子组件，
+   它的根元素带的是自己那份 scope id，父组件的普通选择器选不稳。 */
+.top-nav :deep(.rxt-icon) { margin-right: 7px; }
 .user-button { display: flex; align-items: center; gap: 8px; padding: 4px; border: 0; background: transparent; color: var(--el-text-color-primary); cursor: pointer; white-space: nowrap; }
 .business-main { flex: 1; width: min(1420px, calc(100% - 36px)); margin: 0 auto; padding: 28px 0 46px; }
 .business-footer { width: min(1420px, calc(100% - 36px)); margin: 0 auto; padding: 18px 0 26px; display: flex; justify-content: space-between; color: #87938b; border-top: 1px solid var(--el-border-color-light); font-size: 12px; }

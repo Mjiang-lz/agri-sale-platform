@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="融销通">
+  <!--
+    简化版品牌标（≤20px 强制用简化版，见品牌规范）：
+    三粒麦粒合并为 R27 实心圆、环宽 14→17、节点 R7.5→R12。这是换图形，不是缩放。
+    底用禾青实心圆角方，保证在浅色/深色两种浏览器标签栏上都清晰。
+  -->
+  <rect width="24" height="24" rx="5.6" fill="#0E7A5F" />
+  <g transform="translate(12 12) scale(0.13) translate(-100 -100)">
+    <path d="M159.9 83.95 A62 62 0 1 1 116.05 40.1" fill="none" stroke="#FFFFFF" stroke-width="17" stroke-linecap="round" />
+    <circle cx="100" cy="100" r="27" fill="#FFFFFF" />
+    <circle cx="143.8" cy="56.2" r="12" fill="#F5A524" />
+  </g>
+</svg>
