@@ -3,31 +3,36 @@ import bgCard from "@/assets/BGCard.png.asset.json";
 import articlePhoto from "@/assets/imageTower.png.asset.json";
 import noise from "@/assets/Noise.png.asset.json";
 import arrow from "@/assets/Arrow45.svg";
-import { fetchHomeNews, formatCnDate, platformUrl, type ApiKnowledge } from "@/lib/api";
-import { useRemote } from "@/lib/useRemote";
+import { fetchHomeNews, fetchHomeStats, formatCnDate, platformUrl, type ApiKnowledge, type HomeStats } from "@/lib/api";
+import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
 
-// 本地演示标题；接口 GET /api/home/knowledge?limit=6 通了就用真实资讯
-// 注：后端 HomeServiceImpl.listLatestKnowledge 目前仍是 TODO 空实现（返回空数组），
-// 所以本区现在稳定走演示数据，账号里那条「数据源」标签会把这一点如实标出来。
-const DEMO_ITEMS = [
-  "中央一号文件里的农产品流通要点",
-  "秋收季主要产区价格周报（第 38 周）",
-  "冷链与仓储：农产品上行的最后一公里",
-  "农户融资担保方式对比：信用、联保与仓单质押",
-  "病虫害高发期农事提醒与用药规范",
-  "平台新功能：一键发起求购并自动匹配货源",
-];
-
+// 本区所有内容都来自平台接口，**没有本地演示标题**：
+//   左卡精选  ← GET /api/home/knowledge 的第 1 条（标题与日期都是真实发布内容）
+//   右侧列表  ← 同上接口的 6 条
+//   品类页签  ← GET /api/home/stats 的 knowledgeByCategory（真实分类与条数）
+// 接口没通时显示「未加载」，不再摆一批编出来的资讯标题。
 export function Section6() {
-  // 接口优先、静态兜底：GET /api/home/knowledge?limit=6（公开接口）
-  const { data: knowledge, source } = useRemote(
-    () => fetchHomeNews(DEMO_ITEMS.length),
-    [] as ApiKnowledge[],
-  );
+  const { data: knowledge, state } = useRemote(() => fetchHomeNews(6), [] as ApiKnowledge[]);
+  const { data: stats, state: statsState } = useRemote<HomeStats | null>(() => fetchHomeStats(), null);
 
-  const items = knowledge.length
-    ? knowledge.map((k) => ({ key: String(k.knowledgeId), title: k.title, date: formatCnDate(k.createTime) }))
-    : DEMO_ITEMS.map((t, i) => ({ key: `demo-${i}`, title: t, date: "" }));
+  const featured = knowledge[0];
+
+  const items = knowledge.map((k) => ({
+    key: String(k.knowledgeId),
+    title: k.title,
+    date: formatCnDate(k.createTime),
+  }));
+
+  // 品类页签：真实分类 + 真实条数（后端已按条数倒序），前面加一个「全部」
+  const catTabs = stats
+    ? [
+        { label: "全部", count: stats.knowledgeCount ?? 0 },
+        ...Object.entries(stats.knowledgeByCategory ?? {}).map(([label, count]) => ({ label, count })),
+      ]
+    : [];
+
+  const listEmptyText =
+    state === "error" ? "平台接口暂不可用，知识条目未加载" : "平台当前暂无已发布的农业知识";
 
   return (
     <section className="relative z-40 w-full min-h-screen bg-[#1b1b1b] overflow-hidden font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
@@ -51,22 +56,25 @@ export function Section6() {
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
           >
             <div className="flex items-center justify-between px-8 pt-8 text-[13px]">
-              <span className="text-neutral-900">2025 年 9 月 22 日</span>
-              <span className="text-neutral-400 tracking-[0.12em]">融销通研究院</span>
+              {/* 日期取自该条知识的真实发布时间；没有数据时为空白，不编日期 */}
+              <span className="text-neutral-900">{featured ? formatCnDate(featured.createTime) : ""}</span>
+              <span className="text-neutral-400 tracking-[0.12em]">平台农业知识库</span>
             </div>
             <h3 className="mt-14 lg:mt-24 px-8 text-[30px] lg:text-[40px] leading-[1.15] font-semibold text-neutral-400 tracking-tight">
-              农产品流通的
-              <br />
-              数字化路径
+              {featured ? featured.title : listEmptyText}
             </h3>
             <div className="mt-8 px-8">
               <div className="w-full aspect-[793/700] overflow-hidden">
+                {/* 装饰插图：知识条目在库里没有配图（image_url 全为空），这里不假装成该条的实拍图 */}
                 <img
                   src={articlePhoto.url}
-                  alt="麦田与风机：农产品流通数字化路径配图"
+                  alt="农业知识栏目装饰插图"
                   className="w-full h-full object-cover"
                 />
               </div>
+            </div>
+            <div className="px-8 pb-8 text-[12px] text-neutral-400">
+              {REMOTE_STATUS_TEXT[state]}
             </div>
           </motion.div>
           <div
@@ -108,42 +116,18 @@ export function Section6() {
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8 }}
           >
-            <motion.span
-              className="text-sm font-medium uppercase text-white"
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.5, delay: 0 }}
-            >
-              全部 (17)
-            </motion.span>
-            <motion.span
-              className="text-sm font-medium uppercase text-white/40"
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              政策解读 (7)
-            </motion.span>
-            <motion.span
-              className="text-sm font-medium uppercase text-white/40"
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              行情周报 (4)
-            </motion.span>
-            <motion.span
-              className="text-sm font-medium uppercase text-white/40"
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              农事提醒 (6)
-            </motion.span>
+            {catTabs.map((tab, i) => (
+              <motion.span
+                key={tab.label}
+                className={`text-sm font-medium uppercase ${i === 0 ? "text-white" : "text-white/40"}`}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+              >
+                {tab.label} ({tab.count})
+              </motion.span>
+            ))}
             <motion.span
               className="ml-auto text-xs text-white/30"
               initial={{ opacity: 0 }}
@@ -151,7 +135,7 @@ export function Section6() {
               viewport={{ once: true, amount: 0.2 }}
               transition={{ duration: 0.5, delay: 0.4 }}
             >
-              {source === "api" ? "数据源：平台接口" : "数据源：本地演示"}
+              {REMOTE_STATUS_TEXT[statsState]}
             </motion.span>
           </motion.div>
           <motion.div
@@ -164,6 +148,9 @@ export function Section6() {
           />
 
           <div className="flex flex-col w-full lg:w-[calc(100%+80px)]">
+            {items.length === 0 && (
+              <div className="flex items-center py-8 text-white/50 text-lg">{listEmptyText}</div>
+            )}
             {items.map((item, index) => (
               <motion.div
                 key={item.key}
