@@ -1,0 +1,37 @@
+/*
+  融销通品牌主题覆盖 —— 把 Element Plus 的 primary 从默认蓝 #409EFF 换成品牌「禾青」#0E7A5F。
+
+  为什么单独一个文件、并在 main.js 里紧跟 element-plus/dist/index.css 之后引入：
+  Element Plus 把这一组变量定义在 `:root` 上，覆盖只能靠「同优先级 + 后加载」。
+  放在 App.vue 的 <style> 里虽然通常也能生效，但顺序取决于打包器收集样式表的先后，
+  不稳定；显式引入可以保证顺序，也不受组件懒加载影响。
+
+  为什么 light-3/5/7/8/9 要手算：
+  Element Plus 的浅色阶不是 CSS 能直接算出来的派生值，语义是
+      light-N = mix(primary, white, N/10)   → primary × (1 - N/10) + white × (N/10)
+      dark-2  = mix(primary, black, 2/10)   → primary × 0.8
+  不覆盖它们的话，悬停底色、标签背景这类地方会残留默认蓝的浅色（#ecf5ff 等），
+  出现「文字变绿、背景还是蓝白」的脏混搭。
+
+  换品牌色时的重新推导方法（以 primary = #0E7A5F = rgb(14,122,95) 为例）：
+      light-3 = 14×0.7+255×0.3 , 122×0.7+255×0.3 , 95×0.7+255×0.3 = 86,162,143 = #56A28F
+      light-5 = 14×0.5+255×0.5 , 122×0.5+255×0.5 , 95×0.5+255×0.5 = 135,189,175 = #87BDAF
+      light-7 = 14×0.3+255×0.7 , 122×0.3+255×0.7 , 95×0.3+255×0.7 = 183,215,207 = #B7D7CF
+      light-8 = 14×0.2+255×0.8 , 122×0.2+255×0.8 , 95×0.2+255×0.8 = 207,228,223 = #CFE4DF
+      light-9 = 14×0.1+255×0.9 , 122×0.1+255×0.9 , 95×0.1+255×0.9 = 231,242,239 = #E7F2EF
+      dark-2  = 14×0.8 , 122×0.8 , 95×0.8 = 11,98,76 = #0B624C
+
+  ⚠️ 只覆盖 primary 一组。danger/warning/success 保持 Element Plus 原值 ——
+  业务上的涨跌语义是「红涨绿跌」，那是数据色，不能跟品牌绿混为一谈。
+*/
+
+:root {
+  --el-color-primary: #0E7A5F;
+  --el-color-primary-light-3: #56A28F;
+  --el-color-primary-light-5: #87BDAF;
+  --el-color-primary-light-7: #B7D7CF;
+  --el-color-primary-light-8: #CFE4DF;
+  --el-color-primary-light-9: #E7F2EF;
+  --el-color-primary-dark-2: #0B624C;
+  --el-color-primary-rgb: 14, 122, 95;
+}
