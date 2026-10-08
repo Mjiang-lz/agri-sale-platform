@@ -1,11 +1,13 @@
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import { useRef, useState, useMemo } from "react";
-import { fetchCollageProducts, resolveImage, type ApiProduct } from "@/lib/api";
+import { fetchHotProducts, resolveImage, type ApiProduct } from "@/lib/api";
 import { pickProductPhoto } from "@/lib/productImages";
-import { useRemote } from "@/lib/useRemote";
+import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
 
-// 商品图来自 Pexels（免费可商用），已下载到 public/products/ 本地，答辩时不依赖外网
-// 运行时优先用平台接口的真实货源；接口不通则回落到这些本地演示图
+// 商品图来自 Pexels（免费可商用），已下载到 public/products/ 本地，答辩时不依赖外网。
+// 注意：这是**配图素材**而不是数据 —— 平台上架的商品目前都没传 imageUrl，
+// 所以按「商品名 → 品类」配一张同类目实拍图，避免出现「老母鸡配苹果图」这种错配。
+// 商品名、价格、产地、库存全部来自接口。详见 lib/productImages.ts。
 
 function AnimatedWords({ text, className, delayStart = 0, stagger = 0.06 }:
   { text: string; className?: string; delayStart?: number; stagger?: number }) {
@@ -56,19 +58,15 @@ const FINAL_SLOTS = [
 
 const IMG_CLASS = "w-full h-full object-cover rounded-[1px] pointer-events-none";
 
-// 拼贴卡：本地演示图（接口不通时的兜底），点击跳转 /shop 购物页
-const DEMO_PRODUCTS = [
-  { src: "/products/p01.jpg", alt: "烟台红富士苹果" },
-  { src: "/products/p02.jpg", alt: "寿光水果番茄" },
-  { src: "/products/p08.jpg", alt: "当季新米" },
-  { src: "/products/p04.jpg", alt: "高山土豆" },
-  { src: "/products/p03.jpg", alt: "赣南脐橙" },
-  { src: "/products/p06.jpg", alt: "时令蔬菜组合" },
-];
-
 type CollageCard = { id: string; src: string | null; alt: string };
 
-const CARD_COUNT = 6; // 动画状态表按 6 个槽位写死，卡片数必须补足到 6
+/**
+ * 动画状态表按 6 个槽位写死（INITIAL_STATES / WHILE_IN_VIEW_STATES / FINAL_SLOTS 都是 6 项），
+ * 卡片数不足 6 时下标会落空，所以必须补足到 6 —— 但补的是**写着「暂无」的占位块**，
+ * 不是本地演示图。平台在售货源有 24 条，正常情况下一张都不会缺。
+ */
+const CARD_COUNT = 6;
+const PLACEHOLDER_ALT = "暂无更多在售货源";
 
 /**
  * 后端货源 → 拼贴卡。
@@ -103,22 +101,23 @@ export function Section2() {
   const [isHovering, setIsHovering] = useState(false);
   const [shift, setShift] = useState(0);
 
-  // 接口优先、静态兜底：GET /api/home/products?limit=6（公开，游客可访问）
-  // 后端推荐位目前为空 → fetchCollageProducts 会自动改调 /trade/products 取最新货源
-  const { data: hotProducts, source } = useRemote(
-    () => fetchCollageProducts(CARD_COUNT),
+  // GET /api/home/products?limit=6（公开，游客可访问）
+  // 后端口径：审核通过 + 已上架，按发布时间倒序。取不到就如实报「没取到」，不拿本地图凑数。
+  const { data: hotProducts, state } = useRemote(
+    () => fetchHotProducts(CARD_COUNT),
     [] as ApiProduct[],
   );
 
   const cards = useMemo<CollageCard[]>(() => {
     const list = toCollageCards(hotProducts);
-    // 数量不足时用演示图补足，否则动画状态表的下标会落空
     for (let i = list.length; i < CARD_COUNT; i++) {
-      const demo = DEMO_PRODUCTS[i % DEMO_PRODUCTS.length];
-      list.push({ id: `demo-${i}`, src: demo.src, alt: demo.alt });
+      list.push({ id: `placeholder-${i}`, src: null, alt: PLACEHOLDER_ALT });
     }
     return list.slice(0, CARD_COUNT);
   }, [hotProducts]);
+
+  /** 有真货源才铺拼贴墙；一个都没有就明说，不摆 6 个空占位块假装有内容 */
+  const hasProducts = state === "ok" && hotProducts.length > 0;
 
   const CURSOR_SIZE = 130;
   const mx = useMotionValue(-9999);
@@ -182,64 +181,78 @@ export function Section2() {
             <AnimatedWords text="每一步都有平台在托底" delayStart={0.55} stagger={0.04} />
           </p>
           <p className="mt-2 text-xs text-white/40 lg:text-right">
-            {source === "api" ? "数据源：平台接口" : "数据源：本地演示"} · 点击图片进入商城页 →
+            {REMOTE_STATUS_TEXT[state]}
+            {hasProducts && " · 点击图片进入商城页 →"}
           </p>
         </div>
       </div>
 
-      {/* MOBILE / TABLET — 2x2 grid */}
-      <div className="mt-10 grid grid-cols-2 gap-4 lg:hidden">
-        {mobileCards.map((c) => (
-          <motion.div key={c.id}
-            className="w-full aspect-square overflow-hidden rounded-[2px]"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ duration: 0.6, ease: "easeOut" }}>
-            <CardMedia card={c} />
-          </motion.div>
-        ))}
-      </div>
-
-      {/* DESKTOP COLLAGE */}
-      <div className="relative hidden lg:block" ref={collageRef}>
-        <motion.div
-          className="relative z-10 mt-[-22px] flex w-full flex-row items-center justify-between cursor-grab active:cursor-grabbing"
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.05}
-          onDragStart={() => { draggedRef.current = true; }}
-          onDragEnd={handleDragEnd}
-          onPointerMove={handleCardPointerMove}>
-          {visibleCards.map((card, index) => {
-            const isInitial = shift === 0;
-            return (
-              <motion.div key={card.id}
-                className="overflow-hidden shrink-0"
-                onPointerEnter={handleCardPointerEnter}
-                onPointerLeave={handleCardPointerLeave}
-                initial={isInitial ? INITIAL_STATES[index] : false}
-                whileInView={isInitial ? WHILE_IN_VIEW_STATES[index] : undefined}
-                animate={!isInitial ? FINAL_SLOTS[index] : undefined}
-                viewport={{ once: true }}
-                transition={isInitial
-                  ? { duration: 2.5, times: [0, 0.3, 1], ease: "easeInOut" }
-                  : { duration: 0.8, ease: "easeInOut" }}>
-                {/* img 是 pointer-events-none，点击会落到这层 <a> 上 → /shop */}
-                <CardMedia card={card} onClick={handleCardClick} />
+      {hasProducts ? (
+        <>
+          {/* MOBILE / TABLET — 2x2 grid */}
+          <div className="mt-10 grid grid-cols-2 gap-4 lg:hidden">
+            {mobileCards.map((c) => (
+              <motion.div key={c.id}
+                className="w-full aspect-square overflow-hidden rounded-[2px]"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.6, ease: "easeOut" }}>
+                <CardMedia card={c} />
               </motion.div>
-            );
-          })}
-        </motion.div>
+            ))}
+          </div>
 
-        <motion.div
-          className="fixed top-0 left-0 z-50 hidden lg:flex items-center justify-center w-[130px] h-[130px] rounded-full bg-white/10 backdrop-blur-md shadow-2xl border border-white/20 pointer-events-none"
-          style={{ x: sx, y: sy }}
-          animate={{ opacity: isHovering ? 1 : 0, scale: isHovering ? 1 : 0 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}>
-          <img src="/Arrow45.svg" className="w-[40px] h-[40px] brightness-0 invert" alt="" />
-        </motion.div>
-      </div>
+          {/* DESKTOP COLLAGE */}
+          <div className="relative hidden lg:block" ref={collageRef}>
+            <motion.div
+              className="relative z-10 mt-[-22px] flex w-full flex-row items-center justify-between cursor-grab active:cursor-grabbing"
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.05}
+              onDragStart={() => { draggedRef.current = true; }}
+              onDragEnd={handleDragEnd}
+              onPointerMove={handleCardPointerMove}>
+              {visibleCards.map((card, index) => {
+                const isInitial = shift === 0;
+                return (
+                  <motion.div key={card.id}
+                    className="overflow-hidden shrink-0"
+                    onPointerEnter={handleCardPointerEnter}
+                    onPointerLeave={handleCardPointerLeave}
+                    initial={isInitial ? INITIAL_STATES[index] : false}
+                    whileInView={isInitial ? WHILE_IN_VIEW_STATES[index] : undefined}
+                    animate={!isInitial ? FINAL_SLOTS[index] : undefined}
+                    viewport={{ once: true }}
+                    transition={isInitial
+                      ? { duration: 2.5, times: [0, 0.3, 1], ease: "easeInOut" }
+                      : { duration: 0.8, ease: "easeInOut" }}>
+                    {/* img 是 pointer-events-none，点击会落到这层 <a> 上 → /shop */}
+                    <CardMedia card={card} onClick={handleCardClick} />
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+
+            <motion.div
+              className="fixed top-0 left-0 z-50 hidden lg:flex items-center justify-center w-[130px] h-[130px] rounded-full bg-white/10 backdrop-blur-md shadow-2xl border border-white/20 pointer-events-none"
+              style={{ x: sx, y: sy }}
+              animate={{ opacity: isHovering ? 1 : 0, scale: isHovering ? 1 : 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}>
+              <img src="/Arrow45.svg" className="w-[40px] h-[40px] brightness-0 invert" alt="" />
+            </motion.div>
+          </div>
+        </>
+      ) : (
+        /* 接口没通，或者平台确实一件在售货源都没有 —— 两种情况都如实说，不放演示图 */
+        <div className="mt-10 flex min-h-[200px] w-full items-center justify-center rounded-[2px] border border-dashed border-white/15 bg-white/[0.02] px-6 py-16 lg:mt-16">
+          <p className="max-w-md text-center text-sm leading-relaxed text-white/50">
+            {state === "error"
+              ? "平台接口暂不可用，货源数据未加载。本页不展示任何演示数据，请确认后端服务已启动后刷新。"
+              : "平台当前暂无在售货源。"}
+          </p>
+        </div>
+      )}
 
       <div className="relative z-20 mt-10 flex w-full lg:mt-16 lg:translate-y-[-96px]">
         <div className="hidden lg:block lg:w-[22%]" />
