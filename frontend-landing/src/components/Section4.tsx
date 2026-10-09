@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import lineAsset from "@/assets/Line.svg.asset.json";
+import lineAsset from "@/assets/Line.svg";
 import { WaveGrid } from "./WaveGrid";
 import { fetchHotProducts, formatPrice, platformUrl, resolveImage, type ApiProduct } from "@/lib/api";
 import { pickProductPhoto } from "@/lib/productImages";
@@ -318,7 +318,7 @@ export function Section4() {
             </div>
 
             {/* Pagination Line — 40px below card */}
-            <img src={lineAsset.url} alt="" className="relative z-20 mt-[40px] opacity-0" />
+            <img src={lineAsset} alt="" className="relative z-20 mt-[40px] opacity-0" />
           </div>
         </motion.div>
       </div>

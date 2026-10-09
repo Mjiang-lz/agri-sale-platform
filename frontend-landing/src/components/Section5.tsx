@@ -3,9 +3,10 @@ import { motion, AnimatePresence, useInView, animate } from "framer-motion";
 import { fetchHomeStats, platformUrl, type HomeStats } from "@/lib/api";
 import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
 
-const CDN = "https://qclay.design/lovable/ceptral";
-const noise = { url: `${CDN}/Noise.png` };
-const sideShadow = { url: `${CDN}/Side-Image-Container.png` };
+// 装饰贴图已本地化到 public/landing/（原先直连 qclay.design 第三方 CDN，
+// 答辩现场断网或该站下线会让本节的噪点/侧阴影直接消失）
+const NOISE_URL = "/landing/noise.webp";
+const SIDE_SHADOW_URL = "/landing/side-shadow.webp";
 
 // 背景墙是**配图素材**（Pexels 免费可商用，已本地化到 public/farmers/，答辩不依赖外网），
 // 不是数据。它不承载任何数量含义 —— 数量在中间那三个统计里，取自平台接口。
@@ -127,7 +128,7 @@ export function Section5() {
       {/* Overlays */}
       <div className="absolute inset-0 z-20 bg-[#865438]/50 mix-blend-multiply pointer-events-none" />
       <div className="absolute inset-0 z-[110] bg-gradient-to-b from-[#865438] to-[#865438] opacity-[0.05] pointer-events-none" />
-      <div className="absolute inset-0 z-[100] bg-cover bg-center bg-no-repeat opacity-[0.15] mix-blend-overlay pointer-events-none" style={{ backgroundImage: `url(${noise.url})` }} />
+      <div className="absolute inset-0 z-[100] bg-cover bg-center bg-no-repeat opacity-[0.15] mix-blend-overlay pointer-events-none" style={{ backgroundImage: `url(${NOISE_URL})` }} />
 
       {/* Center Text UI */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-[130] w-full px-4">
@@ -185,7 +186,7 @@ export function Section5() {
       </div>
 
       {/* Absolute Top Layer Side Shadow */}
-      <img src={sideShadow.url} alt="" className="absolute top-0 left-1/2 -translate-x-1/2 w-[984px] h-full object-cover pointer-events-none z-[120]" />
+      <img src={SIDE_SHADOW_URL} alt="" className="absolute top-0 left-1/2 -translate-x-1/2 w-[984px] h-full object-cover pointer-events-none z-[120]" />
     </section>
   );
 }
