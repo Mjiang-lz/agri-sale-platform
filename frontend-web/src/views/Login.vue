@@ -20,11 +20,12 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/request'
 import { useUserStore } from '@/store/user'
 
+const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const formRef = ref()
@@ -35,6 +36,13 @@ const rules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 }
 
+// 回跳路由守卫带过来的目的地；只认站内绝对路径，
+// 挡掉 ?redirect=//evil.com 这类协议相对地址（会被浏览器当外站）
+function safeRedirect() {
+  const r = route.query.redirect
+  return typeof r === 'string' && r.startsWith('/') && !r.startsWith('//') ? r : '/'
+}
+
 async function onSubmit() {
   await formRef.value.validate()
   loading.value = true
@@ -42,7 +50,7 @@ async function onSubmit() {
     const data = await request.post('/auth/login', form)
     userStore.saveLogin(data)
     ElMessage.success('登录成功')
-    router.push('/')
+    router.push(safeRedirect())
   } finally {
     loading.value = false
   }
