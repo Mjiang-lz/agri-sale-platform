@@ -1,0 +1,49 @@
+# 容器部署用的 profile（由 deploy/backend.Dockerfile 指定 spring.profiles.active=docker）。
+#
+# 为什么不直接用 application-prod.yml：
+# 那个文件名在 .gitignore 里，是留给「有真实凭据的本机/线上配置」的，不入库。
+# 这里要的恰好相反 —— 一份谁 clone 下来都能直接跑起来的容器配置，所以必须入库，
+# 另起个名字，两边互不干扰。
+#
+# 与 dev 的差别只有三处：数据源地址、SQL 日志、接口文档开关。
+# 其余（JWT、OBS 本地兜底、分页等）沿用 application.yml 的默认值，不在这里重复。
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 默认指向 compose 里的 mysql 服务名。需要连外部库时用 RXT_DB_URL 覆盖。
+    url: ${RXT_DB_URL:jdbc:mysql://mysql:3306/rxt?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${RXT_DB_USERNAME:root}
+    password: ${RXT_DB_PASSWORD:root}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+
+mybatis-plus:
+  configuration:
+    # 刻意不设 log-impl。
+    # dev 里设的是 StdOutImpl（开发态要看 SQL），这里不设即回到 MyBatis 默认的
+    # 不打日志；写死一个类名反而多一个会随版本失效的字符串。
+    map-underscore-to-camel-case: true
+
+rxt:
+  api-docs:
+    # 对外部署默认关闭。application.yml 里这个开关的默认值本来就是 false，
+    # 这里显式再写一遍，是为了让"部署态不开文档"这件事在部署文件里一眼可见，
+    # 而不用去翻基类配置；需要临时演示时 RXT_API_DOCS_ENABLED=true 即可打开。
+    enabled: ${RXT_API_DOCS_ENABLED:false}
+
+  jwt:
+    # 沿用基类配置的约定：给一个能直接跑起来的默认值 + 醒目注释，由环境变量覆盖。
+    # 这里不留空 —— 空密钥会让 JJWT 在签发时抛异常，表现为「容器起来了、一登录就 500」，
+    # 是演示当天最不该出现的那类失败。
+    # ⚠️ 只要这个地址会被本机以外的人访问到，就必须注入 RXT_JWT_SECRET。基类里那个
+    # dev 默认值是公开在版本库里的，拿它签发 token 等于任何人都能伪造登录态。
+    secret: ${RXT_JWT_SECRET:rxt-docker-insecure-default-please-override-via-env-32b}
+
+logging:
+  level:
+    # 容器里降到 info：dev 的 debug 会把 MyBatis 的每一次查询都打出来，
+    # 演示时刷屏到看不出真正的错误。
+    com.rxt: info
