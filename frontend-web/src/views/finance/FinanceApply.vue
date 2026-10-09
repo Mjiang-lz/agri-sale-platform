@@ -7,7 +7,6 @@
         <p>选择贷款产品，填写额度、期限和资金用途。提交后系统将推荐经营特征相近的联保候选人。</p>
       </div>
       <div class="head-tags">
-        <el-tag type="success" effect="plain">接口：POST /api/finance/apply</el-tag>
         <el-tag v-if="demoMode" type="warning" effect="dark">演示数据</el-tag>
       </div>
     </div>
@@ -446,12 +445,6 @@ onMounted(loadProducts)
 
 <style scoped>
 .finance-apply-page { color: var(--el-text-color-primary); }
-.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 18px; }
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
-.head-tags { display: flex; align-items: center; gap: 8px; }
-.content-card { border-radius: 14px; }
-.card-title { display: flex; justify-content: space-between; align-items: center; }
 .card-title span { color: var(--el-text-color-secondary); font-size: 12px; }
 .product-list { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .product-card { padding: 14px; border: 1px solid var(--el-border-color); border-radius: 12px; background: #fff; text-align: left; cursor: pointer; transition: .2s; }

@@ -633,33 +633,10 @@ onMounted(async () => {
 /* 样式严格限制在 scoped 内，不污染其他页面 */
 .home-page { color: var(--el-text-color-primary); }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p  { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
-.head-tags    { display: flex; align-items: center; gap: 8px; }
 
-.content-card  { border-radius: 14px; }
 .section-card  { margin-top: 18px; }
 
-.card-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-.card-tools { display: flex; align-items: center; gap: 12px; }
 
-.pagination {
-  display: flex;
-  justify-content: center;
-  padding-top: 18px;
-}
 
 /* ===== 区块 1 · 新闻轮播 ===== */
 .banner {

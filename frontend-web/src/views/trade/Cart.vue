@@ -290,15 +290,6 @@ onMounted(loadCart)
 <style scoped>
 .cart-page { color: var(--el-text-color-primary); }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p  { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
 
 .cart-card { border-radius: 14px; overflow: hidden; }
 

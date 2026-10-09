@@ -353,7 +353,6 @@ watch(() => route.params.id, (next, prev) => {
 .seller-head small { margin-top: 5px; color: var(--el-text-color-secondary); font-size: 12px; }
 .seller-scale { margin: 14px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; font-size: 13px; }
 
-.card-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .card-title span { color: var(--el-text-color-secondary); font-size: 12px; }
 
 .comment-list { display: grid; gap: 14px; }

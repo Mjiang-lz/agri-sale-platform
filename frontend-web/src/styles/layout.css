@@ -1,0 +1,126 @@
+/*
+  融销通业务端「页级原语」—— 全站页面的标题区、内容卡、分页。
+
+  为什么独立成一个全局文件：
+  改版前这几组样式是在每个页面 scoped 块里**逐字复制**的
+  （实测 .page-head 出现在 9 个 .vue 中、.pagination 出现在 4 个中，
+   且 .pagination 的 padding-top 分别是 12/14/18/22px —— 同一件事四个数值）。
+  复制带来的问题是「全站想调一次间距，得改 9 个文件且必然改漏」。
+
+  层级关系（重要，别删）：
+  Vue 的 scoped 会给选择器加上 [data-v-xxx]，特异性从 (0,1,0) 抬到 (0,2,0)，
+  **高于**这里的全局单类名规则。所以：
+    · 页面若在 scoped 里自己写了同名规则，它照样赢 —— 个别页面（如商品详情）
+      需要不同的标题尺寸时，就地覆盖即可，不必回来加 :not()；
+    · 页面若没写，就吃这里的默认值，全站自然统一。
+  这正是把共性放全局、差异留页面的目的。
+
+  引入顺序：在 main.js 里紧跟 theme.css 之后（见该文件注释）。
+*/
+
+/* ===== 页面标题区 =====================================================
+   结构约定：<div class="page-head"><div><h2/><p/></div><右侧操作/></div>
+   右侧放按钮用 .head-actions，放标签用 .head-tags。 */
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+.page-head h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--rxt-ink);
+}
+.page-head p {
+  margin: 8px 0 0;
+  max-width: 76ch;
+  color: var(--el-text-color-secondary);
+  line-height: 1.7;
+}
+.head-actions,
+.head-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* ===== 内容卡 ========================================================= */
+.content-card {
+  border-radius: var(--rxt-radius-lg);
+}
+.section-card {
+  border-radius: var(--rxt-radius-lg);
+}
+.card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.card-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ===== 分页 =========================================================== */
+.pagination {
+  display: flex;
+  justify-content: center;
+  padding-top: 18px;
+}
+
+/* ===== 业务主区的卡片层级 =============================================
+   各页面都写 shadow="never"（即 is-never-shadow），EP 会把它变成 box-shadow:none，
+   于是整页只剩 1px 灰边，卡片之间没有层次 —— 长页面尤其平。
+   这里统一补一层很浅的落影：既保留「轻」的观感，又让卡片浮起来。
+   选择器 (0,2,0) 与 .el-card.is-never-shadow 打平，靠 layout.css 在 EP 之后加载取胜
+   （main.js 的引入顺序就是为此定的，别调）。 */
+.business-main .el-card.is-never-shadow {
+  border-color: var(--rxt-border);
+  box-shadow: var(--rxt-shadow-md);
+}
+/* 悬停加深一档，给出可点击的暗示（仅对显式声明 hover 的卡片生效） */
+.business-main .el-card.is-hover-shadow:hover {
+  box-shadow: var(--rxt-shadow-lg);
+}
+
+/* 表格/描述列表所在的卡片不需要落影，避免大面积浮起显得晃 */
+.business-main .el-card.is-never-shadow:has(.el-descriptions) {
+  box-shadow: var(--rxt-shadow-sm);
+}
+
+/* ===== 文字型头像 =====================================================
+   Element Plus 的文字型 el-avatar 默认是「浅灰底 #c0c4cc + 白字」，
+   实测对比度只有 1.75:1（WCAG 正文要 4.5:1）—— 一个浅灰圆里一个白字，
+   在亮屏/投影上基本读不出来。全仓 8 处 el-avatar 都会吃到这条。
+   取色不是随手挑的，三组候选实测对比度：
+     light-8 #CFE4DF 底 + primary #0E7A5F 字 = 3.99  ✗ 差一点
+     light-9 #E7F2EF 底 + primary #0E7A5F 字 = 4.62  ✓ 但底色太浅、圆不明显
+     light-8 #CFE4DF 底 + deep   #0B624C 字 = 5.52  ✓ ← 用这组，圆有形又达标
+   用 :not(:has(img)) 只挑文字型，图片型头像不受影响。 */
+.el-avatar:not(:has(img)) {
+  background: var(--el-color-primary-light-8);
+  color: var(--el-color-primary-dark-2);
+  font-weight: 600;
+}
+
+/* ===== 小屏 =========================================================== */
+@media (max-width: 680px) {
+  .page-head {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .page-head h2 {
+    font-size: 20px;
+  }
+  .head-actions,
+  .head-tags {
+    flex-wrap: wrap;
+  }
+}

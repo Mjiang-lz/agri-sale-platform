@@ -34,4 +34,38 @@
   --el-color-primary-light-9: #E7F2EF;
   --el-color-primary-dark-2: #0B624C;
   --el-color-primary-rgb: 14, 122, 95;
+
+  /* ------------------------------------------------------------------
+     融销通业务端自有设计变量（前缀 rxt-，避开 el- 命名空间）
+
+     为什么要有这一层：改版前「容器宽度 min(1420px, calc(100% - 36px))」「卡片圆角 14px」
+     这类值是在每个 .vue 的 scoped 样式里各写一遍的（实测 .page-head 在 9 个页面里
+     逐字重复）。要全站调一次间距就得改 9 个文件，且必然改漏。
+     收敛到这里之后，页面只写差异，共性走变量。
+     ------------------------------------------------------------------ */
+  --rxt-primary: #0E7A5F;
+  --rxt-primary-deep: #0B624C;
+  --rxt-grain: #1D9E75;
+  /* 暖橙是稀缺强调色：全站只在品牌标节点与「演示数据」提示上出现，别扩散 */
+  --rxt-accent: #F5A524;
+
+  --rxt-page-bg: #f4f7f4;
+  --rxt-surface: #ffffff;
+  /* 品牌墨绿黑，比 EP 默认的 #303133 更贴合农业调性，正文用它 */
+  --rxt-ink: #14302B;
+  --rxt-ink-weak: #87938b;
+
+  --rxt-radius-lg: 14px;
+  --rxt-radius-md: 10px;
+  --rxt-radius-pill: 999px;
+
+  --rxt-border: #e6ece8;
+  /* 两层阴影：近距离细描边感 + 远距离柔和落影，替代纯 1px 灰边带来的「纸片感」 */
+  --rxt-shadow-sm: 0 1px 2px rgba(16, 42, 35, 0.04);
+  --rxt-shadow-md: 0 1px 2px rgba(16, 42, 35, 0.05), 0 10px 24px -16px rgba(16, 42, 35, 0.22);
+  --rxt-shadow-lg: 0 2px 4px rgba(16, 42, 35, 0.05), 0 24px 48px -24px rgba(16, 42, 35, 0.28);
+
+  /* 业务端页面容器：头部、主区、页脚共用同一个宽度，保证左右对齐 */
+  --rxt-container: min(1420px, calc(100% - 36px));
+  --rxt-header-h: 70px;
 }

@@ -168,10 +168,19 @@ function handleUserCommand(command) {
 </script>
 
 <style scoped>
-.business-layout { min-height: 100vh; display: flex; flex-direction: column; background: #f4f7f4; }
-.business-header { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--el-border-color-light); backdrop-filter: blur(14px); }
-.header-inner { width: min(1420px, calc(100% - 36px)); height: 70px; margin: 0 auto; display: flex; align-items: center; gap: 26px; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: #14302B; cursor: pointer; white-space: nowrap; }
+.business-layout { min-height: 100vh; display: flex; flex-direction: column; background: var(--rxt-page-bg); }
+/* 粘性头部：半透明 + 毛玻璃，滚动时内容从底下透出来。
+   注意 backdrop-filter 在无头 Chrome（SwiftShader 软渲染）下会让合成器卡死、
+   截图直接超时 —— 那是渲染环境的问题，不是这里的写法有问题，别据此删掉它。 */
+.business-header {
+  position: sticky; top: 0; z-index: 30;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--rxt-border);
+  box-shadow: var(--rxt-shadow-sm);
+  backdrop-filter: blur(14px);
+}
+.header-inner { width: var(--rxt-container); height: var(--rxt-header-h); margin: 0 auto; display: flex; align-items: center; gap: 26px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: var(--rxt-ink); cursor: pointer; white-space: nowrap; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 19px; letter-spacing: 1px; }
 .brand small { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 10px; }
@@ -182,8 +191,8 @@ function handleUserCommand(command) {
 .top-nav :deep(.rxt-icon) { margin-right: 7px; }
 .user-button { display: flex; align-items: center; gap: 8px; padding: 4px; border: 0; background: transparent; color: var(--el-text-color-primary); cursor: pointer; white-space: nowrap; }
 .guest-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.business-main { flex: 1; width: min(1420px, calc(100% - 36px)); margin: 0 auto; padding: 28px 0 46px; }
-.business-footer { width: min(1420px, calc(100% - 36px)); margin: 0 auto; padding: 18px 0 26px; display: flex; justify-content: space-between; color: #87938b; border-top: 1px solid var(--el-border-color-light); font-size: 12px; }
+.business-main { flex: 1; width: var(--rxt-container); margin: 0 auto; padding: 28px 0 46px; }
+.business-footer { width: var(--rxt-container); margin: 0 auto; padding: 18px 0 26px; display: flex; justify-content: space-between; color: var(--rxt-ink-weak); border-top: 1px solid var(--rxt-border); font-size: 12px; }
 @media (max-width: 1050px) { .header-inner { height: auto; padding: 12px 0; flex-wrap: wrap; gap: 10px; } .top-nav { order: 3; flex-basis: 100%; overflow-x: auto; } .user-button span { display: none; } }
 @media (max-width: 680px) { .header-inner, .business-main, .business-footer { width: min(100% - 24px, 1420px); } .brand small { display: none; } .business-footer { flex-direction: column; gap: 6px; } }
 </style>

@@ -32,7 +32,6 @@
         <template #header>
           <div class="card-head">
             <div><strong>我要提问</strong><span>问题会进入专家工作台</span></div>
-            <el-tag type="success" effect="plain">POST /api/expert/qa/ask</el-tag>
           </div>
         </template>
 

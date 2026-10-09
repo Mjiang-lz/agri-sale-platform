@@ -222,10 +222,6 @@ onMounted(loadApplies)
 </script>
 
 <style scoped>
-.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 18px; }
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
-.head-actions { display: flex; align-items: center; gap: 10px; }
 .table-card { border-radius: 14px; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
 .toolbar :deep(.el-tabs__header) { margin: 0; }

@@ -19,7 +19,6 @@
         <template #header>
           <div class="card-head">
             <span>基本信息</span>
-            <el-tag size="small" type="info" effect="plain">GET / PUT /api/user/profile</el-tag>
           </div>
         </template>
 
@@ -72,7 +71,6 @@
         <template #header>
           <div class="card-head">
             <span>农户经营档案</span>
-            <el-tag size="small" type="info" effect="plain">PUT /api/user/farmer-profile</el-tag>
           </div>
         </template>
 
@@ -300,12 +298,8 @@ onMounted(loadProfile)
 </script>
 
 <style scoped>
-.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 18px; }
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
-.head-actions { display: flex; align-items: center; gap: 10px; }
 .loading-block { padding: 24px; border-radius: 14px; background: #fff; }
-.section-card { margin-bottom: 18px; border-radius: 14px; }
+.section-card { margin-bottom: 18px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-weight: 600; }
 .identity { display: flex; align-items: center; gap: 24px; margin-bottom: 18px; flex-wrap: wrap; }
 .identity-desc { flex: 1; min-width: 320px; }
