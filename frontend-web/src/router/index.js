@@ -32,7 +32,15 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   if (to.meta.public) return true
-  if (!getToken()) return '/login'
+  if (!getToken()) {
+    // 未登录：把「本来想去哪」带过去，登录后回跳。
+    // 不带的话，游客从落地页/外链点具体业务页（如 /trade/products）会落回 /home，目的地丢失
+    // —— 落地页 Section4 四个 tab 与 /shop 的商品卡片都走这条路径。
+    // 默认首页（/、/home）不带，避免 URL 里多一串没意义的 query。
+    const dest = to.fullPath
+    if (dest === '/' || dest === '/home') return '/login'
+    return { path: '/login', query: { redirect: dest } }
+  }
   return true
 })
 
