@@ -8,12 +8,11 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0E7A5F" />
     <meta name="description" content="融销通 —— 基于数字经济的农产品融销一体平台。一穗通产销。" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200..900&display=swap"
-    />
+    <!--
+      字体（Inter Tight）已自托管到 public/fonts/，@font-face 声明在 src/styles.css 里。
+      这里刻意不再引用任何外部域名：第三方样式表放在 <head> 会阻塞渲染，
+      一旦对方挂起，整页白屏且控制台无报错。
+    -->
   </head>
   <body>
     <div id="app"></div>

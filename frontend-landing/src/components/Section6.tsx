@@ -1,7 +1,4 @@
 import { motion } from "framer-motion";
-import bgCard from "@/assets/BGCard.png.asset.json";
-import articlePhoto from "@/assets/imageTower.png.asset.json";
-import noise from "@/assets/Noise.png.asset.json";
 import arrow from "@/assets/Arrow45.svg";
 import { fetchHomeNews, fetchHomeStats, formatCnDate, platformUrl, type ApiKnowledge, type HomeStats } from "@/lib/api";
 import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
@@ -40,7 +37,7 @@ export function Section6() {
         {/* LEFT */}
         <div className="relative col-span-1 w-full h-full flex flex-col justify-start items-center lg:items-start pt-20 pb-20 px-10 lg:pt-[140px] lg:pb-[140px] lg:px-[125px]">
           <motion.img
-            src={bgCard.url}
+            src="/landing/bg-card.webp"
             alt=""
             className="absolute left-0 right-0 top-20 bottom-20 lg:top-[140px] lg:bottom-[140px] w-full object-cover z-0"
             initial={{ y: 150, opacity: 0 }}
@@ -67,7 +64,7 @@ export function Section6() {
               <div className="w-full aspect-[793/700] overflow-hidden">
                 {/* 装饰插图：知识条目在库里没有配图（image_url 全为空），这里不假装成该条的实拍图 */}
                 <img
-                  src={articlePhoto.url}
+                  src="/landing/article-tower.webp"
                   alt="农业知识栏目装饰插图"
                   className="w-full h-full object-cover"
                 />
@@ -79,7 +76,7 @@ export function Section6() {
           </motion.div>
           <div
             className="absolute left-0 right-0 top-20 bottom-20 lg:top-[140px] lg:bottom-[140px] z-20 bg-repeat opacity-[0.15] mix-blend-overlay pointer-events-none"
-            style={{ backgroundImage: `url(${noise.url})` }}
+            style={{ backgroundImage: `url(/landing/noise.webp)` }}
           />
         </div>
 
