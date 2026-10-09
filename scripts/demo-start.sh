@@ -249,9 +249,9 @@ fi
 # 起三个前端
 # ---------------------------------------------------------------------------
 
-# start_frontend <名字> <目录> <端口> <覆盖端口用的环境变量名>
+# start_frontend <名字> <目录> <端口> <覆盖端口用的环境变量名> [附加环境变量 K=V ...]
 start_frontend() {
-  local name="$1" dir="$2" port="$3" envkey="$4"
+  local name="$1" dir="$2" port="$3" envkey="$4" extra_env="${5:-}"
 
   if is_our_frontend "${port}"; then
     ok "${name} 已在 ${port} 上跑着，复用"
@@ -268,7 +268,11 @@ start_frontend() {
 
   # 显式 --strictPort：默认行为是端口被占就悄悄换一个，
   # 那样脚本打印的地址就是错的，演示时打开会扑空。
-  spawn "${name}" "${ROOT}/${dir}" "${ROOT}/${dir}/node_modules/.bin/vite" --port "${port}" --strictPort
+  #
+  # extra_env 用 `env K=V` 前缀注入即可 —— spawn 内部就是 exec "$@"，
+  # 不必为它再加参数。空值时 `env` 原样透传，是安全的空操作。
+  # shellcheck disable=SC2086
+  spawn "${name}" "${ROOT}/${dir}" env ${extra_env} "${ROOT}/${dir}/node_modules/.bin/vite" --port "${port}" --strictPort
   if ! wait_frontend "${name}" "${port}" 90; then
     warn "${name} 90s 内没就绪。最后 30 行日志："
     tail -30 "${LAST_LOG}" >&2
@@ -277,9 +281,19 @@ start_frontend() {
 }
 
 step "前端"
-start_frontend "业务端"   "frontend-web"     "${WEB_PORT}"     "WEB_PORT"
-start_frontend "管理后台" "frontend-admin"   "${ADMIN_PORT}"   "ADMIN_PORT"
-start_frontend "落地页"   "frontend-landing" "${LANDING_PORT}" "LANDING_PORT"
+
+# 三个前端的 /api 代理目标必须跟着**本次实际使用的**后端端口走。
+# 写死 8080 的话，BACKEND_PORT=18080 这种演示会全部打偏 —— 8080 上要么没后端
+# （前端报错但看不出为什么），要么躺着别人的进程（拿到看不懂的响应）。
+API_ENV="VITE_API_TARGET=http://localhost:${BACKEND_PORT}"
+
+start_frontend "业务端"   "frontend-web"     "${WEB_PORT}"     "WEB_PORT"     "${API_ENV}"
+start_frontend "管理后台" "frontend-admin"   "${ADMIN_PORT}"   "ADMIN_PORT"   "${API_ENV}"
+# 落地页还要知道业务端在哪：页面上「进入平台 / 登录 / 免费入驻」是**构建时/启动时**
+# 定死的地址，前端默认值是 http://localhost:5173。只在 WEB_PORT 保持默认时才碰巧对，
+# 一旦 WEB_PORT 被覆盖，这些按钮就会指向一个没人监听的端口。
+start_frontend "落地页"   "frontend-landing" "${LANDING_PORT}" "LANDING_PORT" \
+  "${API_ENV} VITE_PLATFORM_BASE_URL=http://localhost:${WEB_PORT}"
 
 # ---------------------------------------------------------------------------
 # 就绪
