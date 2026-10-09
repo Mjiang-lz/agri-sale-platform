@@ -27,6 +27,7 @@
   th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
   th{background:var(--panel2);font-weight:600;color:#fff}
   td.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:#c9c9c9}
+  td.del{color:#e88580;text-decoration:line-through;text-decoration-color:rgba(217,83,79,.6)}
   .tag{display:inline-block;padding:1px 8px;border-radius:4px;font-size:12px;line-height:1.7;
     white-space:nowrap}
   .t-ok{background:rgba(63,169,106,.16);color:#6fd394}
@@ -59,28 +60,149 @@
 <div class="wrap">
 
   <h1>融销通落地页 · 数据对接验收报告</h1>
-  <p class="sub">落地页从「纯静态复刻」升级为「接口优先、静态兜底」：真实数据取自 agri-sale-platform 后端的公开只读接口。</p>
-  <p class="meta">验收时间 2026-09-22 · 环境 无头 Chrome 153 + CDP（1440×1000）· 后端 Spring Boot :8080 · 落地页 Vite dev :5221</p>
+  <p class="sub">
+    <b>第一轮 2026-09-22</b>：落地页从「纯静态复刻」升级为「接口优先、静态兜底」。<br>
+    <b>第二轮 2026-10-08</b>：把「静态兜底」整个拿掉 —— 页面上出现的每个商品、每个数字都必须在数据库里查得到，
+    取不到就显示空态，不再有任何编造内容。
+  </p>
+  <p class="meta">第二轮验收时间 2026-10-08 · 环境 无头 Chrome 154 + CDP（1440×1000）· 后端 Spring Boot :18080（本轮自启，未动 :8080）· 落地页 Vite dev :3010</p>
 
   <div class="kpi">
-    <div><b>4</b><span>绑定接口的页面区块</span></div>
+    <div><b>12</b><span>本轮改动文件（后端 4 / 前端 8）</span></div>
+    <div><b>1</b><span>新增公开端点 /home/stats</span></div>
     <div><b>2/2</b><span>实测路径（后端通 / 后端断）</span></div>
-    <div><b>24</b><span>商城页真实货源</span></div>
-    <div><b>0</b><span>破图（滚到底复测）</span></div>
+    <div><b>0</b><span>残留「假数据」特征词（两条路径均为 0）</span></div>
   </div>
 
-  <h2>一、接口绑定与实测结果</h2>
+  <h2>一、第二轮：去掉假数据（本轮重点）</h2>
+
+  <p>问题不在落地页本身，而在<b>三层叠加</b>：</p>
+
+  <ol>
+    <li><b>根因在后端</b>：<code>HomeServiceImpl.listHotProducts()</code> 与 <code>listLatestKnowledge()</code>
+      仍是 <code>// TODO 待实现</code>，直接 <code>return Collections.emptyList()</code>。
+      实测 <code>GET /api/home/products</code> 与 <code>/api/home/knowledge</code> 稳定返回 <code>{"code":200,"data":[]}</code>。</li>
+    <li><b>放大器在前端</b>：<code>src/lib/useRemote.ts</code> 写的是「接口优先，静态兜底」——
+      接口报错<b>或返回空数组</b>时静默保留本地演示数据，<code>source</code> 留在 <code>'demo'</code>。
+      后端明明是通的，页面却安静地显示假数据：<b>不报错、不提示、控制台干净</b>。</li>
+    <li><b>还有一批根本无处可取的硬编码</b>：写死的宣传数字、编造的资讯标题、编造的合作社名与价格。</li>
+  </ol>
+
+  <h3>逐处对照</h3>
+  <table>
+    <thead>
+      <tr><th style="width:22%">位置</th><th style="width:39%">原来（假）</th><th>现在（真）</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>后端 <code>HomeServiceImpl</code></td>
+        <td class="del">两个方法 TODO 空实现，恒返回 <code>[]</code></td>
+        <td>真实查询：商品 <code>audit_status='已通过' AND status=1</code> 按发布时间倒序；
+          知识 <code>audit_status='已通过'</code> 按发布时间倒序。命中既有索引，未加新索引</td>
+      </tr>
+      <tr>
+        <td>后端 <code>GET /home/stats</code></td>
+        <td class="del">不存在。落地页要展示数量只能自己拉列表数一遍</td>
+        <td>新增公开端点：在售货源 / 有效求购 / 已通过知识 及知识分类分布，口径由后端定义一次</td>
+      </tr>
+      <tr>
+        <td>§2 商品拼贴</td>
+        <td class="del"><code>DEMO_PRODUCTS</code> 6 张演示图，货源不足时补足到 6 格</td>
+        <td>只用 <code>/home/products</code> 的真实货源；槽位不足补「暂无更多在售货源」占位块；一件都没有就整区显示空态</td>
+      </tr>
+      <tr>
+        <td>§4 角色卡片</td>
+        <td class="del">「今日均价 ¥3.62」「较昨日 +2.4%」「撮合中 128 笔 · 09:41 更新」<br>
+          「寿光绿源合作社」「合作农户 46 户 · 认证等级 A」「128 吨在售库存」</td>
+        <td>绑定最新一条真实货源：湖北荆州 / 粮油 · 在售价 ¥95 / 桶 / 在售库存 200 桶 / 菜籽油 5L /
+          已通过平台内容审核 / 发布者为平台注册农户</td>
+      </tr>
+      <tr>
+        <td>§5 统计数字</td>
+        <td class="del"><code>animate(0, 3.2)</code> 写死 →「平台已服务 <b>3.2</b> 万农户与合作社」</td>
+        <td>取 <code>/home/stats</code>：<b>24</b> 条在售货源 · <b>7</b> 条有效求购 · <b>16</b> 篇农业知识。
+          数字明显变小，但每一个都能在库里查到</td>
+      </tr>
+      <tr>
+        <td>§6 左卡精选</td>
+        <td class="del">写死「2025 年 9 月 22 日 / 融销通研究院 / 农产品流通的数字化路径」</td>
+        <td>绑定最新一条真实知识：<b>2026 年 9 月 4 日 / 平台农业知识库 / 畜禽粪污资源化利用路径</b></td>
+      </tr>
+      <tr>
+        <td>§6 右侧列表</td>
+        <td class="del"><code>DEMO_ITEMS</code> 6 条编造的资讯标题</td>
+        <td><code>/home/knowledge</code> 的 6 条真实知识 + 真实发布时间</td>
+      </tr>
+      <tr>
+        <td>§6 品类页签</td>
+        <td class="del">写死「全部 (17) / 政策解读 (7) / 行情周报 (4) / 农事提醒 (6)」<br>
+          —— 连品类名都和平台的真实分类对不上（平台无「行情周报」「农事提醒」）</td>
+        <td>取自 <code>/home/stats</code>：全部 (16) / 养殖技术 (6) / 种植技术 (5) / 政策解读 (3) / 市场行情 (1) / 病虫害防治 (1)</td>
+      </tr>
+      <tr>
+        <td>/shop 商城页</td>
+        <td class="del">接口不通时回落到 10 张演示卡，含编造的卖家名（赣南果业合作社…）、产地、价格</td>
+        <td>只用 <code>/trade/products</code> 的真实 24 条；接口不通就显示「平台接口暂不可用」，分类按钮从数据推导</td>
+      </tr>
+      <tr>
+        <td><code>useRemote.ts</code></td>
+        <td class="del">失败/为空 → 静默保留 fallback，<code>source</code> 停在 <code>'demo'</code></td>
+        <td>三态 <code>loading | ok | error</code>；成功就渲染接口给的数据（哪怕是空数组），失败由调用方渲染失败态</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>「数据源：平台接口 / 本地演示」这排字也随之作废 —— 现在页面上写的是
+  「<b>数据实时同步自平台接口</b>」或「<b>平台接口暂不可用</b>」，不再有第三种状态。</p>
+
+  <h3>实测截图（第二轮）</h3>
+
+  <div class="grid2">
+    <figure>
+      <img src="shots/20261008-sec5.jpg" alt="§5 平台实时运行数据">
+      <figcaption>§5：3.2 万农户 → <b>24 条货源 / 7 条求购 / 16 篇知识</b>（全部来自 /home/stats）。</figcaption>
+    </figure>
+    <figure>
+      <img src="shots/20261008-sec6.jpg" alt="§6 平台资讯">
+      <figcaption>§6：左卡取最新一条真实知识；页签分类与条数取自接口，与库内分布一致。</figcaption>
+    </figure>
+  </div>
+
+  <div class="grid2">
+    <figure>
+      <img src="shots/20261008-sec2.jpg" alt="§2 商品拼贴">
+      <figcaption>§2：拼贴 6 张全部是真实在售货源（莲藕 / 老母鸡 / 小龙虾 / 生态草鱼…）。</figcaption>
+    </figure>
+    <figure>
+      <img src="shots/20261008-sec4.jpg" alt="§4 角色卡片">
+      <figcaption>§4：卡片绑定最新一条真实货源（菜籽油 5L / 湖北荆州 / ¥95 桶 / 库存 200）。</figcaption>
+    </figure>
+  </div>
+
+  <figure>
+    <img src="shots/20261008-shop.jpg" alt="商城页 24 条真实货源">
+    <figcaption>商城页：24 条真实货源，7 个分类由数据推导；卡片不再展示卖家名（见第六节 ③）。</figcaption>
+  </figure>
+
+  <h2>二、接口绑定与实测结果</h2>
 
   <table>
     <thead>
-      <tr><th style="width:15%">页面区块</th><th style="width:27%">调用接口</th>
-      <th style="width:26%">实测回显</th><th style="width:12%">结论</th></tr>
+      <tr><th style="width:16%">页面区块</th><th style="width:26%">调用接口</th>
+      <th style="width:34%">实测回显</th><th style="width:12%">结论</th></tr>
     </thead>
     <tbody>
       <tr>
         <td>§2 商品拼贴</td>
-        <td class="mono">GET /api/home/products?limit=6<br>↑空则改调<br>GET /api/trade/products</td>
-        <td class="mono">数据源：平台接口<br>菜籽油 5L｜莲藕｜老母鸡｜小龙虾｜生态草鱼｜农家腊肉</td>
+        <td class="mono">GET /api/home/products?limit=6</td>
+        <td class="mono">菜籽油 5L｜莲藕｜老母鸡 净重约 2kg｜小龙虾 4-6 钱｜生态草鱼 约 1.5kg｜农家腊肉 500g<br>
+          （6 张全部 ∈ 接口返回的商品名）</td>
+        <td><span class="tag t-ok">通过</span></td>
+      </tr>
+      <tr>
+        <td>§4 角色卡片</td>
+        <td class="mono">GET /api/home/products?limit=1</td>
+        <td class="mono">湖北荆州 / 粮油 · 在售价 ¥95 / 桶 / 在售库存 200 桶 / 菜籽油 5L</td>
         <td><span class="tag t-ok">通过</span></td>
       </tr>
       <tr>
@@ -90,16 +212,17 @@
         <td><span class="tag t-ok">通过</span></td>
       </tr>
       <tr>
-        <td>§5 农户影像墙</td>
-        <td>本地实拍素材（20 张）</td>
-        <td class="mono">CTA → /register</td>
+        <td>§5 平台运行数据</td>
+        <td class="mono">GET /api/home/stats</td>
+        <td class="mono">24 / 条 在售货源 ｜ 7 / 条 有效求购 ｜ 16 / 篇 农业知识<br>三项均与接口返回逐值相等</td>
         <td><span class="tag t-ok">通过</span></td>
       </tr>
       <tr>
         <td>§6 平台资讯</td>
-        <td class="mono">GET /api/home/knowledge?limit=6</td>
-        <td class="mono">数据源：本地演示（后端返回 []）</td>
-        <td><span class="tag t-warn">降级</span></td>
+        <td class="mono">GET /api/home/knowledge?limit=6<br>GET /api/home/stats</td>
+        <td class="mono">6 条真实标题 + 真实日期（2026 年 9 月 2—4 日）<br>
+          页签：全部 (16) / 养殖技术 (6) / 种植技术 (5) / 政策解读 (3) / 市场行情 (1) / 病虫害防治 (1)</td>
+        <td><span class="tag t-ok">通过</span></td>
       </tr>
       <tr>
         <td>Hero 主视觉</td>
@@ -110,50 +233,89 @@
       <tr>
         <td>/shop 商城页</td>
         <td class="mono">GET /api/trade/products<br>?pageNum=1&amp;pageSize=50</td>
-        <td class="mono">共 24 条在售货源 · 数据源：平台接口<br>分类：全部/粮油/蔬菜/畜禽产品/水产/干货/水果</td>
+        <td class="mono">共 24 条 · 卡片 24 张，卡片名 100% ∈ 接口商品名<br>分类按钮 7 个 = 全部 + 6 个真实品类</td>
         <td><span class="tag t-ok">通过</span></td>
       </tr>
     </tbody>
   </table>
 
-  <figure>
-    <img src="shots/d-di-home.jpg" alt="落地页 Hero 与田间视频">
-    <figcaption>落地页：Hero 已换成 1080p 田间实拍视频（原为鱼群素材）。</figcaption>
-  </figure>
-
-  <figure>
-    <img src="shots/d-di-shop.jpg" alt="商城页展示 24 条真实货源">
-    <figcaption>商城页：24 条真实货源，分类由数据推导（不再写死），商品名与配图按品类逐一对齐。</figcaption>
-  </figure>
-
-  <h2>二、两次路径都要实测</h2>
+  <h2>三、两条路径都要实测</h2>
 
   <div class="grid2">
     <div class="box ok">
-      <h4>① 后端在跑（:8080 通）</h4>
+      <h4>① 后端在跑</h4>
       <ul>
-        <li>§2 标签 → <b>数据源：平台接口</b></li>
-        <li>§2 六张卡显示真实货源名（菜籽油、莲藕…）</li>
+        <li>§2 六张卡显示真实货源名</li>
+        <li>§5 → <b>24 / 7 / 16</b>，与 <code>/home/stats</code> 逐值相等</li>
+        <li>§6 六条真实资讯 + 真实日期；页签 = 全部(16) + 5 个真实分类</li>
         <li>商城页 24 条 · 7 个分类</li>
+        <li>「假数据特征词」残留 <b>0</b></li>
       </ul>
     </div>
     <div class="box warn">
       <h4>② 后端不可用（代理指向死端口）</h4>
       <ul>
-        <li>§2 标签 → <b>数据源：本地演示</b></li>
-        <li>§2 回落 6 张演示卡，页面不白屏</li>
-        <li>商城页 10 条演示货 + 7 个分类，破图 0</li>
+        <li>§2 → 虚线框内「平台接口暂不可用，货源数据未加载。本页不展示任何演示数据…」</li>
+        <li>§5 → 「平台接口暂不可用，数据未加载」（数字位置留空，不填假数字）</li>
+        <li>§6 → 左卡标题位显示空态文案；列表显示「平台接口暂不可用，知识条目未加载」</li>
+        <li>商城页 → 只显示失败态，<b>不再出现 10 张演示卡</b></li>
+        <li>「假数据特征词」残留 <b>0</b>（与第一轮的「回落演示数据」相反）</li>
       </ul>
     </div>
   </div>
 
-  <p>兜底路径是把 dev server 的 <code>/api</code> 代理指向死端口 <code>127.0.0.1:1</code> 实测的
-  （<code>VITE_API_TARGET</code>），<b>没有停掉正在运行的后端进程</b>。</p>
+  <p>失败路径是把 dev server 的 <code>/api</code> 代理指向死端口 <code>127.0.0.1:1</code> 实测的
+  （<code>VITE_API_TARGET=http://127.0.0.1:1</code>，实测代理返回 <b>502</b>），
+  <b>没有停掉机器上任何正在运行的服务</b>。</p>
 
-  <h2>三、商品配图策略</h2>
+  <div class="grid2">
+    <figure>
+      <img src="shots/20261008-down-sec2.jpg" alt="后端不可用时 §2 的空态">
+      <figcaption>失败路径 §2：只说明「没取到」，不放演示图。</figcaption>
+    </figure>
+    <figure>
+      <img src="shots/20261008-down-shop.jpg" alt="后端不可用时商城页的空态">
+      <figcaption>失败路径商城页：原来的 10 张演示卡已彻底移除。</figcaption>
+    </figure>
+  </div>
 
-  <p>后端 24 件货源的 <code>imageUrl</code> <b>全部为空</b>（后台还没传实拍图）。若按顺序拿本地图顶上，
-  会出现「老母鸡配苹果图」这类硬伤，因此改成三级匹配：</p>
+  <h2>四、新增的公开端点 /home/stats</h2>
+
+  <p>落地页要展示「已上架货源 / 有效求购 / 农业知识」这类数量，但这些数字都带业务口径
+  （货源要「已通过审核<b>且</b>上架」、求购要「有效<b>且</b>未过期」、知识要「已通过审核」）。
+  如果让前端自己拉列表再数一遍，同一句话在落地页、答辩 PPT 和交付文档里就会各算各的。
+  因此新增一个只读统计端点，<b>口径只定义一次</b>：</p>
+
+  <table>
+    <thead><tr><th style="width:34%">字段</th><th style="width:12%">实测值</th><th>口径</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">productCount</td><td><b>24</b></td><td><code>t_product</code>：<code>audit_status='已通过' AND status=1</code>（表内共 26 行）</td></tr>
+      <tr><td class="mono">demandCount</td><td><b>7</b></td><td><code>t_demand</code>：<code>status=1 AND valid_until &gt;= NOW()</code>，与求购大厅同一口径（表内共 8 行）</td></tr>
+      <tr><td class="mono">knowledgeCount</td><td><b>16</b></td><td><code>t_knowledge</code>：<code>audit_status='已通过'</code>（表内共 18 行，另 1 条待审核 + 1 条未通过）</td></tr>
+      <tr><td class="mono">knowledgeByCategory</td><td class="mono">养殖技术 6 / 种植技术 5 / 政策解读 3 / 市场行情 1 / 病虫害防治 1</td>
+        <td>一次 <code>GROUP BY category</code> 聚合，按条数倒序</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box warn">
+    <h4>★ 这个端点会动到《详细设计说明书》的基线数字</h4>
+    <p>现行 V1.3 的核对基线写的是「<b>66 端点</b>」，新增 <code>GET /home/stats</code> 后变成 <b>67</b>；
+    同时多了一个 <code>HomeStatisticsVO</code> 类。所以 <b>V1.3 的 §9 与端点清单需要升版（V1.4）</b>，
+    不能只改代码不改文档。否则文档与实现之间就出现了一处静默漂移 —— 这正是这份文档最不该有的东西。</p>
+  </div>
+
+  <div class="box ok">
+    <h4>不需要改 <code>PublicEndpoints</code></h4>
+    <p>白名单里已有 <code>rule(GET, "/home/**")</code>，新端点在 <code>/home/</code> 之下，
+    自动落在既有规则里。<b>没有为了「联调方便」新开一格攻击面。</b>
+    返回值只有 4 个统计量，不含任何用户信息（无手机号、无昵称、无 sellerId）。</p>
+  </div>
+
+  <h2>五、商品配图策略（第一轮结论，仍然有效）</h2>
+
+  <p>后端 24 件货源的 <code>imageUrl</code> <b>全部为空</b>（农户还没传实拍图），
+  16 条已通过的知识的 <code>image_url</code> 同样全为空。若按顺序拿素材图顶上，
+  会出现「老母鸡配苹果图」这类硬伤，因此商品图走四级匹配：</p>
 
   <table>
     <thead><tr><th style="width:8%">优先级</th><th style="width:30%">规则</th><th>说明</th></tr></thead>
@@ -166,25 +328,19 @@
     </tbody>
   </table>
 
-  <p>素材全部来自 Pexels（免费可商用），已下载到 <code>public/products/</code>（27 张），
-  答辩现场不依赖外网。已下载的图逐张用 PIL 校验过完整性 —— 期间有 2 个 Pexels ID 在 CDN 上
-  <code>404 Source image is unreachable</code>，已换成备选图。</p>
+  <p><b>这一层是「配图素材」，不是数据。</b>商品的名称、价格、产地、库存、上下架/审核状态全部来自接口，
+  配图只解决「没有实拍图时用哪张同类目照片」。第二轮把相关注释里的「本地演示图」措辞也一并改掉了 ——
+  它容易被误读成「这些数据是演示的」。</p>
 
-  <h2>四、已知缺口（不阻塞演示，但要知道）</h2>
+  <h2>六、已知缺口</h2>
 
-  <div class="box bad">
-    <h4>① §6 资讯永远显示演示数据 —— 后端空实现</h4>
-    <p><code>HomeServiceImpl.listHotProducts()</code> 与 <code>listLatestKnowledge()</code>
-    目前仍是骨架阶段留下的 <code>// TODO 待实现</code>，直接 <code>return Collections.emptyList()</code>。
-    所以 <code>/api/home/products</code> 和 <code>/api/home/knowledge</code> <b>结构性地永远返回空数组</b>。</p>
-    <ul>
-      <li>§2 已靠「空了就改调 <code>/trade/products</code>」绕开，能拿到真数据；</li>
-      <li>§6 没有等价的公开接口可替代 —— <code>GET /api/knowledge/list</code> 实测 <b>401</b>，
-      不在 <code>PublicEndpoints</code> 白名单里（白名单只放行 <code>/home/**</code>、
-      <code>/trade/products</code>、<code>/demand/list</code>，且都为 GET）。</li>
-    </ul>
-    <p><b>要修的两条路，任选其一：</b>实现 <code>HomeServiceImpl</code> 的两个方法（推荐，§2 也就用上真正的推荐位了）；
-  或把 <code>GET /knowledge/list</code> 加进白名单——但白名单是攻击面，得先确认这个接口真的允许游客访问。</p>
+  <div class="box ok">
+    <h4>① §6 资讯永远显示演示数据 —— <span class="tag t-ok">已于 2026-10-08 修复</span></h4>
+    <p>第一轮报告里这一条写的是「<code>HomeServiceImpl</code> 两个方法仍是 TODO 空实现」，
+    并给了两条修法，「推荐实现 <code>HomeServiceImpl</code> 的两个方法」。
+    <b>本轮就是按这条推荐做的</b>：两个方法已用真实查询实现，<code>/api/home/products</code> 与
+    <code>/api/home/knowledge</code> 现在返回真实数据；§2 也因此用上了真正的首页推荐位，
+    不再需要「空了就改调 <code>/trade/products</code>」这条绕行路径（该绕行函数已删除）。</p>
   </div>
 
   <div class="box warn">
@@ -197,23 +353,131 @@
     若要给评委看完整链路，<b>先用一个测试账号登录一次</b>再演示。</p>
   </div>
 
-  <div class="box">
-    <h4>③ §4 曾把接口路径当成前端路由</h4>
-    <p>「找销路」原本指向 <code>/demand/list</code>（那是后端接口路径），已改为平台前端真实路由
-    <code>/trade/demand</code>。这类错位肉眼看不出来，只有点了才知道 —— 已逐个与
-    <code>frontend-web/src/router/index.js</code> 核对过。</p>
+  <div class="box warn">
+    <h4>③ 平台数据模型里没有「经营主体名称」，卖家名无从匹配 <span class="tag t-info">本轮新发现</span></h4>
+    <p>被删掉的演示数据里有「赣南果业合作社」「寿光绿源合作社」这类卖家名。<b>它们不是随手编的，而是编得没法兑现</b>：</p>
+    <ul>
+      <li><code>GET /trade/products</code> 返回的 <code>ProductVO</code> <b>只有 sellerId，没有卖家名称</b>；</li>
+      <li><code>t_farmer_profile</code> 只有 <code>main_product / scale_desc / credit_record</code>，
+        <b>整个库里没有「合作社名 / 经营主体名称」这个字段</b>；</li>
+      <li><code>t_user</code> 有 <code>real_name</code>，但那是账户持有人姓名 ——
+        把它拼到公开的游客接口上，等于把农户真实姓名挂到公网，是隐私倒退。</li>
+    </ul>
+    <p>所以本轮的处理是：<b>落地页不再展示卖家名</b>，商品卡副标题改为真实有的「产地 · 品类」。
+      如果产品上确实要展示卖家名，需要先定义「经营主体名称」字段并落到
+      <code>t_farmer_profile</code>（属 M5 农产品交易 / 农户档案，需对应模块负责人确认）。</p>
   </div>
 
-  <h2>五、复跑方式</h2>
-  <p>验收脚本 <code>/tmp/verify-integration.mjs</code>（CDP 直读 DOM，不看截图猜结论）。
-  两个硬坑：<b>后台进程跨 Bash 调用会被回收</b>，dev server + Chrome + 验收脚本必须写进同一次调用；
-  <b><code>HTTP_PROXY</code> 会被注入</b>，Node 里 <code>fetch</code> 打 127.0.0.1 要
-  <code>env -u HTTP_PROXY</code> 或设 <code>NO_PROXY</code>，否则报 <code>fetch failed</code>。</p>
-  <p>另外：商城页商品图是 <code>loading="lazy"</code>，<b>不先滚到底就统计 <code>naturalWidth===0</code>
-  会把视口外的图误判成破图</b> —— 本文的「破图 0」是滚动触发后才测的。</p>
+  <div class="box warn">
+    <h4>④ 还有一批「能力描述」与实际实现对不上 <span class="tag t-info">本轮未动，等口径确认</span></h4>
+    <p>本轮改的是<b>数据</b>（数字、商品、资讯、卡片字段）。§3/§4 的能力清单属于<b>宣传文案</b>，
+    不在「假数据」范畴，但确实有几条容易被评委追问：</p>
+    <ul>
+      <li>§4「找货源」：<code>按上市时间与起订量筛选采购机会</code> —— 商品接口无这两个筛选参数；</li>
+      <li>§4「找货源」：<code>查看供需比与近 30 天成交行情</code> —— 库里没有行情/供需比数据；</li>
+      <li>§4「找销路」：<code>按销量与复购率挑选优质采购方</code> —— 没有这类统计；</li>
+      <li>§4「找专家」：<code>电商运营陪跑，直播带货上手即用</code> —— 平台无直播能力；</li>
+      <li>§3/§4：<code>全流程走担保交易</code>、<code>银行直连</code> —— 支付是模拟通道（<code>payOrder</code> 不接真实资金）。</li>
+    </ul>
+    <p>建议按「已实现 / 二期」两档重写这一批条目，但这是品牌口径，<b>留给组长定稿</b>，本轮不擅自改。</p>
+  </div>
+
+  <div class="box">
+    <h4>⑤ 仍在使用本地素材的装饰元素（不是数据，但要知道）</h4>
+    <ul>
+      <li>§5 背景影像墙：<code>public/farmers/f01..f20.jpg</code>（Pexels 免费可商用），每 2 秒随机重排。
+        <b>它不承载任何数量含义</b>（数量已改由 §5 的三个统计承担），但视觉上是一墙人像，
+        容易被读成「这些是平台用户」。要不要保留、要不要去掉随机重排，属设计口径。</li>
+      <li>§6 左卡配图：<code>imageTower.png</code>，装饰性插图（知识条目在库里没有配图），
+        <code>alt</code> 已改为「农业知识栏目装饰插图」，不再冒充该条知识的实拍图。</li>
+      <li><code>Section5.tsx</code> 仍在从 <code>qclay.design</code> 取两张装饰图（<code>Noise.png</code>、
+        <code>Side-Image-Container.png</code>）—— 答辩环境若不外网会缺这两层纹理，属既有遗留项。</li>
+    </ul>
+  </div>
+
+  <div class="box bad">
+    <h4>⑥ 演示前必须重启后端，否则页面会（正确地）显示空态</h4>
+    <p>本轮的 <code>HomeServiceImpl</code> 是<b>后端改动</b>。如果 :8080 上跑的还是旧进程，
+    <code>/home/products</code> 与 <code>/home/knowledge</code> 仍会返回 <code>[]</code>，
+    落地页 §2 与 §6 会如实显示「平台当前暂无…」。<b>这不是回归，是空态在正常工作</b> ——
+    但演示前一定要拉新代码并重启后端。（重启方式见 <code>backend/README.md</code>）</p>
+  </div>
+
+  <h2>七、复跑方式</h2>
+
+  <p>本轮验收脚本已随代码入库：</p>
+  <ul>
+    <li><code>verify/scripts/mk-probe-spec.mjs</code> —— 生成测试规格。探针本体写在页面里，
+      直接在页内 <code>fetch('/api/...')</code> 拿接口数据，再把 DOM 里读到的内容与接口数据<b>逐项比对</b>，
+      不看截图猜结论；</li>
+    <li><code>verify/scripts/mk-down-spec.mjs</code> —— 后端不可用路径（代理指向 <code>127.0.0.1:1</code>）。</li>
+  </ul>
+
+  <p>执行（CDP 探针复用 <code>~/.workbuddy/skills/browser-style-probe/probe.mjs</code>）：</p>
+  <pre style="background:#1b1b1b;border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow:auto;font-size:12.5px;color:#c9c9c9"><code># ① 后端（用自己的端口，别动别人正在跑的 :8080）
+cd backend &amp;&amp; unset SERVER__PORT SERVER__HOST \
+  &amp;&amp; mvn -o spring-boot:run -Dspring-boot.run.arguments="--server.port=18080 --server.address=127.0.0.1"
+
+# ② 落地页 dev server（代理指向 ①）
+cd frontend-landing &amp;&amp; NODE_OPTIONS= VITE_API_TARGET=http://127.0.0.1:18080 \
+  npx vite --host 127.0.0.1 --port 3010 --strictPort
+
+# ③ 探针（必须带 --enable-unsafe-swiftshader，否则 WebGL 建不出来，WaveGrid 会让整页崩掉）
+node verify/scripts/mk-probe-spec.mjs
+node ~/.workbuddy/skills/browser-style-probe/probe.mjs /tmp/landing_spec.json</code></pre>
+
+  <h3>本轮踩到的三个硬坑</h3>
+  <ol>
+    <li><b>无头 Chrome 默认建不出 WebGL</b> → <code>WaveGrid</code>（three.js，§4 背景）抛
+      <code>THREE.WebGLRenderer: Error creating WebGL context</code>，整页被 Vite 错误遮罩盖住，
+      探针读到的所有区块都是空数组（很容易误判成「页面挂了」）。
+      修法：启动参数加 <code>--enable-unsafe-swiftshader --use-gl=angle --use-angle=swiftshader</code>，
+      并去掉 <code>--disable-gpu --disable-software-rasterizer --in-process-gpu</code>。</li>
+    <li><b>按页面坐标 clip 截图会拍到空白</b> → 区块内容是 <code>whileInView</code> + <code>once:true</code> 的动画，
+      元素从未真正进入视口 → 全部停在 <code>opacity:0</code>。截图不报错、只是白的。
+      修法：先 <code>window.scrollTo</code> 滚到目标区并等动画跑完，再拍<b>视口</b>截图，不要用页面坐标 clip。</li>
+    <li><b>用 <code>&amp;</code> 起的 dev server 会在 Bash 调用结束时被回收</b>（报
+      <code>ERR_CONNECTION_REFUSED</code>）。要用后台任务方式启动。
+      另外 <code>HTTP_PROXY</code> 会被注入，打 127.0.0.1 一律 <code>--noproxy '*'</code> /
+      <code>NO_PROXY='*'</code>。</li>
+  </ol>
+
+  <p>还有一个容易被当成 bug 的误报：残留特征词检查里不能放 <code>赣南脐橙</code>、
+  <code>猕猴桃 5 斤装</code> —— 它们是<b>真实商品名</b>（「赣南脐橙 5kg 装」），
+  与旧演示数据同名。第一版检查因此报了两条假阳性。</p>
+
+  <h2>八、第一轮存档（2026-09-22）</h2>
+
+  <p>第一轮的结论是「接口优先、静态兜底」：接口通了显示真数据，不通就回落本地演示数据，保证演示时页面不白屏。
+  当时的 KPI 是「4 个绑定接口的区块 / 2 条实测路径 / 24 条真实货源 / 0 破图」。</p>
+
+  <figure>
+    <img src="shots/d-di-home.jpg" alt="第一轮落地页 Hero 与田间视频">
+    <figcaption>第一轮：Hero 换成 1080p 田间实拍视频（原为鱼群素材）。</figcaption>
+  </figure>
+
+  <figure>
+    <img src="shots/d-di-shop.jpg" alt="第一轮商城页 24 条真实货源">
+    <figcaption>第一轮商城页：24 条真实货源，分类由数据推导（不再写死）。<br>
+      <b>注：</b>当时商品卡副标题是「产地 · 供货方 #N」（接口只给 sellerId）；
+      第二轮改为「产地 · 品类」，不再暴露一个对外没有意义的编号。详见第六节 ③。</figcaption>
+  </figure>
+
+  <div class="box">
+    <h4>两轮的口径差异（写下来免得混淆）</h4>
+    <table>
+      <thead><tr><th style="width:22%">项目</th><th style="width:39%">第一轮 2026-09-22</th><th>第二轮 2026-10-08</th></tr></thead>
+      <tbody>
+        <tr><td>接口不通时</td><td>回落本地演示数据，页面照常好看</td><td>显示空态 / 失败态，<b>不展示任何编造内容</b></td></tr>
+        <tr><td>接口返回空数组</td><td>同样视为「没拿到」，静默用演示数据</td><td>视为「平台确实没有数据」，显示「暂无」</td></tr>
+        <tr><td>§5 数字</td><td>写死 3.2 万农户</td><td>接口实时值 24 / 7 / 16</td></tr>
+        <tr><td>后端依赖</td><td>只需 <code>/trade/products</code>（既有）</td><td>需要 <code>HomeServiceImpl</code> 两个方法与新端点 <code>/home/stats</code></td></tr>
+      </tbody>
+    </table>
+  </div>
 
   <footer>
-    融销通落地页数据对接验收 · 生成于 2026-09-22 · 截图目录 <code>verify/shots/</code>
+    融销通落地页数据对接验收 · 第一轮 2026-09-22 / 第二轮 2026-10-08 · 截图目录 <code>verify/shots/</code>
   </footer>
 
 </div>

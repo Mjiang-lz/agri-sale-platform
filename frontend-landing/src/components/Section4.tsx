@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import cardPhoto from "@/assets/image-29.png.asset.json";
 import lineAsset from "@/assets/Line.svg.asset.json";
 import { WaveGrid } from "./WaveGrid";
-import { platformUrl } from "@/lib/api";
+import { fetchHotProducts, formatPrice, platformUrl, resolveImage, type ApiProduct } from "@/lib/api";
+import { pickProductPhoto } from "@/lib/productImages";
+import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
 
 // 四类角色对应四个 tab，内容与平台真实模块对齐；点击可切换
 // route = 该 tab 对应的平台前端路由（「进入平台」按当前 tab 跳过去）
@@ -58,6 +59,11 @@ const TABS = [
 export function Section4() {
   const [active, setActive] = useState(0);
   const tab = TABS[active];
+
+  // 右侧卡片绑定平台真实货源：在售货源里最新的一条（GET /api/home/products?limit=1）
+  const { data: products, state } = useRemote(() => fetchHotProducts(1), [] as ApiProduct[]);
+  const product = products[0];
+
   return (
     <section className="w-full min-h-[90vh] bg-[#1b1b1b] text-white px-5 py-12 lg:px-10 lg:py-20 flex flex-col overflow-hidden font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
       {/* Top Tabs —— 点击切换 */}
@@ -187,70 +193,97 @@ export function Section4() {
               </div>
             </div>
 
-            {/* Card — 原为 CDN 上的 Card.png（英文天气卡），改为按平台业务信息重建 */}
+            {/* Card —— 绑定平台真实货源：取在售货源里最新的一条渲染。
+                卡里每个字段（产地 / 品类 / 价格 / 单位 / 库存）都来自接口，
+                不再写死「今日均价 ¥3.62」「较昨日 +2.4%」「撮合中 128 笔」
+                「合作农户 46 户」这类平台上并不存在的数据。 */}
             <div className="relative z-20 w-[280px] lg:w-[340px]">
               <div className="block w-full shadow-2xl rounded-lg overflow-hidden bg-[#2C2C2C]">
-                {/* 顶部：产地 + 行情 */}
-                <div className="px-5 pt-6 pb-5 lg:px-6">
-                  <div className="text-white/55 text-[11px] tracking-[0.18em]">山东 · 寿光</div>
-                  <div className="mt-4 text-white text-[13px]">
-                    今日均价 <span className="font-medium">¥3.62</span> / 斤
-                  </div>
-                  <div className="mt-2 text-white text-[13px]">
-                    较昨日 <span className="text-[#DE7D4D]">+2.4%</span>
-                  </div>
-                  <div className="mt-2 text-white/40 text-[11px]">撮合中 128 笔 · 09:41 更新</div>
-                </div>
-
-                {/* 中部：负责人照片 + 取景准星（原素材池是人物肖像，此处按"合作社负责人"用） */}
-                <div className="relative h-[300px] lg:h-[340px] w-full overflow-hidden">
-                  <img
-                    src={cardPhoto.url}
-                    alt="寿光绿源合作社负责人"
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/45" />
-                  {/* 取景准星 */}
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <div className="h-[1px] w-[112px] bg-white/70" />
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[13px] w-[13px] border border-white/90 rounded-[2px]" />
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[22px] w-[1px] bg-white/70" />
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[1px] w-[22px] bg-white/70" />
-                  </div>
-                  <div className="absolute left-5 bottom-4 text-[11px] tracking-[0.14em] text-white/85">
-                    合作社负责人
-                  </div>
-                </div>
-
-                {/* 底部：卖家与库存 */}
-                <div className="px-5 pt-5 pb-6 lg:px-6 bg-[#3A3A3A]">
-                  <div className="text-white text-[20px] lg:text-[22px] leading-tight">寿光绿源合作社</div>
-                  <div className="mt-2 text-white/45 text-[12px] leading-[1.5]">
-                    已完成实名认证与产地核验
-                    <br />
-                    合作农户 46 户 · 认证等级 A
-                  </div>
-                  <div className="mt-8 flex items-end justify-between">
-                    <div>
-                      <div className="text-white text-[24px] leading-none">
-                        128 <span className="text-[12px] text-white/50">吨</span>
+                {product ? (
+                  <>
+                    {/* 顶部：产地 + 价格 + 库存 */}
+                    <div className="px-5 pt-6 pb-5 lg:px-6">
+                      <div className="text-white/55 text-[11px] tracking-[0.18em]">
+                        {product.origin || "产地待完善"}
                       </div>
-                      <div className="mt-1 text-white/40 text-[11px]">在售库存</div>
+                      <div className="mt-4 text-white text-[13px]">
+                        {product.category || "农产品"} · 在售价{" "}
+                        <span className="font-medium">¥{formatPrice(product.price)}</span>
+                        {product.unit ? ` / ${product.unit}` : ""}
+                      </div>
+                      <div className="mt-2 text-white text-[13px]">
+                        在售库存{" "}
+                        <span className="font-medium">
+                          {product.stock ?? 0} {product.unit || ""}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-white/40 text-[11px]">{REMOTE_STATUS_TEXT[state]}</div>
                     </div>
-                    <div className="relative w-[74px] h-[74px] flex items-center justify-center">
-                      {Array.from({ length: 14 }).map((_, i) => (
-                        <span
-                          key={i}
-                          className="absolute left-1/2 top-1/2 h-[6px] w-[1px] bg-white/30"
-                          style={{ transform: `translate(-50%,-50%) rotate(${i * 24 - 156}deg) translateY(-30px)` }}
-                        />
-                      ))}
-                      <div className="relative w-[46px] h-[46px] rounded-full bg-white/25 flex items-center justify-center">
-                        <span className="text-white text-[22px] leading-none">+</span>
+
+                    {/* 中部：货源配图（库里商品都没传 imageUrl，按品类配同类目实拍图） */}
+                    <div className="relative h-[300px] lg:h-[340px] w-full overflow-hidden">
+                      <img
+                        src={resolveImage(product.imageUrl) ?? pickProductPhoto(product, 0) ?? undefined}
+                        alt={product.productName}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/45" />
+                      {/* 取景准星 */}
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <div className="h-[1px] w-[112px] bg-white/70" />
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[13px] w-[13px] border border-white/90 rounded-[2px]" />
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[22px] w-[1px] bg-white/70" />
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[1px] w-[22px] bg-white/70" />
+                      </div>
+                      <div className="absolute left-5 bottom-4 text-[11px] tracking-[0.14em] text-white/85">
+                        {product.category || "在售货源"}
                       </div>
                     </div>
+
+                    {/* 底部：商品与审核状态 */}
+                    <div className="px-5 pt-5 pb-6 lg:px-6 bg-[#3A3A3A]">
+                      <div className="text-white text-[20px] lg:text-[22px] leading-tight">
+                        {product.productName}
+                      </div>
+                      <div className="mt-2 text-white/45 text-[12px] leading-[1.5]">
+                        已通过平台内容审核
+                        <br />
+                        发布者为平台注册农户
+                      </div>
+                      <div className="mt-8 flex items-end justify-between">
+                        <div>
+                          <div className="text-white text-[24px] leading-none">
+                            {product.stock ?? 0}{" "}
+                            <span className="text-[12px] text-white/50">{product.unit || ""}</span>
+                          </div>
+                          <div className="mt-1 text-white/40 text-[11px]">在售库存</div>
+                        </div>
+                        <div className="relative w-[74px] h-[74px] flex items-center justify-center">
+                          {Array.from({ length: 14 }).map((_, i) => (
+                            <span
+                              key={i}
+                              className="absolute left-1/2 top-1/2 h-[6px] w-[1px] bg-white/30"
+                              style={{ transform: `translate(-50%,-50%) rotate(${i * 24 - 156}deg) translateY(-30px)` }}
+                            />
+                          ))}
+                          <div className="relative w-[46px] h-[46px] rounded-full bg-white/25 flex items-center justify-center">
+                            <span className="text-white text-[22px] leading-none">+</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* 接口没通 / 确实没有在售货源：卡片保持版式但如实空着，不填假数据 */
+                  <div className="flex h-[520px] flex-col items-center justify-center gap-3 px-8 text-center">
+                    <div className="text-white/80 text-[15px]">
+                      {state === "error" ? "平台接口暂不可用" : "平台当前暂无在售货源"}
+                    </div>
+                    <div className="text-white/40 text-[12px] leading-[1.6]">
+                      本卡片展示的是平台真实在售货源，没有数据时保持为空。
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Equalizer Bars — dotted columns matching reference shape */}

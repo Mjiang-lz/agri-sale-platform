@@ -28,11 +28,18 @@ request.interceptors.response.use(
       localStorage.removeItem('rxt_token')
       router.push('/login')
     }
-    ElMessage.error(body.message || '请求失败')
-    return Promise.reject(new Error(body.message || '请求失败'))
+    const message = body.message || '请求失败'
+    ElMessage.error(message)
+    // 标记「已提示过」：页面 catch 里不要再弹一次，否则同一次失败会刷出两条提示。
+    // 页面拿到这个标记后应改为渲染行内错误态（带重试按钮），而不是再弹 toast。
+    const err = new Error(message)
+    err.notified = true
+    return Promise.reject(err)
   },
   (error) => {
     ElMessage.error('网络异常，请稍后重试')
+    // 同上：网络层错误已统一提示过，页面只负责渲染错误态
+    error.notified = true
     return Promise.reject(error)
   }
 )

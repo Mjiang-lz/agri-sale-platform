@@ -1,8 +1,8 @@
 /**
- * 商品配图兜底策略。
+ * 商品配图策略。
  *
- * 现状：平台 `/trade/products` 返回的 24 件货源**都没有 imageUrl**（后台还没传实拍图）。
- * 直接按顺序拿本地演示图顶上去，会出现「老母鸡配苹果图」这种硬伤，
+ * 现状：平台在售的 24 件货源**都没有 imageUrl**（农户还没传实拍图）。
+ * 直接按顺序拿素材图顶上去，会出现「老母鸡配苹果图」这种硬伤，
  * 所以这里按**商品名 → 品类**两级匹配挑同类目实拍图：
  *
  *   1. NAME_PHOTO   —— 平台现有 24 件货源逐一精确对齐（最准）
@@ -10,6 +10,8 @@
  *   3. CATEGORY_PHOTOS —— 只认得品类的最后兜底
  *   4. 全部落空返回 null —— 由调用方渲染中性占位块，宁可不放图也不放错图
  *
+ * 注意这是**配图素材**而不是数据：商品的名称、价格、产地、库存全部来自接口，
+ * 这里只解决「没实拍图时用哪张同类目照片」的问题，不产生任何商品信息。
  * 后端补上 imageUrl 后这些兜底会自动失效（调用方先试 resolveImage(row.imageUrl)）。
  */
 
@@ -97,7 +99,7 @@ export function pickCategoryPhoto(category: string | undefined, index: number): 
 }
 
 /**
- * 给一件没有实拍图的货源挑一张本地兜底图。
+ * 给一件没有实拍图的货源挑一张同类目配图。
  * 调用方应当先试真实图：`resolveImage(row.imageUrl) ?? pickProductPhoto(row, i)`。
  */
 export function pickProductPhoto(

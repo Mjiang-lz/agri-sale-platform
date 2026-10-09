@@ -3,12 +3,17 @@
  *
  * 对应 agri-sale-platform 后端（Spring Boot :8080，context-path /api）。
  * 只调用 PublicEndpoints 白名单里的**公开只读**接口，不需要登录：
- *   GET /api/home/**           首页推荐商品、最新农业知识
+ *   GET /api/home/products     首页推荐商品
+ *   GET /api/home/knowledge    首页最新农业知识
+ *   GET /api/home/stats        首页平台运行数据（在售货源 / 有效求购 / 知识条数）
  *   GET /api/trade/products    商品货源列表（支持关键词/品类/价格区间/产地）
  *   GET /api/demand/list       求购需求列表
  *
  * 注意：GET /api/trade/products/{id}（详情）**不在白名单**，游客打不开，
  * 所以卡片不要深链到详情页，跳公开列表页即可。
+ *
+ * 本文件只负责取平台真实数据，**不提供任何演示/兜底数据** ——
+ * 页面上出现的每个商品、每个数字都必须能在库里查到，理由见 useRemote.ts。
  */
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api'
@@ -42,6 +47,18 @@ export type ApiKnowledge = {
   imageUrl?: string
   viewCount?: number
   createTime?: string
+}
+
+/** 首页平台运行数据（GET /home/stats） */
+export type HomeStats = {
+  /** 在售货源数：审核通过且已上架 */
+  productCount?: number
+  /** 有效求购数：状态有效且未过有效期 */
+  demandCount?: number
+  /** 农业知识数：审核通过 */
+  knowledgeCount?: number
+  /** 知识分类分布，后端已按条数倒序 */
+  knowledgeByCategory?: Record<string, number>
 }
 
 /** 后端统一返回体：{ code, message, data } */
@@ -78,18 +95,13 @@ export const fetchHomeNews = (limit = 6) =>
   fetchApi<ApiKnowledge[]>(`/home/knowledge?limit=${limit}`)
 
 /**
- * 首页拼贴用的货源。
+ * 首页平台运行数据（公开）。
  *
- * 后端 `/home/products` 目前**返回空数组**（推荐位还没配数据），
- * 所以空了就改调 `/trade/products` 取最新在售货源，保证首屏有真数据可展示；
- * 两个接口都不通时由 useRemote 回退到本地演示图。
+ * 用于落地页展示真实平台规模。**不要把数字写死在前端** ——
+ * 「在售货源 / 有效求购 / 知识条数」三个口径都由后端统一定义
+ * （见后端 HomeStatisticsVO 的说明），前端只负责显示。
  */
-export async function fetchCollageProducts(limit = 6): Promise<ApiProduct[]> {
-  const recommended = await fetchHotProducts(limit).catch(() => [] as ApiProduct[])
-  if (recommended.length) return recommended.slice(0, limit)
-  const page = await fetchProductPage({ pageNum: 1, pageSize: limit })
-  return page?.records?.slice(0, limit) ?? []
-}
+export const fetchHomeStats = () => fetchApi<HomeStats>('/home/stats')
 
 /** 商品货源检索（公开，游客可访问） */
 export function fetchProductPage(
