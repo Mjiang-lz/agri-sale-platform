@@ -7,9 +7,6 @@
         <h2>融销通 · 首页</h2>
         <p>按需聚合新闻、金融产品、专家、农业知识与电商入口，逐项点击可进入详情。</p>
       </div>
-      <div class="head-tags">
-        <el-tag v-if="anyDemo" type="warning" effect="dark">演示数据</el-tag>
-      </div>
     </div>
 
     <!-- ===========================================================
@@ -231,7 +228,7 @@ import { formatDateTime, isReadable, summary } from '@/utils/text'
  *   - true：真接口失败 / 返回空数组 时回退到本地演示数据并标记 demoMode；
  *   - false：失败时保留空态，避免掩盖接口故障（与 FinanceApply / Knowledge /
  *           MyApplies 三个参考页保持一致）。
- * 新闻区块特殊：后端没有 /home/news 接口，常驻 demo 模式。
+ * 新闻区块特殊：后端没有 /home/news 接口，区块内是本地占位内容（见 loadNews）。
  */
 const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
 const router = useRouter()
@@ -245,14 +242,11 @@ const loading = reactive({
   agriKnowledge: false
 })
 const demoMode = reactive({
-  news: false,
   product: false,
   expert: false,
   expertKnowledge: false,
   agriKnowledge: false
 })
-
-const anyDemo = computed(() => Object.values(demoMode).some(Boolean))
 
 /* ====================================================================
  * 通用工具
@@ -325,7 +319,7 @@ const DEMO_NEWS = [
 
 async function loadNews() {
   loading.news = true
-  // 新闻接口后端尚未实现 → 直接演示数据 + 标记
+  // 新闻接口后端尚未实现 → 先用本地占位内容
   try {
     // 预留：未来对接 GET /api/home/news
     // const data = await request.get('/home/news')
@@ -334,7 +328,6 @@ async function loadNews() {
     throw new Error('news 接口待开发')
   } catch {
     newsList.value = [...DEMO_NEWS].sort((a, b) => b.weight - a.weight)
-    setDemo('news', true)
   } finally {
     loading.news = false
   }
