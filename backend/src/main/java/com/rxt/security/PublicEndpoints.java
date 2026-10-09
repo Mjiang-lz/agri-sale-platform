@@ -88,6 +88,18 @@ public class PublicEndpoints {
             rule(HttpMethod.GET.name(), "/trade/products"),   // 商品货源列表
             rule(HttpMethod.GET.name(), "/demand/list"),      // 求购需求列表
 
+            // 商品详情：游客点开货源卡片就能看到价格、产地与发布农户，无需先注册。
+            // 这是 LX-4 ③ 的裁决结果（此前只放行了列表、详情仍要求登录，
+            // 于是游客能翻列表却点不进任何一件商品，行为是自相矛盾的）。
+            //
+            // 路径写成 {productId} 而<b>不是</b>通配 /trade/products/*，两个原因：
+            //   ① 精确到「一段路径变量」，天然不会吃掉 /trade/products/1/status
+            //      这类多段写接口 —— 那条是农户改上下架用的，必须仍然要求登录；
+            //   ② 与 TradeController 的 @GetMapping("/products/{productId}") 同形，
+            //      白名单放行的集合正好是「真能被该接口接住的请求」。
+            // 仍然只放 GET：编辑（PUT）与上下架（PUT .../status）都是写操作。
+            rule(HttpMethod.GET.name(), "/trade/products/{productId}"),
+
             // —— 框架内部。不限方法 ——
             // 404 / 500 时 Spring 会内部转发到这里，若被要求登录，
             // 「接口不存在」会被改写成「未登录」，排查方向直接被带偏。

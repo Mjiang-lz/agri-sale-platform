@@ -34,6 +34,19 @@ export function submitAppointment(payload) {
   return request.post('/expert/appointment/submit', payload)
 }
 
+/**
+ * 专家预约页：查询我提交过的全部预约（REQ-11）。
+ *
+ * 后端按登录态取 farmerId，不接受前端传归属人 —— 不要试图在这里加 userId 参数。
+ * 返回 AppointmentVO 数组：
+ * { apptId, expertId, expertName, expertDomain, apptTime, apptTopic,
+ *   apptStatus, remark, createTime }
+ * 其中 remark 是专家处理意见或取消原因，配合 apptStatus 构成「结果通知」。
+ */
+export function getMyAppointments() {
+  return request.get('/expert/appointment/my')
+}
+
 /** 专家工作台：查询当前专家可回复的待处理问题。 */
 export function getExpertPendingQuestions() {
   return request.get('/expert/qa/pending')

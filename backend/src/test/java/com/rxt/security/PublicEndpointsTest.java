@@ -135,6 +135,29 @@ class PublicEndpointsTest {
         }
 
         @Test
+        @DisplayName("★ 商品详情对游客开放，但只放 GET，且不外溢到相邻路径")
+        void productDetailOpenToGuests() {
+            // 详情本身：路径变量取什么值都命中（商品是否存在、是否过审由 Service 判 404，
+            // 那是「资源不存在」，不是「没登录」，两者不该混为一谈）
+            assertTrue(isPublic(base, "GET", "/trade/products/1"));
+            assertTrue(isPublic(base, "GET", "/trade/products/99999"));
+
+            // 同样前缀下的写操作一个都不能漏
+            assertFalse(isPublic(base, "PUT", "/trade/products/1"));
+            assertFalse(isPublic(base, "DELETE", "/trade/products/1"));
+            assertFalse(isPublic(base, "POST", "/trade/products/1"));
+
+            // {productId} 只吃一段路径：多一层的写接口（改上下架）必须仍然要登录。
+            // 若当初写成 /trade/products/* 或 /trade/products/**，这一条会直接失守
+            assertFalse(isPublic(base, "PUT", "/trade/products/1/status"));
+            assertFalse(isPublic(base, "GET", "/trade/products/1/status"));
+
+            // 相邻但不同的资源（购物车、订单）不受影响
+            assertFalse(isPublic(base, "GET", "/trade/cart/list"));
+            assertFalse(isPublic(base, "GET", "/trade/order/list"));
+        }
+
+        @Test
         @DisplayName("框架内部错误转发不限方法")
         void errorRule() {
             assertTrue(isPublic(base, "GET", "/error"));

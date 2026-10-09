@@ -2,7 +2,7 @@
   <ExpertAppointmentPanel v-if="isExpert" />
 
   <div v-else class="appointment-page">
-    <!-- 页面用途：农户筛选专家、提交线下预约并查看当前浏览器中的最近提交记录。 -->
+    <!-- 页面用途：农户筛选专家、提交线下预约，并查看服务端的完整预约记录与专家处理意见。 -->
     <el-alert
       v-if="!canBookAppointment"
       class="permission-alert"
@@ -47,16 +47,48 @@
     <el-card shadow="never" class="recent-card">
       <template #header>
         <div class="recent-head">
-          <div><strong>最近提交</strong><span>后端暂未提供“我的预约”查询接口；这里仅保留当前浏览器的最近提交记录，刷新后仍显示本地记录，不代表完整历史。</span></div>
-          <el-button v-if="appointments.length" text type="danger" @click="clearAppointments">清空本地记录</el-button>
+          <div>
+            <strong>我的预约</strong>
+            <span>来自服务端的完整预约记录，含专家的处理意见；刷新不会丢失。</span>
+          </div>
+          <el-button :loading="loadingAppointments" @click="loadAppointments">刷新</el-button>
         </div>
       </template>
-      <el-table :data="appointments" row-key="apptId">
-        <el-table-column prop="expertName" label="专家" width="110" />
-        <el-table-column prop="apptTopic" label="咨询主题" min-width="250" show-overflow-tooltip />
-        <el-table-column label="预约时间" min-width="170"><template #default="{ row }">{{ formatDateTime(row.apptTime) }}</template></el-table-column>
-        <el-table-column label="状态" width="110"><template #default="{ row }"><el-tag type="warning">{{ row.apptStatus }}</el-tag></template></el-table-column>
-        <el-table-column label="提交时间" min-width="170"><template #default="{ row }">{{ formatDateTime(row.createTime) }}</template></el-table-column>
+
+      <el-alert
+        v-if="appointmentError"
+        class="appointment-error"
+        type="error"
+        :closable="false"
+        show-icon
+        title="预约记录加载失败"
+        :description="appointmentError"
+      />
+
+      <el-table v-else v-loading="loadingAppointments" :data="appointments" row-key="apptId">
+        <el-table-column label="专家" min-width="150">
+          <template #default="{ row }">
+            <div class="expert-cell">
+              <strong>{{ row.expertName || `专家 #${row.expertId}` }}</strong>
+              <small v-if="row.expertDomain">{{ row.expertDomain }}</small>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="apptTopic" label="咨询主题" min-width="200" show-overflow-tooltip />
+        <el-table-column label="预约时间" min-width="160">
+          <template #default="{ row }">{{ formatDateTime(row.apptTime) }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="105">
+          <template #default="{ row }">
+            <el-tag :type="statusTagType(row.apptStatus)">{{ row.apptStatus }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="处理意见" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.remark || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="提交时间" min-width="160">
+          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
+        </el-table-column>
         <template #empty><el-empty description="还没有预约记录" /></template>
       </el-table>
     </el-card>
@@ -89,9 +121,9 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import ExpertAppointmentPanel from '@/components/expert/ExpertAppointmentPanel.vue'
-import { submitAppointment } from '@/api/expert'
+import { getMyAppointments, submitAppointment } from '@/api/expert'
 import { expertOptions } from '@/constants/experts'
 import { useUserStore } from '@/store/user'
 
@@ -99,14 +131,19 @@ import { useUserStore } from '@/store/user'
  * 页面用途：专家预约。
  * 接口文件：frontend-web/src/api/expert.js
  * - submitAppointment：POST /api/expert/appointment/submit，真实写入 t_appointment。
- * - 后端暂未提供“我的预约”查询接口，最近提交记录保存在 localStorage。
+ * - getMyAppointments：GET /api/expert/appointment/my，读取当前农户的完整预约记录。
+ *
+ * 说明：此前「我的预约」没有查询接口，页面把记录存在 localStorage 里，
+ * 换浏览器/清缓存就没了，也拿不到专家的处理意见。现已改为读取服务端数据。
  */
-const STORAGE_KEY = 'rxt_expert_appointments'
 const userStore = useUserStore()
 const canBookAppointment = computed(() => userStore.profile?.roleName === '农户')
 const isExpert = computed(() => userStore.profile?.roleName === '专家')
 const experts = expertOptions
 const appointments = ref([])
+const loadingAppointments = ref(false)
+/** 预约列表的加载失败原因。非空时表格位置展示错误态，避免「加载失败」看起来像「一条都没有」 */
+const appointmentError = ref('')
 const dialogVisible = ref(false)
 const submitting = ref(false)
 const selectedExpert = ref(null)
@@ -141,8 +178,44 @@ const filteredExperts = computed(() => experts.filter((item) => {
 }))
 
 function disabledDate(date) { return date.getTime() < new Date().setHours(0, 0, 0, 0) }
-function readLocal() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] } }
-function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(appointments.value)) }
+
+/**
+ * 读取我的预约。
+ *
+ * 失败时把原因留在页面上，而不是让表格空着 —— 「加载失败」与「一条都没有」
+ * 在界面上必须区分开，否则用户会以为预约记录丢了。
+ * toast 已由 request.js 统一弹过，这里只渲染行内错误态。
+ */
+async function loadAppointments() {
+  appointmentError.value = ''
+  if (!canBookAppointment.value && !isExpert.value) {
+    // 非农户/专家身份没有预约记录可查，不必请求（后端也会 403）
+    appointments.value = []
+    return
+  }
+  loadingAppointments.value = true
+  try {
+    const data = await getMyAppointments()
+    appointments.value = Array.isArray(data) ? data : []
+  } catch (err) {
+    appointments.value = []
+    appointmentError.value = err?.message || '无法连接后端服务，请确认后端已启动后重试。'
+  } finally {
+    loadingAppointments.value = false
+  }
+}
+
+/** 状态对应的标签颜色，让「已拒绝」和「已完成」一眼能分开 */
+function statusTagType(status) {
+  return {
+    待处理: 'warning',
+    已接受: 'primary',
+    已完成: 'success',
+    已拒绝: 'danger',
+    已取消: 'info'
+  }[status] || 'info'
+}
+
 function openDialog(expert) { selectedExpert.value = expert; form.expertId = expert.expertId; form.apptTime = ''; form.apptTopic = ''; form.remark = ''; dialogVisible.value = true }
 
 async function handleSubmit() {
@@ -154,23 +227,19 @@ async function handleSubmit() {
   if (!valid) return
   submitting.value = true
   try {
-    const apptId = await submitAppointment({ expertId: form.expertId, apptTime: form.apptTime, apptTopic: form.apptTopic, remark: form.remark })
-    const expert = experts.find((item) => item.expertId === form.expertId)
-    appointments.value.unshift({ apptId, expertName: expert?.realName || '专家', apptTopic: form.apptTopic, apptTime: form.apptTime.replace('T', ' '), apptStatus: '待处理', remark: form.remark, createTime: new Date().toISOString().slice(0, 19).replace('T', ' ') })
-    saveLocal()
+    await submitAppointment({ expertId: form.expertId, apptTime: form.apptTime, apptTopic: form.apptTopic, remark: form.remark })
     dialogVisible.value = false
     ElMessage.success('预约已提交，专家处理后可在线下联系确认')
+    // 重新拉取列表，让新记录带上服务端生成的编号与状态，
+    // 而不是在前端拼一条「看起来像」的记录塞进表格
+    await loadAppointments()
+  } catch (err) {
+    console.error('提交专家预约失败：', err)
   } finally { submitting.value = false }
 }
 
-async function clearAppointments() {
-  await ElMessageBox.confirm('仅清空当前浏览器中的最近提交显示，不会删除数据库预约记录。', '确认清空', { type: 'warning' })
-  appointments.value = []
-  saveLocal()
-}
-
 function formatDateTime(value) { return value ? String(value).replace('T', ' ').slice(0, 16) : '--' }
-onMounted(() => { appointments.value = readLocal() })
+onMounted(loadAppointments)
 </script>
 
 <style scoped>
@@ -200,5 +269,8 @@ onMounted(() => { appointments.value = readLocal() })
 .selected-expert { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 13px; border-radius: 12px; background: var(--el-color-primary-light-9); }
 .selected-expert strong, .selected-expert span { display: block; }
 .selected-expert span { margin-top: 4px; color: var(--el-text-color-secondary); font-size: 12px; }
+.expert-cell strong, .expert-cell small { display: block; }
+.expert-cell small { margin-top: 3px; color: var(--el-text-color-secondary); font-size: 12px; }
+.appointment-error { margin-bottom: 4px; }
 @media (max-width: 760px) { .appointment-hero { align-items: flex-start; flex-direction: column; } .hero-badge { width: 100%; } .filter-row, .expert-grid { grid-template-columns: 1fr; } .recent-head { align-items: flex-start; flex-direction: column; } }
 </style>
