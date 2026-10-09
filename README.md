@@ -78,6 +78,8 @@ agri-sale-platform/
 ├── frontend-web/               # rxt-web：业务端（农户 / 采购方 / 专家 / 银行用户）
 ├── frontend-admin/             # rxt-admin：管理后台（平台管理员）
 ├── frontend-landing/           # rongxiaotong-landing：官网落地页（React 19 + TanStack Router，独立静态站点）
+├── scripts/
+│   └── demo-start.sh           # 演示/答辩一键启动（后端 + 三个前端，含就绪校验与统一收尾）
 └── docs/
     ├── 交付文档/                # 可行性研究报告、软件需求规格说明书、概要设计说明书、详细设计说明书
     ├── 设计图/                  # 架构分层图、组件图、部署图、包图、类图、顺序图
@@ -90,6 +92,31 @@ agri-sale-platform/
 仓库规范规则，见 **[CONTRIBUTING.md](./CONTRIBUTING.md)**。
 
 ## 本地启动
+
+### 一键启动（演示 / 答辩用）
+
+```bash
+scripts/demo-start.sh                 # 起后端 + 三个前端
+scripts/demo-start.sh --no-backend    # 后端已经在跑，只起三个前端
+scripts/demo-start.sh --open          # 起来后顺带用浏览器打开落地页
+```
+
+拉起四个进程，并逐个**确认真的可用**再报成功 —— 判据不是「端口有响应」，
+而是响应体确实是本项目的。端口被别的服务占了不会被误判成「已经起来了」，
+那类假成功在演示当天最难发现。就绪后会打印全部地址和演示账号。
+
+| 服务 | 地址 | 端口可用环境变量覆盖 |
+| --- | --- | --- |
+| 后端 API | `http://localhost:8080/api` | `BACKEND_PORT` |
+| 业务端 | `http://localhost:5173` | `WEB_PORT` |
+| 管理后台 | `http://localhost:5174` | `ADMIN_PORT` |
+| 落地页 | `http://localhost:3000` | `LANDING_PORT` |
+
+- 启动前**已经在跑**的进程（比如你自己开着的后端）会被复用，不会重复拉起，也不会被脚本关掉。
+- `Ctrl-C` 退出时，只收掉本次由脚本拉起的进程，连 `mvn` / `vite` fork 出来的子进程一起收。
+- 每个服务的日志在 `logs/demo/<服务名>.log`（该目录不入库）。
+
+> 需要改数据源、单独调某个服务、或想看接口文档，看下面几节。
 
 ### 后端
 
