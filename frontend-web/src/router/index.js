@@ -11,8 +11,11 @@ const routes = [
     redirect: '/home',
     children: [
       { path: 'home', component: () => import('@/views/Home.vue'), meta: { title: '首页' } },
-      { path: 'trade/products', component: () => import('@/views/trade/ProductList.vue'), meta: { title: '商品货源' } },
-      { path: 'trade/product/:id', component: () => import('@/views/trade/ProductDetail.vue'), meta: { title: '商品详情' } },
+      // 商品货源与商品详情对游客开放（LX-4 ③ 的裁决）：后端这两个接口本来就在
+      // PublicEndpoints 白名单里，前端却由全局守卫一律打回登录页，
+      // 结果是「游客能调接口、却看不到页面」。路由 meta.public 与白名单保持一致。
+      { path: 'trade/products', component: () => import('@/views/trade/ProductList.vue'), meta: { title: '商品货源', public: true } },
+      { path: 'trade/product/:id', component: () => import('@/views/trade/ProductDetail.vue'), meta: { title: '商品详情', public: true } },
       { path: 'trade/demand', component: () => import('@/views/trade/DemandList.vue'), meta: { title: '求购需求' } },
       { path: 'trade/cart', component: () => import('@/views/trade/Cart.vue'), meta: { title: '购物车' } },
       { path: 'trade/orders', component: () => import('@/views/trade/OrderList.vue'), meta: { title: '我的订单' } },

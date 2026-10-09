@@ -288,8 +288,13 @@ docker compose down -v
 ## 当前状态
 
 骨架已就绪：目录结构、实体映射、建表脚本、统一返回与异常处理、JWT 认证链路均已打通，
-主要业务模块已按功能点逐个补齐；仅首页聚合（`HomeServiceImpl`）与智能推荐
-（`RecommendServiceImpl`）仍为待实现骨架。
+主要业务模块已按功能点逐个补齐。
+
+> **2026-10-09 更正**：本节此前写着「仅首页聚合（`HomeServiceImpl`）与智能推荐
+> （`RecommendServiceImpl`）仍为待实现骨架」，两个说法都已不成立 ——
+> `HomeServiceImpl` 早已是完整实现（197 行、零 TODO），
+> 而 `RecommendServiceImpl` 是一份**零调用方的死代码**，线上真正在跑的推荐入口是
+> `FinanceApplyServiceImpl.recommendGuarantors`（本次实现）。修 README 时不要再把两者混为一谈。
 
 **已完成**
 
@@ -298,18 +303,36 @@ docker compose down -v
 | M0 项目基础设施 | 建表脚本、统一返回与异常、分页、字段填充、跨域、JWT 认证链路 | 已就绪 |
 | **M0 参数校验** | **全局参数校验**：路径不存在 404、缺必填参数 / 类型不匹配 400、分页下界拦截 | 已完成（P1） |
 | **M0 日志规范** | **链路标识**：每请求一个 traceId，写入 MDC 与 `X-Trace-Id` 响应头 | 已完成（P1） |
-| **M0 鉴权白名单** | 放行规则改为「**HTTP 方法 + 路径**」双条件，写接口不再被只读规则顺带放过 | 已完成（P1） |
+| **M0 鉴权白名单** | 放行规则改为「**HTTP 方法 + 路径**」双条件，写接口不再被只读规则顺带放过；商品详情 `GET /trade/products/{productId}` 对游客开放 | 已完成（P1） |
 | **M0 接口文档** | **Swagger / OpenAPI**：dev 环境可交互调试，非 dev 默认关闭（单一开关） | 已完成（P1） |
 | M1 用户与权限 | 注册 / 登录 / 登出、个人资料与农户经营档案、角色权限校验（`PermissionChecker`） | 已完成 |
 | M1 角色菜单 | 登录与资料接口返回 `menuPerms`（取自 `t_role.menu_perms`），供前端按角色渲染菜单 | 已完成 |
-| M2 农产品交易 | 商品、购物车、订单（含支付 / 发货 / 收货状态流转） | 已完成 |
+| M2 农产品交易 | 商品、购物车、订单（含支付 / 发货 / 收货状态流转）、商品详情页 | 已完成 |
 | M2 求购需求 | 求购需求发布与检索 | 已完成 |
-| M4 融资服务 | 融资申请、我的融资、银行侧审批 | 接口在（原路由冲突已修，见下方「已修记录」） |
-| M5 专家助力 | 知识、问答、预约 | 部分完成 |
+| M4 融资服务 | 融资申请、我的融资、银行侧审批、**联合融资人智能推荐与联保小组组建** | 已完成 |
+| M5 专家助力 | 知识、问答、预约（含「我的预约」查询） | 部分完成（尚缺：专家一览、专家介绍、咨询专家） |
 | M6 平台治理 | 内容审核（商品 / 知识 / 评论） | 已完成 |
 | **M6 平台治理** | **用户管理**：分页检索、启停用、调整角色、角色下拉 | 已完成（P1） |
 | **M6 平台治理** | **融资管理**：银行侧待办与审批、管理员只读台账 | 已完成（P1） |
 | **M6 平台治理** | **数据看板**：总量、待办、分布、近 7 日趋势 | 已完成（P1） |
+
+**2026-10-09 变更（组长接手成员未交付部分）**
+
+- **补全两个联保空壳**：`FinanceApplyServiceImpl.recommendGuarantors`（原 `return new ArrayList<>()`）
+  与 `LoanGroupServiceImpl` 的三个方法（原只有步骤注释，`POST /api/finance/group`
+  **返回成功但写库为零**）。
+- `POST /api/finance/group` 返回值由 `Result<Void>` 改为 `Result<LoanGroupCreateVO>`，
+  回传 `joined` / `skipped` 明细 —— 前端不会再出现「提示成功、组里其实只有自己」。
+- `LoanGroupDTO` 去掉 `description`（`t_loan_group` 里没有这一列），新增 `memberIds` / `loanProductId`。
+- `GET /api/finance/recommend` 返回类型由 `List<UserVO>` 改为 `List<GuarantorCandidateVO>`，
+  新增 `matchRate`（0~100 的**绝对分**）与 `matchReason`；已在进行中小组的农户直接不出现在结果里。
+  **候选人 VO 刻意不含手机号**，别再往里加。
+- `GET /api/trade/products/{productId}` 加入免登录白名单（**仅 GET**），
+  前端 `trade/products` 与 `trade/product/:id` 路由同步标记 `meta.public`，
+  `MainLayout` 对未登录访客显示登录 / 注册而不是身份切换器。
+- 新增 `GET /api/expert/appointment/my`（我的预约，按登录态取归属人，不接受跨用户查询）。
+- 前端 `ProductDetail.vue` 由 18 行占位页改为完整页面；`Appointment.vue` 的 localStorage
+  记录改为读取服务端。
 
 **已修记录（2026-09-22 核对）**
 
