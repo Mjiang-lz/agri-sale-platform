@@ -53,9 +53,47 @@
           <el-form-item label="昵称" prop="realName">
             <el-input v-model="baseForm.realName" maxlength="50" show-word-limit placeholder="请输入昵称" />
           </el-form-item>
-          <el-form-item label="头像地址" prop="avatarUrl">
-            <el-input v-model="baseForm.avatarUrl" maxlength="255" placeholder="对象存储 URL，可留空" />
-            <div class="field-tip">留空则显示昵称首字；对象存储尚未启用阶段，可先手工填写图片地址。</div>
+          <el-form-item label="头像" prop="avatarUrl">
+            <!--
+              上传控件走 el-upload 的自定义 http-request，而不是让它自己 action 上传：
+              项目的 request 拦截器统一附带 JWT、统一解包 Result 并弹错，走它才能拿到
+              后端返回的 { url, objectKey, ... } 并复用同一套错误提示。
+            -->
+            <div class="avatar-field">
+              <el-upload
+                action="#"
+                :show-file-list="false"
+                :http-request="handleAvatarUpload"
+                :before-upload="beforeAvatarUpload"
+                accept=".jpg,.jpeg,.png,.gif,.webp"
+              >
+                <el-button :loading="uploadingAvatar" size="small">
+                  {{ baseForm.avatarUrl ? '更换头像' : '上传头像' }}
+                </el-button>
+              </el-upload>
+              <el-button
+                v-if="baseForm.avatarUrl"
+                size="small"
+                type="danger"
+                plain
+                :disabled="savingBase"
+                @click="clearAvatar"
+              >
+                移除
+              </el-button>
+              <!-- 上传成功后立刻回显，让用户确认存的是哪张图，不必等保存基本信息 -->
+              <el-image v-if="avatarPreview" class="avatar-preview" :src="avatarPreview" fit="cover" />
+            </div>
+            <div class="field-tip">
+              支持 JPG / PNG / GIF / WEBP，不超过 5MB。未上传时显示昵称首字。
+              <!-- 保留下面的手工输入框作为兜底：内网/离线环境下 OBS 不可用时仍可贴地址 -->
+            </div>
+            <el-input
+              v-model="baseForm.avatarUrl"
+              maxlength="255"
+              placeholder="或直接填写图片地址"
+              class="avatar-url-input"
+            />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading="savingBase" :disabled="!baseDirty" @click="saveBase">
@@ -134,6 +172,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getProfile, updateProfile, updateFarmerProfile } from '@/api/user'
+import { checkImageFile, uploadAvatar } from '@/api/common'
 
 /**
  * 页面用途：个人中心（对应《软件需求规格说明书》2.8 个人信息 - 基本信息管理 / 农户经营档案）。
@@ -185,6 +224,48 @@ const hasFarmerProfile = computed(() => Boolean(profile.value?.farmerProfile))
 // 头像预览跟随输入实时变化，便于填完地址立刻看到效果
 const avatarPreview = computed(() => baseForm.avatarUrl.trim() || undefined)
 const nameInitial = computed(() => (baseForm.realName.trim() || profile.value?.realName || '用').slice(0, 1))
+
+const uploadingAvatar = ref(false)
+
+/**
+ * 上传前的本地校验，只是为了即时反馈；真正的类型/大小判定在服务端
+ * ImageFileValidator（按文件头 magic number 判，不认后缀与 Content-Type）。
+ */
+function beforeAvatarUpload(file) {
+  const err = checkImageFile(file, { label: '头像' })
+  if (err) {
+    ElMessage.warning(err)
+    return false
+  }
+  return true
+}
+
+/**
+ * 自定义上传：走项目的 request 封装而不是 el-upload 自身的 action，
+ * 这样 JWT、Result 解包、错误 ElMessage 都与其它接口一致。
+ *
+ * ★ 注意后端 PUT 的约定是「null＝不修改、空串＝清空」，所以这里**不能**顺手调保存接口：
+ * 上传只拿到地址，是否入库由用户点「保存基本信息」决定，避免"刚选完图就被自动保存"。
+ */
+async function handleAvatarUpload(options) {
+  uploadingAvatar.value = true
+  try {
+    const result = await uploadAvatar(options.file)
+    baseForm.avatarUrl = result.url
+    options.onSuccess(result)
+    ElMessage.success('头像已上传，别忘了点「保存基本信息」')
+  } catch (error) {
+    // request 拦截器已统一弹过错误文案，这里不重复提示
+    options.onError(error)
+  } finally {
+    uploadingAvatar.value = false
+  }
+}
+
+/** 移除头像：置空而非删除文件对象 —— 服务端没有删除接口，且旧图可能仍被别处引用 */
+function clearAvatar() {
+  baseForm.avatarUrl = ''
+}
 
 const baseDirty = computed(
   () => baseForm.realName !== baseSnapshot.value.realName || baseForm.avatarUrl !== baseSnapshot.value.avatarUrl
@@ -306,6 +387,13 @@ onMounted(loadProfile)
 .tip { margin-bottom: 20px; }
 .edit-form { max-width: 680px; }
 .field-tip { margin-top: 6px; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.6; }
+
+/* 头像上传行：按钮 + 移除 + 预览横向排布。预览固定 56×56 与上方 el-avatar 同尺寸，
+   尺寸跟着 el-avatar 走而不是写死，避免以后调整大小时两处不一致。 */
+.avatar-field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.avatar-preview { width: 56px; height: 56px; border-radius: 50%; }
+/* 手工填地址的兜底输入框：与主表单拉开距离，避免和上传按钮抢视觉焦点 */
+.avatar-url-input { margin-top: 8px; }
 @media (max-width: 760px) {
   .page-head { flex-direction: column; align-items: stretch; }
   .identity { gap: 16px; }
