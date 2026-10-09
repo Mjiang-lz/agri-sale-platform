@@ -92,8 +92,8 @@
     <!-- ===========================================================
          区块 3 · 专家一览
          需求：分页展示，支持按擅长领域筛选
-         数据源：GET /api/expert/experts?domain=xxx → Result<List<ExpertInfo>>
-                姓名通过 GET /api/user/{userId}/brief 补全
+         数据源：GET /api/expert/experts?domain=xxx
+                → Result<List<ExpertVO>>，姓名/头像已在服务端装配好，无需二次请求
        =========================================================== -->
     <el-card shadow="never" class="content-card section-card">
       <template #header>
@@ -117,7 +117,7 @@
                 <span v-else class="ua-initial">{{ (e.realName || '专').slice(0, 1) }}</span>
               </span>
               <div class="expert-id">
-                <strong>{{ e.realName }}</strong>
+                <strong>{{ e.realName || '农技专家' }}</strong>
                 <el-tag size="small" effect="plain">{{ e.expertDomain }}</el-tag>
               </div>
             </div>
@@ -134,7 +134,7 @@
     </el-card>
 
     <!-- ===========================================================
-         区块 4 · 专家知识展示（按发布时间倒序，authorId 在专家列表内）
+         区块 4 · 专家知识展示（按发布时间倒序；authorId 是专家主键，需落在专家列表内）
          数据源：GET /api/home/knowledge?limit=10
        =========================================================== -->
     <el-card shadow="never" class="content-card section-card">
@@ -222,6 +222,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/request'
+import { getExperts } from '@/api/expert'
 import { formatDateTime, isReadable, summary } from '@/utils/text'
 
 /* ====================================================================
@@ -401,18 +402,16 @@ function mapDemoProducts(list) {
 /* ====================================================================
  * 区块 3 · 专家一览
  * ====================================================================
- * 流程：先拉专家列表 → 用 userId 批量补全姓名/头像（/user/{id}/brief）→ 客户端分页 */
+ * 数据源：GET /api/expert/experts（ExpertVO），姓名/头像由服务端一次装配好。
+ * 首页只预览前 expertPageSize 条，客户端不再逐行补全用户信息。 */
 const expertList = ref([])                 // 已含 realName/avatarUrl
 const expertDomain = ref('')
 const expertPageSize = 3
 
-const expertDomains = computed(() => {
-  const set = new Set()
-  expertList.value.forEach((e) => {
-    if (e.expertDomain && isReadable(e.expertDomain)) set.add(e.expertDomain)
-  })
-  return [...set]
-})
+// 领域下拉的选项：用「只增不减的并集」而不是从当前列表推导。
+// 一旦按某领域筛过，返回的列表里就只剩那一个领域，若从列表推导，
+// 下拉会塌成单选项、用户切不回别的领域（只能先清空）。
+const expertDomains = ref([])
 
 // 首页预览只展示前 3 条；点击卡片或"查看更多"跳转 /expert/qa
 const previewExperts = computed(() => expertList.value.slice(0, expertPageSize))
@@ -436,54 +435,43 @@ const DEMO_EXPERTS_RAW = [
   { expertId: 5, userId: 10, expertDomain: '农业金融', introduction: '熟悉农业贷款贴息政策与联合贷款机制。',           workloadStat: '已回答 19 问 / 接待 4 预约' }
 ]
 
+/** 演示数据没有对应的 t_user 行，姓名统一用与真实链路一致的占位。 */
+function demoExperts() {
+  return DEMO_EXPERTS_RAW.map((e) => ({ ...e, realName: '农技专家', avatarUrl: '' }))
+}
+
 async function loadExperts() {
   loading.expert = true
-  let raw = []
   try {
-    const params = expertDomain.value ? { domain: expertDomain.value } : {}
-    const data = await request.get('/expert/experts', { params })
-    raw = normalizeList(data)
-    if (!raw.length && useDemo) {
-      raw = DEMO_EXPERTS_RAW
+    const data = await getExperts(expertDomain.value)
+    expertList.value = normalizeList(data).map((e) => ({
+      expertId: e.expertId,
+      userId: e.userId,
+      expertDomain: e.expertDomain,
+      introduction: e.introduction,
+      workloadStat: e.workloadStat,
+      // 后端已保证 realName 非 null（可能为空串），这里再兜一层默认值
+      realName: e.realName || '农技专家',
+      avatarUrl: e.avatarUrl || ''
+    }))
+    if (!expertList.value.length && useDemo) {
+      expertList.value = demoExperts()
       setDemo('expert', true)
     }
   } catch (err) {
+    // request.js 已统一弹过错误提示，这里只负责兜底，不重复打扰用户
     console.error('专家列表加载失败：', err)
-    raw = []
-    if (useDemo) {
-      ElMessage.warning('专家列表加载失败，已显示演示数据')
-      raw = DEMO_EXPERTS_RAW
-      setDemo('expert', true)
-    }
+    expertList.value = useDemo ? demoExperts() : []
+    if (useDemo) setDemo('expert', true)
+  } finally {
+    loading.expert = false
   }
 
-  // 姓名/头像用 /user/{userId}/brief 批量补全
-  const enriched = await Promise.all(
-    raw.map(async (e) => {
-      let realName = '农技专家'
-      let avatarUrl = ''
-      try {
-        const u = await request.get(`/user/${e.userId}/brief`)
-        if (u) {
-          realName  = u.realName || realName
-          avatarUrl = u.avatarUrl || ''
-        }
-      } catch {
-        // 单点失败不影响整体；保留占位姓名
-      }
-      return {
-        expertId: e.expertId,
-        userId: e.userId,
-        expertDomain: e.expertDomain,
-        introduction: e.introduction,
-        workloadStat: e.workloadStat,
-        realName,
-        avatarUrl
-      }
-    })
-  )
-  expertList.value = enriched
-  loading.expert = false
+  const seen = new Set(expertDomains.value)
+  expertList.value.forEach((e) => {
+    if (isReadable(e.expertDomain)) seen.add(e.expertDomain)
+  })
+  expertDomains.value = [...seen]
 }
 
 function goExpertDetail(expert) {
@@ -492,7 +480,7 @@ function goExpertDetail(expert) {
 }
 
 /* ====================================================================
- * 区块 4 · 专家知识（authorId 在专家列表中，按 createTime 倒序）
+ * 区块 4 · 专家知识（authorId 是专家主键，按 createTime 倒序）
  * ====================================================================
  * 后端只有 /home/knowledge 一条公共知识接口；"专家知识"语义上指由专家
  * (t_expert 内 userId) 发布的内容，前端按 authorId 过滤。 */
@@ -527,15 +515,22 @@ async function loadExpertKnowledge() {
     }
   }
 
-  // 过滤：authorId 在专家列表里；isReadable 避开 17/18 那种乱码记录
-  const expertUserIds = new Set(
-    expertList.value.map((e) => Number(e.userId)).filter(Boolean)
+  // 过滤：authorId 落在专家列表里；isReadable 避开 17/18 那种乱码记录。
+  //
+  // ⚠️ 这里比对的是 **expertId（专家主键）**，不是 userId。
+  // `t_knowledge.author_id` 的外键是 `fk_knowledge_author_id → t_expert(expert_id)`
+  // （schema.sql），后端写入时也是 `setAuthorId(expert.getExpertId())`
+  // （KnowledgeServiceImpl），审核模块再用 toUserIdByExpertId(authorId) 换算成用户 ——
+  // 即 authorId 全链路都是专家主键。此前这里拿它去比 expertList 的 userId，
+  // 只因专家列表恒为空（接口 404）而被 `size === 0` 短路掩盖，从没真正生效过。
+  const expertIds = new Set(
+    expertList.value.map((e) => Number(e.expertId)).filter(Boolean)
   )
   const filtered = raw
     .filter((k) => k.auditStatus === '已通过' && isReadable(k.title))
-    .filter((k) => (useDemo && demoMode.expertKnowledge) || expertUserIds.size === 0
+    .filter((k) => (useDemo && demoMode.expertKnowledge) || expertIds.size === 0
       ? true
-      : expertUserIds.has(Number(k.authorId)))
+      : expertIds.has(Number(k.authorId)))
     .sort((a, b) => String(b.createTime).localeCompare(String(a.createTime)))
 
   expertKnowledgeList.value = filtered.slice(0, 3)

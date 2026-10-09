@@ -13,10 +13,12 @@ import com.rxt.mapper.UserMapper;
 import com.rxt.entity.User;
 import com.rxt.service.ExpertService;
 import com.rxt.vo.AppointmentVO;
+import com.rxt.vo.ExpertVO;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +31,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class ExpertServiceImpl implements ExpertService {
+
+    /** 审核结论词表里的「通过」。全仓没有共享常量类，各服务各自持有（同 HomeServiceImpl:49）。 */
+    private static final String AUDIT_APPROVED = "已通过";
 
     @Autowired private KnowledgeMapper knowledgeMapper;
     @Autowired private QuestionMapper questionMapper;
@@ -111,6 +116,60 @@ public class ExpertServiceImpl implements ExpertService {
                 vo.setExpertDomain(expert.getExpertDomain());
                 vo.setExpertName(expertNames.get(expert.getUserId()));
             }
+            result.add(vo);
+        }
+        return result;
+    }
+
+    /**
+     * 专家一览（概设 UI-EXP-03「专家介绍」）。
+     *
+     * <p>只返回已通过审核的入驻专家 —— 未过审的专家不该出现在公开页面上。
+     * 领域筛选是可选的：{@code domain} 为 null 或空白时不加该条件。</p>
+     *
+     * <p>姓名与头像在 {@code t_user}、其余字段在 {@code t_expert}，因此按 {@code IN}
+     * 批量装配一次，而不是逐行查库（N+1）。原前端为此额外调了
+     * {@code GET /user/{id}/brief}，那个端点并不存在，所以每次开首页都会报错 ——
+     * 这里直接把 {@code realName} / {@code avatarUrl} 带出，调用方无需再补一轮请求。</p>
+     *
+     * <p>用 {@code realName} 兜底为空串而不是 null：模板里做的是
+     * {@code {{ e.realName }}}，为 null 时 Vue 会渲染出空字符串，但若调用方要做
+     * {@code .trim()} 之类的处理就会炸。统一给空串，契约更稳。</p>
+     */
+    @Override
+    public List<ExpertVO> listExperts(String domain) {
+        List<ExpertInfo> experts = expertInfoMapper.selectList(
+                Wrappers.<ExpertInfo>lambdaQuery()
+                        .eq(ExpertInfo::getAuditStatus, AUDIT_APPROVED)
+                        .eq(StringUtils.hasText(domain), ExpertInfo::getExpertDomain, domain)
+                        .orderByAsc(ExpertInfo::getExpertId));
+        if (experts.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Set<Long> userIds = experts.stream()
+                .map(ExpertInfo::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(HashSet::new));
+
+        Map<Long, User> users = userIds.isEmpty() ? Collections.emptyMap()
+                : userMapper.selectBatchIds(userIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, Function.identity(), (a, b) -> a));
+
+        List<ExpertVO> result = new ArrayList<>(experts.size());
+        for (ExpertInfo expert : experts) {
+            ExpertVO vo = new ExpertVO();
+            vo.setExpertId(expert.getExpertId());
+            vo.setUserId(expert.getUserId());
+            vo.setExpertDomain(expert.getExpertDomain());
+            vo.setIntroduction(expert.getIntroduction());
+            vo.setWorkloadStat(expert.getWorkloadStat());
+
+            User user = expert.getUserId() == null ? null : users.get(expert.getUserId());
+            // 专家档案的 user_id 理论上总是能命中 t_user；真命不中也要保持
+            // realName 非 null（见方法注释），故给空串而不是留 null。
+            vo.setRealName(user == null || user.getRealName() == null ? "" : user.getRealName());
+            vo.setAvatarUrl(user == null ? null : user.getAvatarUrl());
             result.add(vo);
         }
         return result;
