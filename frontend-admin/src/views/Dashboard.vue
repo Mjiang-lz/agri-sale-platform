@@ -409,11 +409,12 @@ onMounted(loadStatistics)
 .dashboard-page { color: #24332b; }
 .dash-hero { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 28px; border-radius: 18px; color: #fff; background: linear-gradient(125deg, #173f2a, #2b8154); box-shadow: 0 16px 34px rgba(23, 63, 42, .16); }
 .eyebrow { color: #ccebd5; font-size: 13px; }
-.dash-hero h2 { margin: 9px 0 7px; font-size: 26px; }
+
+.dash-hero h2 { margin: 9px 0 7px; font-size: 26px; white-space: nowrap; }
 .dash-hero p { margin: 0; max-width: 760px; color: rgba(255,255,255,.72); line-height: 1.7; }
 /* 左侧文案区允许收缩，否则在中等宽度下会把标题挤成竖排 */
 .dash-hero > div:first-child { flex: 1; min-width: 0; }
-.dash-hero h2 { white-space: nowrap; }
+
 .hero-side { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
 .hero-time { padding: 12px 18px; text-align: right; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; background: rgba(255,255,255,.1); }
 .hero-time span { display: block; color: rgba(255,255,255,.66); font-size: 12px; }
@@ -452,17 +453,16 @@ onMounted(loadStatistics)
 /* 两列两行网格：左列放刻度，右列上下分别是画布和日期标签。
    用 flex 会把日期当成画布的第三个兄弟节点挤到右侧。 */
 .line-chart { display: grid; grid-template-columns: 26px minmax(0, 1fr); grid-template-rows: 150px auto; column-gap: 8px; }
-.chart-axis { grid-area: 1 / 1; }
-.chart-body { grid-area: 1 / 2; }
-.chart-labels { grid-area: 2 / 2; }
-.chart-axis { position: relative; width: 26px; height: 150px; color: #9aa69e; font-size: 10px; }
+
+.chart-axis { grid-area: 1 / 1; position: relative; width: 26px; height: 150px; color: #9aa69e; font-size: 10px; }
 .chart-axis span { position: absolute; right: 0; line-height: 1; transform: translateY(-50%); }
-.chart-body { position: relative; flex: 1; height: 150px; min-width: 0; }
+.chart-body { grid-area: 1 / 2; position: relative; height: 150px; min-width: 0; }
 .chart-svg { width: 100%; height: 150px; cursor: crosshair; }
 .chart-hover { position: absolute; top: 4px; z-index: 2; padding: 5px 9px; pointer-events: none; white-space: nowrap; border-radius: 8px; color: #fff; font-size: 11px; background: rgba(29, 86, 55, .9); transform: translateX(-50%); transition: left .12s ease, opacity .12s ease; }
 .chart-hover b { margin-right: 6px; }
+.chart-labels { grid-area: 2 / 2; position: relative; height: 14px; margin-top: 6px; color: #839087; font-size: 10px; }
 /* 绝对定位对齐折线的数据点 x 坐标；两端标签靠 translate 收进可视区，避免溢出卡片 */
-.chart-labels { position: relative; height: 14px; margin-top: 6px; color: #839087; font-size: 10px; }
+
 .chart-labels span { position: absolute; white-space: nowrap; transform: translateX(-50%); }
 .chart-labels span:first-child { transform: none; }
 .chart-labels span:last-child { transform: translateX(-100%); }
@@ -485,6 +485,8 @@ onMounted(loadStatistics)
 .legend b { color: #1d5637; }
 .legend small { width: 38px; color: #8b978f; text-align: right; }
 @media (max-width: 1280px) { .chart-grid, .dist-grid { grid-template-columns: 1fr; } }
-@media (max-width: 1000px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } .todo-grid { grid-template-columns: 1fr; } .dash-hero { align-items: stretch; flex-direction: column; } .hero-side { justify-content: space-between; } .hero-time { text-align: left; } }
-@media (max-width: 680px) { .stat-grid { grid-template-columns: 1fr; } .donut-wrap { flex-direction: column; } .hero-side { flex-direction: column; align-items: stretch; } }
+
+@media (max-width: 1000px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } .todo-grid { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .dash-hero { align-items: stretch; flex-direction: column; } .hero-side { justify-content: space-between; } .hero-time { text-align: left; } .stat-grid { grid-template-columns: 1fr; } .donut-wrap { flex-direction: column; } }
+
 </style>
