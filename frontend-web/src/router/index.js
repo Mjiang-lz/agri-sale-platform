@@ -69,7 +69,14 @@ router.beforeEach(async (to) => {
       // `import router from '@/router'`，顶部引入 api/user 会让 router ↔ request 形成模块环，
       // 环里取默认导出容易拿到 undefined。动态 import 到调用时才解析，绕开这个问题。
       const { getProfile } = await import('@/api/user')
-      userStore.saveLogin(await getProfile())
+      // ⚠️ getProfile() 返回的是 UserVO，**没有 token 字段**（有 token 的是登录接口的 LoginVO）。
+      // 直接 saveLogin(它) 会让 saveLogin 里的 setToken(data.token) 写入 undefined ——
+      // localStorage 落下去的是**字面字符串 "undefined"**，下一次请求带着 `Bearer undefined`
+      // 换回 401，拦截器随即清掉 token 并踢回登录页。
+      // 也就是说：这段「自愈」恰好把它本意要救的那类用户（有 token、无 profile）登出了。
+      // 所以合并时要把当前仍然有效的 token 显式兜回去（守卫在上面已确认 getToken() 非空）。
+      const latest = await getProfile()
+      userStore.saveLogin({ ...userStore.profile, ...latest, token: getToken() })
       hydrateSettled = true
     } catch {
       // 要区分「会话真的失效」和「只是网络抖了一下」：
