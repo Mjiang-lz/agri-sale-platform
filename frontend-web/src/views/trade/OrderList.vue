@@ -317,16 +317,6 @@ onMounted(loadOrders)
 <style scoped>
 .order-list-page { color: var(--el-text-color-primary); }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p  { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
-.head-actions { display: flex; align-items: center; gap: 12px; }
 
 .table-card { border-radius: 14px; }
 
@@ -353,11 +343,6 @@ onMounted(loadOrders)
 
 .amount { color: #f56c6c; font-size: 15px; }
 
-.pagination {
-  display: flex;
-  justify-content: center;
-  padding-top: 14px;
-}
 
 .detail-head {
   display: flex;
