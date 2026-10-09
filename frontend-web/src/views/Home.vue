@@ -7,16 +7,16 @@
         <h2>融销通 · 首页</h2>
         <p>按需聚合新闻、金融产品、专家、农业知识与电商入口，逐项点击可进入详情。</p>
       </div>
-      <div class="head-tags">
-        <el-tag v-if="anyDemo" type="warning" effect="dark">演示数据</el-tag>
-      </div>
     </div>
 
     <!-- ===========================================================
          区块 1 · 新闻轮播展示
-         需求：按排序权重轮播；支持手动切换；点击跳转详情
-         数据源：GET /api/home/news（后端尚未实现；本 MR 用前端演示数据填充，
-                跳转统一走 /expert/knowledge 知识列表页，等新闻接口就绪后再切真接口）。
+         需求：轮播展示平台公告与农业行业新闻（《软件需求规格说明书》「新闻轮播展示」，
+                优先级 中；数据源为"管理员维护的新闻条目与封面图"）。
+         现状：后端没有新闻表、没有 /api/home/news 端点、管理端也没有维护入口，
+                该功能点尚未实现 ⇒ 保留轮播实现，但默认只渲染空态。
+         TODO 待实现：补齐新闻表 + GET /api/home/news + 管理端维护页后，
+                 解开 loadNews 里的注释即可，模板与字段契约无需改动。
        =========================================================== -->
     <el-card shadow="never" class="content-card section-card">
       <template #header>
@@ -231,7 +231,9 @@ import { formatDateTime, isReadable, summary } from '@/utils/text'
  *   - true：真接口失败 / 返回空数组 时回退到本地演示数据并标记 demoMode；
  *   - false：失败时保留空态，避免掩盖接口故障（与 FinanceApply / Knowledge /
  *           MyApplies 三个参考页保持一致）。
- * 新闻区块特殊：后端没有 /home/news 接口，常驻 demo 模式。
+ * 新闻区块特殊：后端没有 /home/news 端点（需求「新闻轮播展示」尚未实现），
+ * 所以它**不参与接口失败回退**——只有 useDemo 为 true 时才注入本地占位公告，
+ * 默认一律空态。见 loadNews。
  */
 const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
 const router = useRouter()
@@ -245,14 +247,11 @@ const loading = reactive({
   agriKnowledge: false
 })
 const demoMode = reactive({
-  news: false,
   product: false,
   expert: false,
   expertKnowledge: false,
   agriKnowledge: false
 })
-
-const anyDemo = computed(() => Object.values(demoMode).some(Boolean))
 
 /* ====================================================================
  * 通用工具
@@ -288,7 +287,7 @@ function formatMoney(value) {
 }
 
 /* ====================================================================
- * 区块 1 · 新闻轮播（接口待开发，常驻演示）
+ * 区块 1 · 新闻轮播（接口尚未实现，默认空态）
  * ====================================================================
  * 字段权重用于"按排序权重轮播"：权重大的优先展示。
  * 跳转详情：路由里暂无新闻详情，先统一跳 /expert/knowledge，等
@@ -296,6 +295,9 @@ function formatMoney(value) {
 const newsList = ref([])
 const activeNewsIndex = ref(0)
 
+// 仅 useDemo 为 true 时使用的本地占位公告。**默认关闭**（.env.development
+// 里 VITE_USE_DEMO=false），因为这几条是"平台公告"体例的文案，常驻显示等于
+// 拿假公告冒充真实通知 —— 比一般占位数据更容易被误读。
 const DEMO_NEWS = [
   {
     id: 'demo-news-1',
@@ -325,16 +327,15 @@ const DEMO_NEWS = [
 
 async function loadNews() {
   loading.news = true
-  // 新闻接口后端尚未实现 → 直接演示数据 + 标记
   try {
-    // 预留：未来对接 GET /api/home/news
-    // const data = await request.get('/home/news')
-    // newsList.value = normalizeList(data).filter(...)
-    // if (!newsList.value.length && useDemo) { ... }
-    throw new Error('news 接口待开发')
-  } catch {
-    newsList.value = [...DEMO_NEWS].sort((a, b) => b.weight - a.weight)
-    setDemo('news', true)
+    // 后端尚未实现新闻接口（见区块 1 的 TODO）。接口就绪后把下面两行换成真实请求
+    // 即可，模板与字段契约都不用动：
+    //   const data = await request.get('/home/news')
+    //   newsList.value = normalizeList(data).sort((a, b) => b.weight - a.weight)
+    newsList.value = []
+    if (useDemo) {
+      newsList.value = [...DEMO_NEWS].sort((a, b) => b.weight - a.weight)
+    }
   } finally {
     loading.news = false
   }
