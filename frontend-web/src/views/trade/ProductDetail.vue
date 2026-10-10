@@ -174,6 +174,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { addToCart, getTradeProductDetail } from '@/api/trade'
 import { getToken } from '@/utils/auth'
+import { productImage } from '@/utils/imagery'
 
 /**
  * 页面用途：商品详情（REQ-06）。
@@ -200,12 +201,12 @@ const currentImage = ref('')
 
 const loggedIn = computed(() => Boolean(getToken()))
 
-/** 图集：主图排第一，去重后展示；后端对历史数据已保证 images 是数组（可能为空） */
+/** 图集：主图排第一，去重后展示。演示数据 imageUrl 全 NULL，所以主图走 productImage 兜底。 */
 const images = computed(() => {
   const list = Array.isArray(product.value?.images)
     ? product.value.images.filter(Boolean)
     : []
-  const main = product.value?.imageUrl
+  const main = productImage(product.value)
   if (main && !list.includes(main)) {
     return [main, ...list]
   }
