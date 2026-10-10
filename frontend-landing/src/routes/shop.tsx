@@ -13,7 +13,8 @@ export const Route = createFileRoute('/shop')({ component: ShopPage })
  * **没有本地演示数据**：接口没通就明说没通，不摆一批编出来的商品名、价格和卖家。
  *
  * 注意：详情接口 GET /api/trade/products/{id} 不在后端白名单里（游客 401），
- * 所以「立即采购」跳平台公开列表页，而不是深链详情。
+ * 所以卡片不深链详情。「立即采购」按用户要求跳平台**登录页**（带 redirect
+ * 回货源列表）—— 下单本来就必须登录，把游客丢进列表页他也做不了什么。
  */
 
 type Card = {
@@ -49,7 +50,10 @@ function toCard(p: ApiProduct, i: number): Card {
     unit,
     cat: p.category || '其他',
     tag: p.stock ? `库存 ${p.stock}${unit}` : undefined,
-    href: platformUrl('/trade/products'),
+    // 2026-10-10：用户要求「点『立即采购』跳转到登录页」。
+    // 带上 redirect，登录后直接落在货源列表 —— 业务端 Login.vue 的 safeRedirect()
+    // 只认站内绝对路径（挡掉 //evil.com 这类协议相对地址），跨应用传 query 是安全的。
+    href: platformUrl('/login?redirect=/trade/products'),
   }
 }
 
@@ -205,7 +209,8 @@ function ShopPage() {
         )}
 
         <p className="mt-12 text-center text-xs text-white/30">
-          「立即采购」与「进入平台」跳转到平台业务界面（Vue 应用），下单、担保结算与物流跟踪在那里完成
+          「立即采购」先跳平台登录页（登录后落到平台货源列表）；「进入平台」直接进入平台业务界面，
+          下单、担保结算与物流跟踪在那里完成
           {state === 'ok' && ` · ${REMOTE_STATUS_TEXT[state]}`}
         </p>
       </main>
