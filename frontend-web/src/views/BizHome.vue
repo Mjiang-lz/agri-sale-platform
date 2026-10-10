@@ -334,8 +334,15 @@
                  1) 后端 avatarUrl 可用（avatarOk 记录成功加载）→ 用真实照片
                  2) 否则用按 expertId 生成的写实专家头像
                  3) 都失败 → 姓名首字兜底，不留碎图
-                 avatarUrl 目前多是死链（uploads/ 空目录 + 路径多一层 /api），
-                 所以生成头像兜底，数据库修好后 avatarUrl 会自动优先。 -->
+                 ★ 2026-10-10 实测更正（此前这里写成「uploads/ 空目录 + 路径多一层 /api」，两条都是错的）：
+                 - /api/files/** 就是正确路径。context-path=/api，资源处理器映射的是不含
+                   context-path 的 /files/**（FileStorageService.LOCAL_PATH_PATTERN），
+                   两者拼起来才是对外 URL。实测直连与走 Vite 代理都返回 200 + image/jpeg。
+                 - 真实上传的头像是能显示的：李官杏 2026-10-08 上传的 a6218....jpg
+                   在 disk 上真实存在（1.48MB），URL 可正常取图。
+                 - 死链只出现在 3 条**种子数据**上（王建国/张桂芳 2026-08-21、赵国强 2026-08-23），
+                   它们 update_time 停在 8 月、对应的文件从来没落过盘。
+                 所以这里按 id 逐个探测、失败才兜底，是给种子数据兜的，不是给上传流程兜的。 -->
             <div class="ec-avatar" :style="{ background: expertBg(e.expertId) }">
               <img
                 v-if="avatarOk[e.expertId] && e.avatarUrl"
@@ -630,10 +637,12 @@ const experts = ref([])
 /* 专家总数（全量）。首页「入驻专家 N 位」要报平台真实规模，
    而 experts 是截断过的列表（滑轨上限 12），拿它当分母会少报。 */
 const expertTotal = ref(0)
-/* 每位专家的头像是否可用。演示数据里 t_user.avatar_url 大多为 NULL，
-   且库里唯一那条指向的文件在磁盘上并不存在（uploads/ 是空目录），
+/* 每位专家的头像是否可用。死链来自**种子数据**：王建国/张桂芳/赵国强 三条
+   seed 行在 2026-08 就写好了 avatar_url，但对应文件从未落盘（uploads/ 里没有），
    所以「有 avatarUrl」不等于「图能显示」——必须按 id 单独记成功与否，
-   一张图失败不能连累其他专家。 */
+   一张图失败不能连累其他专家。
+   注意：真实上传的头像是好的（李官杏 2026-10-08 那张在磁盘上真实存在且可取图），
+   别再把这里的兜底误解成「上传流程坏了」。 */
 const avatarOk = reactive({})
 
 /* ---------------- 专家墙横向滑动轨道（2026-10-10） ----------------

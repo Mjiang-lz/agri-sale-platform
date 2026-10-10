@@ -132,7 +132,8 @@
                    ★ 用 el-avatar 而不是 el-image（2026-10-10 实测改）：el-image
                    图加载失败时会渲染 Element Plus 自带的「加载失败」占位（文案来自
                    locale 的 el.image.error），而**这里加载失败是正常情况** ——
-                   库里那 3 条种子 avatar_url 指向的文件根本不存在（uploads/ 是空目录），
+                   王建国/张桂芳/赵国强 这 3 条 seed 行的 avatar_url 是 2026-08 写死的，
+                   对应文件从未落盘（uploads/ 里没有它们，只有真实上传的文件）。
                    实测赵国强（专家）进本页就会看到一个「加载失败」红框。
                    el-avatar 则与上方第 76 行、顶栏 MainLayout.vue 完全一致：
                    图能加载就显示图，失败自动回退到昵称首字，不露报错文案。 -->
