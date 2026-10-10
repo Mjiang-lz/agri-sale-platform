@@ -41,8 +41,27 @@ public class Order implements Serializable {
     /** 下单时单价快照 */
     private BigDecimal unitPrice;
 
-    /** 订单金额 */
+    /** 订单金额 = unit_price × quantity */
     private BigDecimal orderAmount;
+
+    /**
+     * 收货人姓名（下单时快照）。
+     *
+     * <p>与 {@code unitPrice} 同一口径：快照而不是外键引用 t_address。
+     * 地址可被用户修改或删除，若订单只存 address_id，改一次地址会让全部历史订单
+     * 的收货信息跟着变 —— 历史订单必须保留「当时发到哪」这个事实。
+     * 本变更之前产生的历史订单这三项为 null。</p>
+     */
+    private String consignee;
+
+    /** 收货人手机号（下单时快照） */
+    private String consigneePhone;
+
+    /** 收货地址全文：省 + 市 + 区县 + 详细地址（下单时快照） */
+    private String receiverAddress;
+
+    /** 买家备注（如「工作日送达」），可选 */
+    private String orderRemark;
 
     /** 订单状态：待支付、待发货、待收货、已完成、已取消 */
     private String orderStatus;

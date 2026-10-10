@@ -37,6 +37,21 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem(ACTIVE_ROLE_KEY, role)
   }
 
+  /**
+   * 局部更新本地缓存的登录资料（只改本地，不回写后端）。
+   *
+   * 用途：个人中心改完昵称 / 头像后，顶栏那处「昵称」要立刻跟着变。
+   * profile 是**登录那一刻**的快照，不同步的话用户改完名字得重新登录
+   * 才看得到，会以为没保存成功。
+   *
+   * ⚠️ 只传后端确实改成功的字段 —— 前端不能抢在后端之前改写本地事实。
+   */
+  function setProfile(patch) {
+    if (!patch || typeof patch !== 'object') return
+    profile.value = { ...(profile.value || {}), ...patch }
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile.value))
+  }
+
   function saveLogin(data) {
     token.value = data.token
     setToken(data.token)
@@ -57,5 +72,5 @@ export const useUserStore = defineStore('user', () => {
     removeToken()
   }
 
-  return { token, profile, menuPerms, activeRole, setMenuPerms, setActiveRole, saveLogin, logout }
+  return { token, profile, menuPerms, activeRole, setMenuPerms, setActiveRole, setProfile, saveLogin, logout }
 })

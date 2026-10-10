@@ -1,12 +1,59 @@
 <template>
   <div class="profile-page">
     <!-- 页面用途：个人中心。查看并维护本人基本资料；农户角色额外维护经营档案。 -->
+
+    <!-- ================= 问候 + 待办 =================
+         这两块原来在业务端首页的头部。它们都是「我的东西」，
+         所以搬到个人中心，首页头部让给了平台资讯。
+         问候字号刻意压到 16px：下面 .page-head 的「个人信息」是 24px 主标题，
+         这里再放一个同级标题会让两层标题打架。 -->
+    <div class="todo-head">
+      <div class="th-left">
+        <h2 class="th-greet">{{ greeting }}</h2>
+        <!-- 身份展示（2026-10-10 从顶栏挪过来）：
+             原来「当前身份：农户」和昵称挤在顶栏右侧同一个位置，
+             现在顶栏只放昵称，身份归位到「我的资料」这一页。
+             标签配色复用页面内 roleTagType()，与下方基本信息里的
+             「登录角色」保持一致；旁边那行只在**切过视角**时才出现，
+             没切过就显示出来只是把同一件事说了两遍。 -->
+        <div class="th-role">
+          <el-tag :type="roleTagType(actualRole)" effect="light" size="small" round>
+            {{ actualRole || '未同步' }}
+          </el-tag>
+          <span v-if="viewRole" class="th-view">当前视角：{{ viewRole }}</span>
+        </div>
+      </div>
+      <el-popover placement="bottom-end" :width="360" trigger="click">
+        <template #reference>
+          <button type="button" class="todo-pill" :class="{ 'is-zero': todoTotal === 0 }">
+            <span class="todo-num">{{ todoTotal }}</span>
+            <span class="todo-label">件待办</span>
+          </button>
+        </template>
+        <div class="todo-panel">
+          <h4>待你处理</h4>
+          <ul v-if="todos.length">
+            <li v-for="t in todos" :key="t.text" @click="go(t.path)">
+              <span class="td-label">{{ t.label }}</span>
+              <span class="td-text">{{ t.text }}</span>
+              <span class="td-arrow">→</span>
+            </li>
+          </ul>
+          <p v-else class="todo-clear">当前没有待处理事项</p>
+        </div>
+      </el-popover>
+    </div>
+
     <div class="page-head">
       <div>
         <h2>个人信息</h2>
         <p>维护本人昵称与头像；农户角色可在此维护经营档案，档案将作为融资智能匹配的输入特征。</p>
       </div>
       <div class="head-actions">
+        <!-- 收货地址入口：顶部导航的「个人中心」子菜单里也有一个，
+             这里再放一个是给「刚在个人中心看完资料、顺手去改地址」这条路径用的。
+             地址数据本身不在这页编辑，所以是跳转而不是就地展开。 -->
+        <el-button @click="go('/user/address')">收货地址</el-button>
         <el-button :loading="loading" @click="loadProfile">重新加载</el-button>
       </div>
     </div>
@@ -81,8 +128,20 @@
               >
                 移除
               </el-button>
-              <!-- 上传成功后立刻回显，让用户确认存的是哪张图，不必等保存基本信息 -->
-              <el-image v-if="avatarPreview" class="avatar-preview" :src="avatarPreview" fit="cover" />
+              <!-- 上传成功后立刻回显，让用户确认存的是哪张图，不必等保存基本信息。
+                   ★ 用 el-avatar 而不是 el-image（2026-10-10 实测改）：el-image
+                   图加载失败时会渲染 Element Plus 自带的「加载失败」占位（文案来自
+                   locale 的 el.image.error），而**这里加载失败是正常情况** ——
+                   库里那 3 条种子 avatar_url 指向的文件根本不存在（uploads/ 是空目录），
+                   实测赵国强（专家）进本页就会看到一个「加载失败」红框。
+                   el-avatar 则与上方第 76 行、顶栏 MainLayout.vue 完全一致：
+                   图能加载就显示图，失败自动回退到昵称首字，不露报错文案。 -->
+              <el-avatar
+                v-if="avatarPreview"
+                :size="56"
+                :src="avatarPreview"
+                class="avatar-preview"
+              >{{ nameInitial }}</el-avatar>
             </div>
             <div class="field-tip">
               支持 JPG / PNG / GIF / WEBP，不超过 5MB。未上传时显示昵称首字。
@@ -171,8 +230,12 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import request from '@/api/request'
+import { useUserStore } from '@/store/user'
 import { getProfile, updateProfile, updateFarmerProfile } from '@/api/user'
 import { checkImageFile, uploadAvatar } from '@/api/common'
+import { APPLY_STATUS, isPendingApply } from '@/constants/finance'
 
 /**
  * 页面用途：个人中心（对应《软件需求规格说明书》2.8 个人信息 - 基本信息管理 / 农户经营档案）。
@@ -185,6 +248,135 @@ import { checkImageFile, uploadAvatar } from '@/api/common'
  * 按项目约定：本页只展示真实接口结果，不做演示数据回退 —— 个人资料与登录者绑定，
  * 回退到假数据没有意义，反而会掩盖接口故障。
  */
+/* ====================================================================
+ * 问候 + 待办（从业务端首页搬过来）
+ *
+ * 权限口径与首页、MainLayout 的 menuPerms 完全一致：
+ * 没有 trade 权限就不去拉订单接口，没有 finance 权限就不去拉融资接口，
+ * 避免无权限角色每次进个人中心都收到一串 403。
+ * ==================================================================== */
+const router = useRouter()
+const userStore = useUserStore()
+
+const actualRole = computed(() => userStore.profile?.roleName || '')
+
+// 顶栏不再显示身份之后，这一页要负责说清「我现在以什么身份在操作」。
+// 农户/采购方可以在顶栏切视角，切过之后 activeRole 就与登录角色不一致 ——
+// 只有这种情况才提示，没切过时显示「当前视角：农户」等于把同一件事说两遍。
+const viewRole = computed(() => {
+  const v = userStore.activeRole
+  return v && v !== actualRole.value ? v : ''
+})
+const menuPerms = computed(() => String(userStore.menuPerms || '').split(',').filter(Boolean))
+const can = (k) => menuPerms.value.includes(k)
+const showTrade = computed(() => can('trade'))
+const showFinance = computed(() => can('finance'))
+const showBankReview = computed(() => actualRole.value === '银行用户')
+
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  const period = h < 6 ? '凌晨好' : h < 12 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好'
+  // 用登录返回的 realName 而不是本页的 profile：本页的 profile 是异步拉的，
+  // 首帧还没有值，名字会闪一下。
+  const name = userStore.profile?.realName || ''
+  return name ? `${period}，${name}` : period
+})
+
+const buyOrders = ref([])
+const soldOrders = ref([])
+const applies = ref([])
+const bankApplies = ref([])
+
+/** 待办清单：只统计「现在需要我动手」的，不把"已被驳回"这类历史也算成待办 */
+const todos = computed(() => {
+  const list = []
+  if (showFinance.value) {
+    const source = showBankReview.value ? bankApplies.value : applies.value
+    // ⚠️ 银行侧待办只有一种状态：「已推送银行」。
+    // 原来这里统一用 /待|审批中|审核中/ 匹配 —— 「已推送银行」四个字里
+    // **没有「待」字**，所以银行用户的「待审批」永远算出来是 0，
+    // 待办清单上一条都不显示。银行视角必须走 isPendingApply()。
+    // 农户视角则相反，在途状态较多（待匹配 / 已组建小组 / 已推送银行），
+    // 保留原来的宽口径匹配。
+    const pending = showBankReview.value
+      ? source.filter((a) => isPendingApply(a.applyStatus))
+      : source.filter((a) => /待|审批中|审核中/.test(a.applyStatus || ''))
+    if (pending.length) {
+      list.push({
+        label: '融资申请',
+        text: showBankReview.value
+          ? `${pending.length} 笔申请待审批`
+          : `${pending.length} 笔申请处理中`,
+        path: showBankReview.value ? '/finance/bank-review' : '/finance/my'
+      })
+    }
+    const rejected = source.filter((a) => a.applyStatus === APPLY_STATUS.REJECTED)
+    if (rejected.length) {
+      list.push({
+        label: '融资申请',
+        // 银行是出结论的一方，说「被驳回」语义反了
+        text: showBankReview.value
+          ? `${rejected.length} 笔已给出「不通过」结论`
+          : `${rejected.length} 笔被驳回，可查看原因`,
+        path: showBankReview.value ? '/finance/bank-review' : '/finance/my'
+      })
+    }
+  }
+  if (showTrade.value) {
+    const toDeliver = [...buyOrders.value, ...soldOrders.value]
+      .filter((o) => /待发货|待支付|待收货/.test(o.orderStatus || o.status || ''))
+    if (toDeliver.length) {
+      list.push({ label: '订单', text: `${toDeliver.length} 笔订单待处理`, path: '/trade/orders' })
+    }
+  }
+  return list
+})
+const todoTotal = computed(() => todos.value.length)
+
+function go(p) {
+  if (p) router.push(p)
+}
+
+function listOf(d) {
+  return Array.isArray(d) ? d : (d?.records || d?.list || [])
+}
+
+async function loadTodos() {
+  const jobs = []
+  if (showTrade.value) {
+    jobs.push(
+      request.get('/trade/order/list', { params: { pageNum: 1, pageSize: 5 }, silent: true })
+        .then((d) => { buyOrders.value = listOf(d) }).catch(() => { buyOrders.value = [] })
+    )
+    jobs.push(
+      request.get('/trade/order/sold', { params: { pageNum: 1, pageSize: 5 }, silent: true })
+        .then((d) => { soldOrders.value = listOf(d) }).catch(() => { soldOrders.value = [] })
+    )
+  }
+  if (showFinance.value) {
+    // 银行用户要「别人提交的申请」，农户要「自己提交的申请」——同一模块两个视角。
+    // ⚠️ 银行侧原来是 '/loan/applies'，后端**没有这个路径**（真实的是
+    // /loan-admin/applies），404 被 catch 吞掉后待办恒为 0。
+    // 该接口返回的是数组且只认 status 参数，pageNum/pageSize 会被后端忽略，
+    // 保留只是为了和下面农户分支的写法一致。
+    const ep = showBankReview.value ? '/loan-admin/applies' : '/finance/apply/my'
+    jobs.push(
+      request.get(ep, { params: { pageNum: 1, pageSize: 5 }, silent: true })
+        .then((d) => {
+          if (showBankReview.value) bankApplies.value = listOf(d)
+          else applies.value = listOf(d)
+        })
+        .catch(() => {
+          if (showBankReview.value) bankApplies.value = []
+          else applies.value = []
+        })
+    )
+  }
+  // 待办拉取失败不能影响个人资料本身的展示，所以这里吞掉异常，
+  // 由 request 拦截器负责提示；页面照常显示「0 件待办」。
+  await Promise.all(jobs)
+}
+
 const loading = ref(false)
 const profile = ref(null)
 const savingBase = ref(false)
@@ -336,6 +528,12 @@ async function saveBase() {
     if (baseForm.avatarUrl !== baseSnapshot.value.avatarUrl) payload.avatarUrl = baseForm.avatarUrl.trim()
 
     await updateProfile(payload)
+    // 同步本地登录态：顶栏那处「昵称」读的就是这份缓存（store/user.js 的 profile），
+    // 不更新的话改完名字顶栏还显示旧的，得重新登录才变 —— 用户会以为没保存成功
+    userStore.setProfile({
+      realName: baseForm.realName.trim(),
+      avatarUrl: baseForm.avatarUrl.trim()
+    })
     ElMessage.success('基本信息已保存')
     await loadProfile()
   } catch {
@@ -375,10 +573,59 @@ function resetFarmerForm() {
   farmerFormRef.value?.clearValidate()
 }
 
-onMounted(loadProfile)
+onMounted(() => {
+  loadProfile()
+  loadTodos()
+})
 </script>
 
 <style scoped>
+/* ---------- 问候 + 待办（从首页搬过来） ---------- */
+.todo-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px; margin-bottom: 12px;
+}
+/* 左侧从「单行问候」变成「问候 + 身份」两行；右侧待办胶囊仍垂直居中 */
+.th-left { display: flex; flex-direction: column; gap: 6px; }
+.th-greet {
+  margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4;
+  color: var(--rxt-primary);
+}
+.th-role { display: flex; align-items: center; gap: 8px; }
+.th-view { font-size: 12px; color: var(--el-text-color-secondary); }
+.todo-pill {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid var(--rxt-border);
+  border-radius: var(--rxt-radius-pill);
+  background: var(--el-color-primary-light-9);
+  font-family: inherit; cursor: pointer;
+  transition: border-color 0.2s;
+}
+.todo-pill:hover { border-color: var(--rxt-primary); }
+.todo-pill.is-zero { background: transparent; }
+.todo-num {
+  font-size: 20px; font-weight: 600; line-height: 1;
+  color: var(--rxt-primary); font-variant-numeric: tabular-nums;
+}
+.todo-pill.is-zero .todo-num { color: var(--el-text-color-placeholder); }
+.todo-label { font-size: 14px; color: var(--el-text-color-secondary); }
+
+.todo-panel h4 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+.todo-panel ul { margin: 0; padding: 0; list-style: none; }
+.todo-panel li {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+  padding: 11px 4px; border-top: 1px solid var(--el-border-color-lighter); cursor: pointer;
+}
+.todo-panel li:hover .td-arrow { transform: translateX(3px); }
+.td-label {
+  padding: 2px 8px; border-radius: 4px;
+  background: var(--el-color-primary-light-9); color: var(--rxt-primary-deep); font-size: 12px;
+}
+.td-text { font-size: 14px; color: var(--el-text-color-primary); }
+.td-arrow { color: var(--rxt-primary); transition: transform 0.2s; }
+.todo-clear { margin: 0; font-size: 14px; color: var(--el-text-color-secondary); }
+
 .loading-block { padding: 24px; border-radius: 14px; background: #fff; }
 .section-card { margin-bottom: 18px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-weight: 600; }

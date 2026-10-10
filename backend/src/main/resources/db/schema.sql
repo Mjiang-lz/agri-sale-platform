@@ -178,6 +178,11 @@ CREATE TABLE `t_cart` (
 -- 表 3-7　t_order 订单表（对应 REQ-03）
 -- 说明：unit_price 采用下单时快照而非实时读取商品表，保证历史订单金额不受调价影响；
 --       order_amount 由服务端计算，不接受前端传入，从设计上杜绝金额篡改。
+--       收货信息（consignee / consignee_phone / receiver_address）同样是**下单时快照**，
+--       与 unit_price 一个口径：地址可被用户随时修改或删除，若订单只存 address_id，
+--       改一次地址会让全部历史订单的收货信息跟着变，那就不叫历史了。
+--       因此这四列故意与 t_address 冗余，不建外键。详见
+--       migrations/2026-10-10_01_address_and_order_snapshot.sql。
 DROP TABLE IF EXISTS `t_order`;
 CREATE TABLE `t_order` (
   `order_id`     BIGINT        NOT NULL AUTO_INCREMENT             COMMENT '订单主键',
@@ -188,6 +193,10 @@ CREATE TABLE `t_order` (
   `quantity`     INT           NOT NULL                            COMMENT '购买数量',
   `unit_price`   DECIMAL(12,2) NOT NULL                            COMMENT '下单时单价快照',
   `order_amount` DECIMAL(12,2) NOT NULL                            COMMENT '订单金额 = unit_price × quantity，与订单明细完全一致',
+  `consignee`        VARCHAR(50)  NULL                             COMMENT '收货人姓名（下单时快照）',
+  `consignee_phone`  VARCHAR(20)  NULL                             COMMENT '收货人手机号（下单时快照）',
+  `receiver_address` VARCHAR(300) NULL                             COMMENT '收货地址全文（下单时快照）',
+  `order_remark`     VARCHAR(200) NULL                             COMMENT '买家备注',
   `order_status` VARCHAR(20)   NOT NULL                            COMMENT '订单状态：待支付、待发货、待收货、已完成、已取消',
   `pay_time`     DATETIME          NULL                            COMMENT '支付成功时间',
   `deliver_time` DATETIME          NULL                            COMMENT '发货时间',
@@ -488,6 +497,37 @@ CREATE TABLE `t_appointment` (
   COLLATE = utf8mb4_general_ci COMMENT = '专家预约';
 
 -- ===========================================================================
+-- 表 3-19　t_address 收货地址表（对应 REQ-07 下单结算）
+-- 说明：本表晚于《概要设计说明书》3.3 的 18 张表，是 2026-10-10 补的。
+--       起因：结算链路原本只有 POST /api/trade/order {productId, quantity}，
+--       订单里没有任何收货信息，农户发货时拿不到收件人与地址。
+-- 与 t_order 的关系：t_order 存的是**快照**（consignee / consignee_phone /
+--       receiver_address），不指向本表主键 —— 理由见 t_order 上方注释。
+--       is_default「同一用户最多一条 1」由应用层保证，不写 CHECK：
+--       MySQL 5.7 与 8.0.12 都只解析不执行 CHECK（见本文件头部说明）。
+-- ===========================================================================
+DROP TABLE IF EXISTS `t_address`;
+CREATE TABLE `t_address` (
+  `address_id`  BIGINT       NOT NULL AUTO_INCREMENT             COMMENT '地址主键',
+  `user_id`     BIGINT       NOT NULL                            COMMENT '所属用户',
+  `consignee`   VARCHAR(50)  NOT NULL                            COMMENT '收货人姓名',
+  `phone`       VARCHAR(20)  NOT NULL                            COMMENT '收货人手机号',
+  `province`    VARCHAR(50)  NOT NULL                            COMMENT '省 / 直辖市',
+  `city`        VARCHAR(50)  NOT NULL                            COMMENT '市',
+  `district`    VARCHAR(50)      NULL                            COMMENT '区 / 县',
+  `detail`      VARCHAR(200) NOT NULL                            COMMENT '详细地址（街道门牌）',
+  `is_default`  TINYINT      NOT NULL DEFAULT 0                  COMMENT '是否默认地址：1 是，0 否',
+  `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间',
+  `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`address_id`),
+  -- 我的地址列表（按用户取全部，默认地址单独筛）
+  KEY `idx_address_user` (`user_id`)
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci COMMENT = '收货地址';
+
+-- ===========================================================================
 -- 五、外键约束
 -- 说明：统一在建表完成后添加，避免建表顺序依赖；不引入级联删除（见 3.1 第 8 条）。
 --       多态关联字段（t_audit.target_id、t_comment.target_id）按设计不建外键。
@@ -513,6 +553,8 @@ ALTER TABLE `t_demand`
     ADD CONSTRAINT `fk_demand_publisher_id` FOREIGN KEY (`publisher_id`) REFERENCES `t_user` (`user_id`);
 ALTER TABLE `t_comment`
     ADD CONSTRAINT `fk_comment_user_id` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_address`
+    ADD CONSTRAINT `fk_address_user` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`user_id`);
 
 -- 融资域
 ALTER TABLE `t_loan_group`

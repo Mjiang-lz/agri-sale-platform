@@ -73,9 +73,9 @@
       <el-row :gutter="16">
         <el-col v-for="p in products" :key="p.productId" :xs="24" :sm="12" :md="8" :lg="6">
           <el-card shadow="hover" class="goods-card" @click="goDetail(p)">
-            <div class="goods-cover" :class="coverClass(p.category)">
-              <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.productName" />
-              <span v-else class="cover-text">{{ (p.productName || '农产').slice(0, 2) }}</span>
+            <div class="goods-cover" :class="coverClass(p.category)" :style="{ background: productFallbackBg(p) }">
+              <span class="cover-text">{{ productFallbackText(p) }}</span>
+              <img :src="productImage(p)" :alt="p.productName" loading="lazy" @error="onImgError" />
               <el-tag v-if="p.status !== 1" class="cover-tag" type="info" size="small">已下架</el-tag>
             </div>
             <div class="goods-body">
@@ -124,6 +124,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getTradeProducts } from '@/api/trade'
+import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
 
 /**
  * 页面用途：商品货源列表（公开接口，游客可访问）。
@@ -169,6 +170,11 @@ const hasFilter = computed(() =>
 const emptyText = computed(() =>
   hasFilter.value ? '没有符合条件的商品，试试放宽筛选条件' : '暂无在架商品'
 )
+
+/** 图片 404 时隐藏 img，露出下层的首字底色，避免碎图 */
+function onImgError(e) {
+  e.target.style.opacity = '0'
+}
 
 /** 价格格式化：后端 BigDecimal 序列化成 number，这里兜住非数值情况 */
 function formatPrice(value) {
@@ -279,11 +285,15 @@ onMounted(loadProducts)
 }
 .goods-cover img { width: 100%; height: 100%; object-fit: cover; }
 .cover-text {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
   font-size: 34px;
   font-weight: 700;
-  color: rgba(255, 255, 255, .85);
+  color: rgba(20, 48, 43, 0.22);
   letter-spacing: 2px;
+  z-index: 0;
 }
+.goods-cover img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
 .cover-tag { position: absolute; top: 8px; right: 8px; }
 
 .g-green  { background: linear-gradient(135deg, #2d7a4c, #73b586); }

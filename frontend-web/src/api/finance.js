@@ -44,3 +44,49 @@ export function getMyFinanceApplies(pageNum = 1, pageSize = 100) {
     params: { pageNum, pageSize }
   })
 }
+
+/* ====================================================================
+ * 融资管理（银行侧）
+ *
+ * 后端是独立的 LoanAdminController，基础路径 /api/loan-admin ——
+ * 注意不是 /api/finance 下面的子路径，两者是并列的模块：
+ *   · /finance/*     申请人视角（农户提交、农户看自己的进度）
+ *   · /loan-admin/*  银行审批视角（看别人提交的、给出结论）
+ * 分成两个模块是有意的：银行用户「看自己的申请」永远是空的，
+ * 与农户共用一套接口会让权限判断和返回字段都变得含糊。
+ *
+ * 本组接口只对「银行用户」角色开放，其他角色调用会拿到
+ * HTTP 200 + body code 403（后端在 Service 层 requireRole(BANK)）。
+ * ==================================================================== */
+
+/**
+ * 查询已推送至银行侧的融资申请。
+ *
+ * ⚠️ 返回的是**数组**，不是 MyBatis-Plus 的分页对象 ——
+ * 银行侧待办天然量少，后端没做分页，前端不要按 records/total 去读。
+ *
+ * @param {string} [status] 按申请状态筛选。不传即返回全部已推送的申请
+ *        （含已出结论的）。注意后端筛选前会先按 push_time 非空过滤，
+ *        所以「待匹配 / 已组建小组」这些还没推给银行的申请永远不出现。
+ */
+export function getBankApplies(status) {
+  return request.get('/loan-admin/applies', {
+    params: status ? { status } : {}
+  })
+}
+
+/**
+ * 提交审批结论。请求体对应 LoanApproveDTO：
+ *   { approvalResult: '通过' | '不通过', loanAmount?, approvalOpinion? }
+ *
+ * 「通过时放款金额必填、不通过时审批意见必填」这两条由后端校验，
+ * 前端做表单校验只是为了提前给反馈，不是安全边界 ——
+ * 放款金额还额外限制「不得超过申请额度」，那条只在后端。
+ *
+ * ⚠️ 同一笔申请只能审批一次：后端只允许对状态仍为「已推送银行」的申请出结论，
+ * 重复提交会报「该申请当前状态为「审批通过」，不可审批」。
+ * 所以提交成功后必须重新拉列表，不能只改本地那一行。
+ */
+export function approveBankApply(applyId, payload) {
+  return request.post(`/loan-admin/applies/${applyId}/approve`, payload)
+}

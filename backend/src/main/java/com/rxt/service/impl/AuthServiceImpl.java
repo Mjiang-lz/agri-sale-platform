@@ -83,6 +83,9 @@ public class AuthServiceImpl implements AuthService {
         // 菜单权限随登录响应一起下发，前端据此渲染侧边栏，
         // 实现「不同角色看到的菜单不同」；权限判定仍以后端服务层为准。
         vo.setMenuPerms(role.getMenuPerms());
+        // 头像随登录一起下发。漏掉它的话，前端 saveLogin 用登录响应覆盖本地 profile 时
+        // 会把刚保存的头像地址冲成 undefined，顶栏（读 profile.avatarUrl）就永远显示首字。
+        vo.setAvatarUrl(user.getAvatarUrl());
 
         log.info("登录成功 userId={} phone={} role={}", user.getUserId(), user.getPhone(), role.getRoleName());
         return vo;
