@@ -10,6 +10,20 @@
  */
 const TOKEN_KEY = 'rxt_admin_token'
 
+/**
+ * 当前登录者的**角色名**。
+ *
+ * 为什么角色也要落盘：路由守卫在**整页刷新**之后仍要能判断「是不是管理员」，
+ * 而 pinia 里的 profile 是内存态、刷新即丢。只存 token 的话，刷新页面时
+ * 守卫无从判断角色，就只能放行 —— 那等于这道闸门不存在。
+ *
+ * ★ 这一层是**体验闸**，不是安全边界：localStorage 用户可手改。
+ * 真正的边界在后端 —— `/api/admin/**` 的服务层已统一 `requireAdmin()`
+ * （实测：农户 / 采购方 / 专家 / 银行用户打这四个接口全部返回 `code:403`）。
+ * 手改这里最多得到一个「处处 403 的空壳」。
+ */
+const ROLE_KEY = 'rxt_admin_role'
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -18,6 +32,24 @@ export function setToken(token) {
   localStorage.setItem(TOKEN_KEY, token)
 }
 
+/**
+ * 清登录态。
+ * **角色一并清掉**：只清 token 会留下「已经登出、但仍被判为管理员」的脏状态，
+ * 下次带着别的角色进后台时守卫会误放行。
+ */
 export function removeToken() {
   localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(ROLE_KEY)
+}
+
+export function getRole() {
+  return localStorage.getItem(ROLE_KEY)
+}
+
+export function setRole(role) {
+  if (role) {
+    localStorage.setItem(ROLE_KEY, role)
+  } else {
+    localStorage.removeItem(ROLE_KEY)
+  }
 }
