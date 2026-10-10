@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>收货地址</h2>
-        <p>管理常用的收货地址。结算时会在这些地址里选一条，农户按它发货；设为默认的那条会被优先选中。</p>
+        <p>管理常用的收货地址。结算时会在这些地址里选一条，农户按它发货；设为默认的那条会被优先选中</p>
       </div>
       <div class="head-actions">
         <el-button :loading="loading" @click="loadList">刷新</el-button>

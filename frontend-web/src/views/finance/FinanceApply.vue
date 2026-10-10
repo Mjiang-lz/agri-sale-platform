@@ -4,7 +4,7 @@
     <div class="page-head">
       <div>
         <h2>融资申请</h2>
-        <p>选择贷款产品，填写额度、期限和资金用途。提交后系统将推荐经营特征相近的联保候选人。</p>
+        <p>选择贷款产品，填写额度、期限和资金用途。提交后系统将推荐经营特征相近的联保候选人</p>
       </div>
       <div class="head-tags">
         <el-tag v-if="demoMode" type="warning" effect="dark">演示数据</el-tag>

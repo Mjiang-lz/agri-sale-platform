@@ -4,7 +4,7 @@
     <div class="page-head">
       <div>
         <h2>我的融资</h2>
-        <p>查看融资申请、联合小组、银行审批和放款进度。点击“查看进度”可展开完整时间轴。</p>
+        <p>查看融资申请、联合小组、银行审批和放款进度。点击“查看进度”可展开完整时间轴</p>
       </div>
       <div class="head-actions">
         <el-tag v-if="demoMode" type="warning" effect="dark">演示数据</el-tag>

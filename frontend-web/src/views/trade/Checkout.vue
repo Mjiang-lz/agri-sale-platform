@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>确认订单</h2>
-        <p>选择收货地址、核对商品与数量后提交。提交后订单为「待支付」，货款与发货由买卖双方在订单列表里继续流转。</p>
+        <p>选择收货地址、核对商品与数量后提交。提交后订单为「待支付」，货款与发货由买卖双方在订单列表里继续流转</p>
       </div>
       <div class="head-actions">
         <el-button @click="goCart">返回购物车</el-button>

@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>购物车</h2>
-        <p>调整购买数量、移除条目，确认后逐条生成订单。</p>
+        <p>调整购买数量、移除条目，确认后逐条生成订单</p>
       </div>
       <div class="head-actions">
         <el-button :loading="loading" @click="loadCart">刷新</el-button>
