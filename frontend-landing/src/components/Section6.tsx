@@ -31,8 +31,10 @@ export function Section6() {
   const listEmptyText =
     state === "error" ? "平台接口暂不可用，知识条目未加载" : "平台当前暂无已发布的农业知识";
 
+  // id="news" —— Hero 顶部导航「资讯中心」的锚点。2026-10-10 补。
+  // ⚠️ 注释写在 return 之外：放进 return 内且与根元素并列会让 JSX 有两个顶层节点，整页 500。
   return (
-    <section className="relative z-40 w-full min-h-screen bg-[#1b1b1b] overflow-hidden font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
+    <section id="news" className="relative z-40 w-full min-h-screen bg-[#1b1b1b] overflow-hidden font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
       <div className="grid grid-cols-1 lg:grid-cols-2 w-full h-full">
         {/* LEFT */}
         <div className="relative col-span-1 w-full h-full flex flex-col justify-start items-center lg:items-start pt-20 pb-20 px-10 lg:pt-[140px] lg:pb-[140px] lg:px-[125px]">

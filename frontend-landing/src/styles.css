@@ -86,3 +86,27 @@ img {
 :lang(zh), [lang="zh"] {
   line-height: 1.55;
 }
+
+/* ------------------------------------------------------------------
+ * 页内锚点平滑滚动
+ *
+ * Hero 顶部导航三项（平台能力 / 解决方案 / 资讯中心）走的是纯 <a href="#...">，
+ * 浏览器默认行为是「瞬间跳过去」，在这么长的页面（约 6300px）上会让人
+ * 一下失去位置感。开 scroll-behavior 后改由浏览器平滑滚过去，零 JS。
+ * 对应区块的 id 由 Section3 / Section4 / Section6 挂上。
+ *
+ * 不需要给 section 加 scroll-margin-top：这一页的头部（Hero 里的 header）
+ * 是普通流内元素，不是 fixed/sticky，滚动时不会遮住目标区块的顶部。
+ * ⚠️ 若将来把头部改成 sticky，必须同时给 [id] 补 scroll-margin-top，
+ *    否则锚点会把区块标题顶到头部底下藏起来。
+ * ------------------------------------------------------------------ */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 尊重用户的「减少动态效果」设置：前庭功能障碍者看平滑滚动会不适 */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
