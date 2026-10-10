@@ -10,21 +10,32 @@ const routes = [
     component: () => import('@/views/layout/MainLayout.vue'),
     redirect: '/home',
     children: [
-      { path: 'home', component: () => import('@/views/Home.vue'), meta: { title: '首页' } },
+      { path: 'home', component: () => import('@/views/BizHome.vue'), meta: { title: '首页' } },
       // 商品货源与商品详情对游客开放（LX-4 ③ 的裁决）：后端这两个接口本来就在
       // PublicEndpoints 白名单里，前端却由全局守卫一律打回登录页，
       // 结果是「游客能调接口、却看不到页面」。路由 meta.public 与白名单保持一致。
       { path: 'trade/products', component: () => import('@/views/trade/ProductList.vue'), meta: { title: '商品货源', public: true } },
       { path: 'trade/product/:id', component: () => import('@/views/trade/ProductDetail.vue'), meta: { title: '商品详情', public: true } },
       { path: 'trade/demand', component: () => import('@/views/trade/DemandList.vue'), meta: { title: '求购需求' } },
+      // 我的商品：农户发布与上下架的入口。
+      // 后端 /trade/my-products 等四个接口早在骨架期就实现了，前端一直缺这一页，
+      // 于是「农户登录后没有任何入口发布自己的农产品」——供给侧闭环是断的。
+      { path: 'trade/my-products', component: () => import('@/views/trade/MyProducts.vue'), meta: { title: '我的商品' } },
       { path: 'trade/cart', component: () => import('@/views/trade/Cart.vue'), meta: { title: '购物车' } },
+      // 结算确认页。购物车点「结算」跳这里 —— 下单必须带收货地址，
+      // 所以地址选择与商品核对得有独立页面，弹窗里塞不下。
+      { path: 'trade/checkout', component: () => import('@/views/trade/Checkout.vue'), meta: { title: '确认订单' } },
       { path: 'trade/orders', component: () => import('@/views/trade/OrderList.vue'), meta: { title: '我的订单' } },
       { path: 'finance/apply', component: () => import('@/views/finance/FinanceApply.vue'), meta: { title: '融资申请' } },
       { path: 'finance/my', component: () => import('@/views/finance/MyApplies.vue'), meta: { title: '我的融资' } },
+      // 融资审批（银行用户视角）。与上面的「我的融资」是两个模块：
+      // /finance/* 是申请人看自己的，/loan-admin/* 是银行看别人提交的。
+      { path: 'finance/bank-review', component: () => import('@/views/finance/BankReview.vue'), meta: { title: '融资审批' } },
       { path: 'expert/knowledge', component: () => import('@/views/expert/Knowledge.vue'), meta: { title: '农业知识' } },
       { path: 'expert/qa', component: () => import('@/views/expert/Qa.vue'), meta: { title: '专家问答' } },
       { path: 'expert/appointment', component: () => import('@/views/expert/Appointment.vue'), meta: { title: '专家预约' } },
-      { path: 'user/profile', component: () => import('@/views/user/Profile.vue'), meta: { title: '个人中心' } }
+      { path: 'user/profile', component: () => import('@/views/user/Profile.vue'), meta: { title: '个人中心' } },
+      { path: 'user/address', component: () => import('@/views/user/Address.vue'), meta: { title: '收货地址' } }
     ]
   }
 ]
@@ -63,7 +74,15 @@ router.beforeEach(async (to) => {
   if (!getToken()) return toLogin(to)
 
   const userStore = useUserStore()
-  if (!userStore.menuPerms && !hydrateSettled) {
+  // 需要补拉的两种情况：
+  //   1) 缺 menuPerms —— 老会话（rxt_user_profile 是后加的），菜单会只剩「首页」；
+  //   2) profile 里**没有 avatarUrl 这个字段** —— 登录接口（LoginVO）此前不下发头像，
+  //      导致 saveLogin 用登录响应整体覆盖 profile 时把头像地址冲掉，顶栏永远显示首字。
+  //      补一次 getProfile() 就回来了（UserVO 是带 avatarUrl 的）。
+  // ⚠️ 用 `=== undefined` 而不是 falsy 判断：avatarUrl 合法地可以是 null（从没设过头像），
+  //    那种情况下不该每次导航都去打接口。
+  const needHydrate = !userStore.menuPerms || userStore.profile?.avatarUrl === undefined
+  if (needHydrate && !hydrateSettled) {
     try {
       // 用动态 import 而不是文件顶部的静态 import：api/request.js 里有
       // `import router from '@/router'`，顶部引入 api/user 会让 router ↔ request 形成模块环，
