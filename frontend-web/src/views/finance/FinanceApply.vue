@@ -87,7 +87,7 @@
                 :auto-upload="false"
                 :limit="5"
                 accept=".pdf,.jpg,.jpeg,.png"
-                on-exceed="handleFileExceed"
+                :on-exceed="handleFileExceed"
               >
                 <el-button>选择资料</el-button>
                 <template #tip>
