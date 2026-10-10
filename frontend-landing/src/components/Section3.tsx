@@ -8,8 +8,12 @@ const items = [
 ];
 
 export function Section3() {
+  // id="capability" —— Hero 顶部导航「平台能力」的锚点。
+  // 2026-10-10 补：此前这个 id 谁也没挂，锚点 href 写了却点了页面不动。
+  // ⚠️ 注释必须写在 return 之外：写成 `return ({/* ... */} <section>)`
+  //    会变成两个相邻的顶层节点，JSX 不允许，整页 500。
   return (
-    <section className="relative w-full overflow-hidden bg-[#1b1b1b] px-5 py-20 font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif] text-white lg:px-10 lg:py-32">
+    <section id="capability" className="relative w-full overflow-hidden bg-[#1b1b1b] px-5 py-20 font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif] text-white lg:px-10 lg:py-32">
       <div className="grid w-full grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-10">
         {/* LEFT — 4 cols */}
         <div className="col-span-1 lg:col-span-4">

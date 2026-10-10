@@ -64,8 +64,10 @@ export function Section4() {
   const { data: products, state } = useRemote(() => fetchHotProducts(1), [] as ApiProduct[]);
   const product = products[0];
 
+  // id="solution" —— Hero 顶部导航「解决方案」的锚点。2026-10-10 补。
+  // ⚠️ 注释写在 return 之外：放进 return 内且与根元素并列会让 JSX 有两个顶层节点，整页 500。
   return (
-    <section className="w-full min-h-[90vh] bg-[#1b1b1b] text-white px-5 py-12 lg:px-10 lg:py-20 flex flex-col overflow-hidden font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
+    <section id="solution" className="w-full min-h-[90vh] bg-[#1b1b1b] text-white px-5 py-12 lg:px-10 lg:py-20 flex flex-col overflow-hidden font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
       {/* Top Tabs —— 点击切换 */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap w-full gap-3 lg:gap-5 mb-8 lg:mb-10">
         {TABS.map((t, index) => (

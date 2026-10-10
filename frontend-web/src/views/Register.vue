@@ -14,8 +14,7 @@
     loading + try/finally、登录/注册互跳。
   -->
   <AuthShell>
-    <h1 class="auth-title">注册融销通账号</h1>
-    <p class="auth-sub">按真实身份注册，平台会据此分配可见的功能菜单。</p>
+    <h1 class="auth-title auth-title-solo">注册融销通账号</h1>
 
     <el-form
       ref="formRef"

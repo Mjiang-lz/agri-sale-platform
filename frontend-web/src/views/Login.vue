@@ -10,10 +10,15 @@
 
     改版后：外层交给 AuthShell（品牌标 + 底纹 + 页脚），卡内自带登录/注册互跳。
     调试用的 el-alert 与它暴露的接口路径一并删除。
+
+    2026-10-10：按用户要求**去掉副标题**（原为「登录后即可发布货源、参与求购与融资申请。」）。
+    删掉 <p class="auth-sub"> 会让表单贴住标题 —— 旧写法里那段间距是由
+    .auth-sub 的 `margin: 8px 0 22px` 撑着的，而 .auth-sub 注册页也在用，
+    不能直接改它。所以这里给 h1 多挂一个 .auth-title-solo（定义在 AuthShell 的
+    非 scoped 块里）把下间距接过来，注册页不受影响。
   -->
   <AuthShell>
-    <h1 class="auth-title">欢迎回来</h1>
-    <p class="auth-sub">登录后即可发布货源、参与求购与融资申请。</p>
+    <h1 class="auth-title auth-title-solo">欢迎回来</h1>
 
     <el-form
       ref="formRef"

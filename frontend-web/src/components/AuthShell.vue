@@ -110,6 +110,16 @@ import RxtLogo from '@/components/RxtLogo.vue'
   color: var(--el-text-color-secondary);
 }
 
+/*
+  没有副标题时的标题（登录页 2026-10-10 去掉了副标题）。
+  标题到表单的下间距原本由 .auth-sub 的 margin-bottom 撑着，
+  副标题一没，表单就会贴住标题 —— 这里把那段间距接下来。
+  ★ 不去改 .auth-title 本身：注册页还有副标题，改了它间距会翻倍。
+*/
+.auth-title-solo {
+  margin-bottom: 22px;
+}
+
 /* 主操作按钮撑满卡片；高度交给 EP 的 size="large"，不手写 px */
 .auth-submit .el-form-item__content {
   display: block;
