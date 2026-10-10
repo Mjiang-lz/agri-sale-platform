@@ -41,9 +41,9 @@
 
         <div v-for="item in items" :key="item.cartId" class="cart-row">
           <div class="col-product product-cell">
-            <div class="thumb" :class="coverClass(item)">
-              <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.productName" />
-              <span v-else>{{ (item.productName || '农产').slice(0, 2) }}</span>
+            <div class="thumb" :class="coverClass(item)" :style="{ background: productFallbackBg({ productId: item.productId }) }">
+              <span class="thumb-fallback">{{ productFallbackText({ productName: item.productName }) }}</span>
+              <img :src="productImage({ productId: item.productId, productName: item.productName, imageUrl: item.imageUrl })" :alt="item.productName" @error="onImgError" />
             </div>
             <div class="pinfo">
               <h4>{{ item.productName || `商品 #${item.productId}` }}</h4>
@@ -84,15 +84,14 @@
           <span class="settle-amount">¥{{ formatPrice(totalAmount) }}</span>
         </div>
         <div class="settle-right">
-          <el-button :disabled="checkingOut" @click="loadCart">重新计价</el-button>
+          <el-button :disabled="loading" @click="loadCart">重新计价</el-button>
           <el-button
             type="primary"
             size="large"
-            :loading="checkingOut"
             :disabled="!settleableItems.length"
-            @click="checkout"
+            @click="goCheckout"
           >
-            结算{{ settleableItems.length ? `（${settleableItems.length}）` : '' }}
+            去结算{{ settleableItems.length ? `（${settleableItems.length}）` : '' }}
           </el-button>
         </div>
       </el-card>
@@ -120,6 +119,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCartList, removeCartItem, updateCartQuantity } from '@/api/trade'
+import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
 
 /**
  * 页面用途：我的购物车（采购方视角，身份取自登录态）。
@@ -134,16 +134,22 @@ import { getCartList, removeCartItem, updateCartQuantity } from '@/api/trade'
  * totalAmount、stock、status、createTime。
  * status=0 表示商品已下架，前端需置灰并排除出结算。
  *
- * 结算说明：后端下单接口 POST /api/trade/order 的 OrderCreateDTO 是
- * 「一个 productId + 一个 quantity」（一次一单），因此这里按条目逐单创建，
- * 而不是把整个购物车打包成一个订单。
+ * 结算说明（2026-10-10 改）：结算动作不再在本页完成，改为跳转到
+ * trade/Checkout.vue（/trade/checkout）—— 因为下单现在必须带 addressId，
+ * 得有个地方选收货地址、核对明细，弹窗里塞不下地址簿 + 商品清单两块。
+ *
+ * ⚠️ 这里曾经是「ElMessageBox 确认后直接循环调 createOrder」。那段代码本身就是坏的：
+ *    `const { createOrder } = await import('@/api/trade')` 拿到的是 undefined
+ *    （api/trade.js 当时没有导出 createOrder），调用抛 TypeError 后被循环里的
+ *    catch 吞掉，最终提示成「N 笔下单全部失败，请检查后端服务与商品库存」——
+ *    把前端自己的 bug 报成了后端故障。现在 createOrder 已补上，
+ *    并统一由结算页调用，本页不再持有下单逻辑。
  *
  * 失败处理：所有写操作失败都弹提示，且不静默刷新列表（避免用户误以为改动成功）。
  */
 const router = useRouter()
 
 const loading = ref(false)
-const checkingOut = ref(false)
 const items = ref([])
 /** 接口失败标记：与「购物车是空的」区分开 */
 const errorState = ref(false)
@@ -156,6 +162,9 @@ const settleableItems = computed(() =>
 const totalAmount = computed(() =>
   settleableItems.value.reduce((sum, i) => sum + Number(i.totalAmount || 0), 0)
 )
+
+/** 图片 404 时隐藏 img，露出下层首字 */
+function onImgError(e) { e.target.style.opacity = '0' }
 
 function formatPrice(value) {
   const n = Number(value)
@@ -236,48 +245,16 @@ async function removeItem(item) {
   }
 }
 
-async function checkout() {
-  const list = settleableItems.value
-  if (!list.length) return
-
-  try {
-    await ElMessageBox.confirm(
-      `将为 ${list.length} 种商品分别生成订单，合计 ¥${formatPrice(totalAmount.value)}。确定继续吗？`,
-      '确认结算',
-      { type: 'warning', confirmButtonText: '确认下单', cancelButtonText: '取消' }
-    )
-  } catch {
-    return // 用户取消
-  }
-
-  checkingOut.value = true
-  // 逐条下单：中途失败要如实告知已成功多少单，不能让用户重复下单
-  const succeeded = []
-  const failed = []
-  for (const item of list) {
-    try {
-      const { createOrder } = await import('@/api/trade')
-      await createOrder({ productId: item.productId, quantity: item.quantity })
-      succeeded.push(item.productName)
-    } catch (err) {
-      failed.push(item.productName)
-      console.error(`下单失败：${item.productName}`, err)
-    }
-  }
-  checkingOut.value = false
-
-  if (!failed.length) {
-    ElMessage.success(`已生成 ${succeeded.length} 笔订单`)
-    router.push('/trade/orders')
-    return
-  }
-
-  if (!succeeded.length) {
-    ElMessage.error(`${failed.length} 笔下单全部失败，请检查后端服务与商品库存`)
-  } else {
-    ElMessage.warning(`成功 ${succeeded.length} 笔，失败 ${failed.length} 笔（${failed.join('、')}）`)
-  }
-  await loadCart()
+/**
+ * 去结算：跳到结算确认页。
+ *
+ * 本页不再做任何校验/下单 —— 结算页会自己按「在架且库存 > 0」重新取一遍购物车，
+ * 所以即便用户在这页停留久了商品被下架，结算页也能如实反映。
+ * 这里只挡一下「一件都不能结算」的空转入，避免跳到结算页看到空态。
+ */
+function goCheckout() {
+  if (!settleableItems.value.length) return
+  router.push('/trade/checkout')
 }
 
 function goProductList() {
@@ -290,15 +267,6 @@ onMounted(loadCart)
 <style scoped>
 .cart-page { color: var(--el-text-color-primary); }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p  { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
 
 .cart-card { border-radius: 14px; overflow: hidden; }
 
@@ -324,6 +292,7 @@ onMounted(loadCart)
 .col-product { display: flex; align-items: center; gap: 12px; min-width: 0; }
 
 .thumb {
+  position: relative;
   width: 56px;
   height: 56px;
   flex-shrink: 0;
@@ -331,11 +300,12 @@ onMounted(loadCart)
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: rgba(20, 48, 43, 0.35);
   font-size: 18px;
   overflow: hidden;
 }
-.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb .thumb-fallback { position: absolute; z-index: 0; }
+.thumb img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
 .t-0 { background: linear-gradient(135deg, #2d7a4c, #73b586); }
 .t-1 { background: linear-gradient(135deg, #91602a, #d4a164); }
 .t-2 { background: linear-gradient(135deg, #2c6679, #78adba); }

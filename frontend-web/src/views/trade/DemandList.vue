@@ -248,15 +248,6 @@ onMounted(loadDemands)
 <style scoped>
 .demand-list-page { color: var(--el-text-color-primary); }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p  { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
 
 .filter-card { margin-bottom: 18px; border-radius: 14px; }
 .filter-row {
@@ -327,11 +318,6 @@ onMounted(loadDemands)
 .expect-price .unit  { font-size: 12px; color: #909399; }
 .contact { color: var(--el-text-color-secondary); font-size: 12px; }
 
-.pagination {
-  display: flex;
-  justify-content: center;
-  padding-top: 12px;
-}
 
 .error-alert { margin-top: 4px; }
 .error-alert :deep(.el-alert__content) { width: 100%; }

@@ -78,6 +78,13 @@ agri-sale-platform/
 ├── frontend-web/               # rxt-web：业务端（农户 / 采购方 / 专家 / 银行用户）
 ├── frontend-admin/             # rxt-admin：管理后台（平台管理员）
 ├── frontend-landing/           # rongxiaotong-landing：官网落地页（React 19 + TanStack Router，独立静态站点）
+├── scripts/
+│   └── demo-start.sh           # 演示/答辩一键启动（后端 + 三个前端，含就绪校验与统一收尾）
+├── deploy/                     # 容器部署：两个 Dockerfile + Nginx 分流配置
+│   ├── web.Dockerfile          # 三个前端构建 + Nginx 静态托管（一个镜像一个端口）
+│   ├── backend.Dockerfile      # 后端构建与运行镜像
+│   └── nginx.conf              # 路径分流 / SPA 回退 / 缓存 / /api 反代
+├── docker-compose.yml          # MySQL + 后端 + 前端托管，四个容器一键起
 └── docs/
     ├── 交付文档/                # 可行性研究报告、软件需求规格说明书、概要设计说明书、详细设计说明书
     ├── 设计图/                  # 架构分层图、组件图、部署图、包图、类图、顺序图
@@ -90,6 +97,31 @@ agri-sale-platform/
 仓库规范规则，见 **[CONTRIBUTING.md](./CONTRIBUTING.md)**。
 
 ## 本地启动
+
+### 一键启动（演示 / 答辩用）
+
+```bash
+scripts/demo-start.sh                 # 起后端 + 三个前端
+scripts/demo-start.sh --no-backend    # 后端已经在跑，只起三个前端
+scripts/demo-start.sh --open          # 起来后顺带用浏览器打开落地页
+```
+
+拉起四个进程，并逐个**确认真的可用**再报成功 —— 判据不是「端口有响应」，
+而是响应体确实是本项目的。端口被别的服务占了不会被误判成「已经起来了」，
+那类假成功在演示当天最难发现。就绪后会打印全部地址和演示账号。
+
+| 服务 | 地址 | 端口可用环境变量覆盖 |
+| --- | --- | --- |
+| 后端 API | `http://localhost:8080/api` | `BACKEND_PORT` |
+| 业务端 | `http://localhost:5173` | `WEB_PORT` |
+| 管理后台 | `http://localhost:5174` | `ADMIN_PORT` |
+| 落地页 | `http://localhost:3000` | `LANDING_PORT` |
+
+- 启动前**已经在跑**的进程（比如你自己开着的后端）会被复用，不会重复拉起，也不会被脚本关掉。
+- `Ctrl-C` 退出时，只收掉本次由脚本拉起的进程，连 `mvn` / `vite` fork 出来的子进程一起收。
+- 每个服务的日志在 `logs/demo/<服务名>.log`（该目录不入库）。
+
+> 需要改数据源、单独调某个服务、或想看接口文档，看下面几节。
 
 ### 后端
 
@@ -117,8 +149,9 @@ mvn spring-boot:run
 > `backend/src/main/resources/db/README.md`。
 
 服务默认监听 `http://localhost:8080/api`。
-（若本机 8080 已被别的项目占用，可加 `-Dspring-boot.run.arguments=--server.port=18080` 换端口，
-注意同时改 `frontend-web/vite.config.*` 里的代理地址。）
+（若本机 8080 已被别的项目占用，可加 `-Dspring-boot.run.arguments=--server.port=18080` 换端口；
+前端代理侧不用改配置文件，起前端时带上 `VITE_API_TARGET=http://localhost:18080` 即可，
+或者直接用 `BACKEND_PORT=18080 scripts/demo-start.sh`，它会把三处变量一起对齐。）
 
 ### 接口文档（Swagger）
 
@@ -159,6 +192,82 @@ npm run dev
 
 业务端默认 `http://localhost:5173`，管理后台默认 `http://localhost:5174`，
 开发态通过 Vite 代理把 `/api` 转发到 `http://localhost:8080`。
+代理目标可以用 `VITE_API_TARGET` 覆盖（三个前端都认这个变量），
+换了后端端口时不用再改配置文件：
+
+```bash
+VITE_API_TARGET=http://localhost:18080 npm run dev
+```
+
+> 用 `scripts/demo-start.sh` 起的时候这些变量会被自动带上：三个前端拿到
+> `VITE_API_TARGET=http://localhost:${BACKEND_PORT}`，落地页另外拿到
+> `VITE_PLATFORM_BASE_URL=http://localhost:${WEB_PORT}`（决定页面上
+> 「进入平台 / 登录 / 免费入驻」跳到哪）。所以 `BACKEND_PORT=18080 WEB_PORT=5273
+> scripts/demo-start.sh` 这种换端口的玩法是全链路跟着走的。
+
+## 部署（Docker Compose）
+
+一套 compose 起四个容器：MySQL + 后端 + 三个前端的静态托管与分流（同一个 Nginx）。
+**Nginx 只对外暴露一个端口**，按路径分流：
+
+| 路径 | 去向 |
+| --- | --- |
+| `/` | 落地页（`frontend-landing`） |
+| `/app/` | 业务端（`frontend-web`） |
+| `/admin/` | 管理后台（`frontend-admin`） |
+| `/api/**` | 反代到 `backend:8080` |
+
+```bash
+# 起（首次会自动初始化库表 + 灌演示数据）
+RXT_HTTP_PORT=8088 docker compose up -d --build
+
+# 看状态 / 跟日志
+docker compose ps
+docker compose logs -f backend
+
+# 停（保留数据卷）/ 连数据一起清掉
+docker compose down
+docker compose down -v
+```
+
+起来后访问 `http://localhost:8088/`（落地页）、`/app/`（业务端）、`/admin/`（管理后台）。
+
+| 文件 | 作用 |
+| --- | --- |
+| `docker-compose.yml` | 四个服务的编排、健康检查、卷与端口 |
+| `deploy/web.Dockerfile` | 构建三个前端并打进 Nginx 镜像（三个构建阶段并行） |
+| `deploy/backend.Dockerfile` | 后端构建 + 运行镜像（非 root 用户运行） |
+| `deploy/nginx.conf` | 路径分流、SPA 回退、缓存策略、`/api` 反代 |
+| `backend/src/main/resources/application-docker.yml` | 容器内 profile（数据源指向服务名 `mysql`，接口文档默认关） |
+| `.dockerignore` | 构建上下文瘦身（排除 `node_modules` / `dist` / `target` 等） |
+
+**几个刻意为之的地方，改之前先看这里：**
+
+- **子路径是构建期决定的。** 业务端必须用 `RXT_BASE=/app/` 构建、管理后台用 `RXT_BASE=/admin/`；
+  落地页要用 `VITE_PLATFORM_BASE_URL=/app`。这三件事 Dockerfile 里都写好了，
+  但**手工构建时漏掉任何一个，症状都是白屏或按钮指向 `localhost:5173`**，
+  而不是明显的报错。`RXT_BASE` 同时喂给 Vite 的 `base` 和前端路由的 `createWebHistory`，
+  两边同源同一个值。
+- **`nginx.conf` 里刻意不写正则 location。** nginx 的匹配优先级是
+  「精确 `=` > 前缀 `^~` > 正则 `~` > 最长前缀」，一旦写了
+  `location ~* \.(js|css|png|jpg)$` 这类缓存规则，它会**盖过前缀 location**，
+  把 `/api/files/xxx.jpg` 也当静态文件去磁盘上找 —— 上传的图片全 404，
+  而且只有「有图的地方」才看得出来。所以缓存规则一律写成前缀 + `^~`。
+- **`proxy_pass` 后面不带尾斜杠。** 后端 `context-path=/api`，原始 URI 要原样透传；
+  写成 `http://backend:8080/` 会把 `/api` 前缀替掉，全盘 404。
+- **`client_max_body_size 20m`**，与后端 `spring.servlet.multipart.max-request-size` 对齐。
+  nginx 默认只有 1MB，不改的话传图直接 413，而且**后端日志里一条都不留**，
+  很容易被误判成「前端根本没调接口」。
+- **`RXT_JWT_SECRET` 必须非空。** 留空会让 JJWT 在签发时抛异常，症状是
+  「容器起来了、一登录就 500」。compose 里给了一个**明确标注为不安全**的默认值，
+  对外部署时用环境变量覆盖。
+- **MySQL 的健康检查查的是真实数据**（`SELECT COUNT(*) FROM rxt.t_user`），
+  不是 `mysqladmin ping` —— ping 只能证明进程活着，而 `docker-entrypoint-initdb.d`
+  下的初始化脚本是 mysqld 起来**之后**才执行的，用 ping 会提前判定「已就绪」，
+  后端抢跑就会连到还没建表的库。
+
+> 本机没有 Docker 时，用 `scripts/demo-start.sh` 跑本地四进程版本即可，功能一致
+> （区别是本地版三个前端各占一个端口，没有路径分流）。
 
 ## 分层约定
 
@@ -179,8 +288,13 @@ npm run dev
 ## 当前状态
 
 骨架已就绪：目录结构、实体映射、建表脚本、统一返回与异常处理、JWT 认证链路均已打通，
-主要业务模块已按功能点逐个补齐；仅首页聚合（`HomeServiceImpl`）与智能推荐
-（`RecommendServiceImpl`）仍为待实现骨架。
+主要业务模块已按功能点逐个补齐。
+
+> **2026-10-09 更正**：本节此前写着「仅首页聚合（`HomeServiceImpl`）与智能推荐
+> （`RecommendServiceImpl`）仍为待实现骨架」，两个说法都已不成立 ——
+> `HomeServiceImpl` 早已是完整实现（197 行、零 TODO），
+> 而 `RecommendServiceImpl` 是一份**零调用方的死代码**，线上真正在跑的推荐入口是
+> `FinanceApplyServiceImpl.recommendGuarantors`（本次实现）。修 README 时不要再把两者混为一谈。
 
 **已完成**
 
@@ -189,18 +303,36 @@ npm run dev
 | M0 项目基础设施 | 建表脚本、统一返回与异常、分页、字段填充、跨域、JWT 认证链路 | 已就绪 |
 | **M0 参数校验** | **全局参数校验**：路径不存在 404、缺必填参数 / 类型不匹配 400、分页下界拦截 | 已完成（P1） |
 | **M0 日志规范** | **链路标识**：每请求一个 traceId，写入 MDC 与 `X-Trace-Id` 响应头 | 已完成（P1） |
-| **M0 鉴权白名单** | 放行规则改为「**HTTP 方法 + 路径**」双条件，写接口不再被只读规则顺带放过 | 已完成（P1） |
+| **M0 鉴权白名单** | 放行规则改为「**HTTP 方法 + 路径**」双条件，写接口不再被只读规则顺带放过；商品详情 `GET /trade/products/{productId}` 对游客开放 | 已完成（P1） |
 | **M0 接口文档** | **Swagger / OpenAPI**：dev 环境可交互调试，非 dev 默认关闭（单一开关） | 已完成（P1） |
 | M1 用户与权限 | 注册 / 登录 / 登出、个人资料与农户经营档案、角色权限校验（`PermissionChecker`） | 已完成 |
 | M1 角色菜单 | 登录与资料接口返回 `menuPerms`（取自 `t_role.menu_perms`），供前端按角色渲染菜单 | 已完成 |
-| M2 农产品交易 | 商品、购物车、订单（含支付 / 发货 / 收货状态流转） | 已完成 |
+| M2 农产品交易 | 商品、购物车、订单（含支付 / 发货 / 收货状态流转）、商品详情页 | 已完成 |
 | M2 求购需求 | 求购需求发布与检索 | 已完成 |
-| M4 融资服务 | 融资申请、我的融资、银行侧审批 | 接口在（原路由冲突已修，见下方「已修记录」） |
-| M5 专家助力 | 知识、问答、预约 | 部分完成 |
+| M4 融资服务 | 融资申请、我的融资、银行侧审批、**联合融资人智能推荐与联保小组组建** | 已完成 |
+| M5 专家助力 | 知识、问答、预约（含「我的预约」查询） | 部分完成（尚缺：专家一览、专家介绍、咨询专家） |
 | M6 平台治理 | 内容审核（商品 / 知识 / 评论） | 已完成 |
 | **M6 平台治理** | **用户管理**：分页检索、启停用、调整角色、角色下拉 | 已完成（P1） |
 | **M6 平台治理** | **融资管理**：银行侧待办与审批、管理员只读台账 | 已完成（P1） |
 | **M6 平台治理** | **数据看板**：总量、待办、分布、近 7 日趋势 | 已完成（P1） |
+
+**2026-10-09 变更（组长接手成员未交付部分）**
+
+- **补全两个联保空壳**：`FinanceApplyServiceImpl.recommendGuarantors`（原 `return new ArrayList<>()`）
+  与 `LoanGroupServiceImpl` 的三个方法（原只有步骤注释，`POST /api/finance/group`
+  **返回成功但写库为零**）。
+- `POST /api/finance/group` 返回值由 `Result<Void>` 改为 `Result<LoanGroupCreateVO>`，
+  回传 `joined` / `skipped` 明细 —— 前端不会再出现「提示成功、组里其实只有自己」。
+- `LoanGroupDTO` 去掉 `description`（`t_loan_group` 里没有这一列），新增 `memberIds` / `loanProductId`。
+- `GET /api/finance/recommend` 返回类型由 `List<UserVO>` 改为 `List<GuarantorCandidateVO>`，
+  新增 `matchRate`（0~100 的**绝对分**）与 `matchReason`；已在进行中小组的农户直接不出现在结果里。
+  **候选人 VO 刻意不含手机号**，别再往里加。
+- `GET /api/trade/products/{productId}` 加入免登录白名单（**仅 GET**），
+  前端 `trade/products` 与 `trade/product/:id` 路由同步标记 `meta.public`，
+  `MainLayout` 对未登录访客显示登录 / 注册而不是身份切换器。
+- 新增 `GET /api/expert/appointment/my`（我的预约，按登录态取归属人，不接受跨用户查询）。
+- 前端 `ProductDetail.vue` 由 18 行占位页改为完整页面；`Appointment.vue` 的 localStorage
+  记录改为读取服务端。
 
 **已修记录（2026-09-22 核对）**
 

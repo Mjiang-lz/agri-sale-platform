@@ -11,6 +11,7 @@ import request from './request'
  * - POST /api/expert/qa/ask             提交问题
  * - GET  /api/expert/qa/my              查询我的问题
  * - GET  /api/expert/qa/list            查询某个问题的回答
+ * - GET  /api/expert/experts            查询专家一览（首页「专家一览」用）
  * - POST /api/expert/appointment/submit 提交专家预约
  */
 
@@ -32,6 +33,36 @@ export function getQuestionAnswers(questionId) {
 /** 专家预约页：提交线下预约，请求体对应 AppointmentDTO。 */
 export function submitAppointment(payload) {
   return request.post('/expert/appointment/submit', payload)
+}
+
+/**
+ * 专家预约页：查询我提交过的全部预约（REQ-11）。
+ *
+ * 后端按登录态取 farmerId，不接受前端传归属人 —— 不要试图在这里加 userId 参数。
+ * 返回 AppointmentVO 数组：
+ * { apptId, expertId, expertName, expertDomain, apptTime, apptTopic,
+ *   apptStatus, remark, createTime }
+ * 其中 remark 是专家处理意见或取消原因，配合 apptStatus 构成「结果通知」。
+ */
+export function getMyAppointments() {
+  return request.get('/expert/appointment/my')
+}
+
+/**
+ * 专家一览（概设 UI-EXP-03「专家介绍」）。
+ *
+ * @param {string} [domain] 专业领域，用于筛选；不传或传空串表示不限领域
+ * @returns {Promise<Array>} ExpertVO 数组：
+ *   { expertId, userId, realName, avatarUrl, expertDomain, introduction, workloadStat }
+ *
+ * 后端只返回「已通过审核」的专家，且 realName / avatarUrl 已在服务端一次装配好，
+ * 调用方不需要（也不应该）再对每行补一次用户信息 —— 既有的逐行补全写法会让
+ * 列表接口退化成 N+1，之前首页正是踩在这上面。
+ */
+export function getExperts(domain) {
+  return request.get('/expert/experts', {
+    params: domain ? { domain } : {}
+  })
 }
 
 /** 专家工作台：查询当前专家可回复的待处理问题。 */

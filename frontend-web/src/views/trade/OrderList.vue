@@ -48,9 +48,9 @@
         <el-table-column label="商品" min-width="180">
           <template #default="{ row }">
             <div class="goods-cell">
-              <div class="mini-thumb">
-                <img v-if="row.imageUrl" :src="row.imageUrl" :alt="row.productName" />
-                <span v-else>{{ (row.productName || '农产').slice(0, 2) }}</span>
+              <div class="mini-thumb" :style="{ background: productFallbackBg({ productId: row.productId }) }">
+                <span class="mini-fallback">{{ productFallbackText({ productName: row.productName }) }}</span>
+                <img :src="productImage({ productId: row.productId, productName: row.productName, imageUrl: row.imageUrl })" :alt="row.productName" @error="onImgError" />
               </div>
               <span class="goods-name">{{ row.productName || `商品 #${row.productId}` }}</span>
             </div>
@@ -138,6 +138,25 @@
           <el-descriptions-item label="支付时间">{{ formatDateTime(currentOrder.payTime) || '未支付' }}</el-descriptions-item>
           <el-descriptions-item label="发货时间">{{ formatDateTime(currentOrder.deliverTime) || '未发货' }}</el-descriptions-item>
           <el-descriptions-item label="收货时间">{{ formatDateTime(currentOrder.receiveTime) || '未收货' }}</el-descriptions-item>
+          <!--
+            收货信息：农户按它发货，买家核对自己填的对不对，所以买卖双方都要看得到。
+            ⚠️ 2026-10-10 之前创建的订单这几列为 NULL（当时订单表还没有这些字段），
+            这里必须按「未填写收货信息」整段跳过，不能渲染成空行，
+            否则一批历史订单详情里会多出三行空白，看着像加载失败。
+          -->
+          <el-descriptions-item v-if="currentOrder.receiverAddress" label="收货人">
+            {{ currentOrder.consignee || '—' }}
+            <span v-if="currentOrder.consigneePhone" class="recv-phone">{{ currentOrder.consigneePhone }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentOrder.receiverAddress" label="收货地址">
+            {{ currentOrder.receiverAddress }}
+          </el-descriptions-item>
+          <el-descriptions-item v-else label="收货信息">
+            <span class="recv-missing">该订单创建于收货信息功能上线前，未记录收货地址</span>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentOrder.orderRemark" label="买家备注">
+            {{ currentOrder.orderRemark }}
+          </el-descriptions-item>
         </el-descriptions>
       </template>
     </el-drawer>
@@ -157,6 +176,7 @@ import {
   receiveOrder
 } from '@/api/trade'
 import { formatDateTime } from '@/utils/text'
+import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
 
 /**
  * 页面用途：我的订单（可切换「我买的 / 我卖的」两个视角）。
@@ -172,8 +192,13 @@ import { formatDateTime } from '@/utils/text'
  *
  * 后端返回 MyBatis-Plus Page，records 元素为 OrderVO：
  * orderId、orderNo、buyerId、sellerId、productId、productName、imageUrl、
- * unit、quantity、unitPrice、orderAmount、orderStatus、
+ * unit、quantity、unitPrice、orderAmount、consignee、consigneePhone、
+ * receiverAddress、orderRemark、orderStatus、
  * payTime、deliverTime、receiveTime、createTime。
+ *
+ * 收货信息（consignee / consigneePhone / receiverAddress / orderRemark）是
+ * 下单时的**快照**，不是指向地址簿的外键 —— 用户后来改了或删了地址都不影响这里。
+ * 2026-10-10 之前创建的订单这几列为 NULL，详情里按「未记录」展示。
  *
  * 订单状态取值：待支付 / 待发货 / 待收货 / 已完成 / 已取消（后端是中文枚举，
  * 不是数字），因此状态筛选直接把中文串传给后端的 orderStatus 参数。
@@ -205,6 +230,9 @@ const STATUS_TYPE = {
 function statusType(status) {
   return STATUS_TYPE[status] || 'info'
 }
+
+/** 图片 404 时隐藏 img，露出下层首字 */
+function onImgError(e) { e.target.style.opacity = '0' }
 
 function formatPrice(value) {
   const n = Number(value)
@@ -317,21 +345,12 @@ onMounted(loadOrders)
 <style scoped>
 .order-list-page { color: var(--el-text-color-primary); }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p  { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
-.head-actions { display: flex; align-items: center; gap: 12px; }
 
 .table-card { border-radius: 14px; }
 
 .goods-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .mini-thumb {
+  position: relative;
   width: 40px;
   height: 40px;
   flex-shrink: 0;
@@ -339,12 +358,12 @@ onMounted(loadOrders)
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #2d7a4c, #73b586);
-  color: #fff;
+  color: rgba(20, 48, 43, 0.35);
   font-size: 14px;
   overflow: hidden;
 }
-.mini-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.mini-thumb .mini-fallback { position: absolute; z-index: 0; }
+.mini-thumb img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
 .goods-name {
   white-space: nowrap;
   overflow: hidden;
@@ -353,11 +372,6 @@ onMounted(loadOrders)
 
 .amount { color: #f56c6c; font-size: 15px; }
 
-.pagination {
-  display: flex;
-  justify-content: center;
-  padding-top: 14px;
-}
 
 .detail-head {
   display: flex;
@@ -371,6 +385,11 @@ onMounted(loadOrders)
   color: var(--el-text-color-secondary);
 }
 .detail-head h3 { margin: 6px 0 0; font-size: 18px; }
+
+/* 收货人后面的手机号：与姓名同一行，字号小一档做区分 */
+.recv-phone { margin-left: 8px; color: var(--el-text-color-secondary); font-size: 12px; }
+/* 历史订单（收货信息功能上线前创建）没有地址时的说明文案 */
+.recv-missing { color: var(--el-text-color-secondary); font-size: 12px; }
 
 .error-alert { margin-bottom: 14px; }
 .error-alert :deep(.el-alert__content) { width: 100%; }

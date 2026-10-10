@@ -243,7 +243,6 @@ onMounted(() => {
 .item-body p { min-height: 64px; margin: 0; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.65; }
 .item-footer { align-items: center; margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--el-border-color-lighter); }
 .verified { color: var(--el-color-success); }
-.pagination { display: flex; justify-content: center; padding-top: 22px; }
 .detail-title { margin: 14px 0 10px; line-height: 1.45; }
 .detail-meta { display: flex; gap: 20px; color: var(--el-text-color-secondary); font-size: 13px; }
 .detail-image { width: 100%; max-height: 300px; margin-top: 18px; border-radius: 12px; }

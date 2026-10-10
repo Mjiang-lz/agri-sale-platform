@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { Component, useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
 
 const vertexShader = /* glsl */ `
@@ -77,10 +77,55 @@ function WaveMesh() {
   );
 }
 
+/**
+ * 这一层只是 §4 的背景装饰。three.js 拿不到 WebGL 上下文时会直接抛错，
+ * 而 §4 是路由组件的一层 —— 不拦的话异常一路冒到 TanStack Router 的根错误边界，
+ * 整页会被换成 "Something went wrong!"，正文一个字都看不到。
+ *
+ * 实测环境：无头浏览器（--disable-gpu）必现；关闭硬件加速的 Chrome、
+ * 部分远程桌面/虚拟机同样会命中。
+ *
+ * 两道防线：
+ *   1. 进不进得来 —— 先做能力探测，没有 WebGL 就不去创建上下文，顺带不刷那条吓人的控制台报错；
+ *   2. 进去后炸了 —— 错误边界兜住（上下文丢失、着色器编译失败等探测查不出来的情况）。
+ * 两者都只影响这一层装饰，页面其余部分照常渲染。
+ */
+function webglAvailable(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+
+class WaveGridBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(err: unknown) {
+    console.warn("[WaveGrid] WebGL 不可用，已跳过 §4 的背景装饰层（不影响页面其余部分）：", err);
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 export function WaveGrid() {
+  // 探测只在挂载时做一次（惰性初始化），结果不随任何交互变化。
+  const [ok] = useState(webglAvailable);
+  if (!ok) return null;
+
   return (
-    <Canvas camera={{ position: [0, 1.33, 5], fov: 45 }} dpr={[1, 2]}>
-      <WaveMesh />
-    </Canvas>
+    <WaveGridBoundary>
+      <Canvas camera={{ position: [0, 1.33, 5], fov: 45 }} dpr={[1, 2]}>
+        <WaveMesh />
+      </Canvas>
+    </WaveGridBoundary>
   );
 }

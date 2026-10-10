@@ -4,6 +4,7 @@ import com.rxt.common.Result;
 import com.rxt.dto.LoanGroupDTO;
 import com.rxt.security.UserContext;
 import com.rxt.service.LoanGroupService;
+import com.rxt.vo.LoanGroupCreateVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,11 +35,14 @@ public class LoanGroupController {
 
     /**
      * 组建联合贷款小组。
+     *
+     * <p>返回入组明细而不是空结果：被推荐人可能因为「已在其他进行中小组」
+     * 或「尚未提交同产品申请」而进不来，这些必须如实回传，否则发起人会以为
+     * 小组已经凑齐 —— 与「提示成功、库里没数据」是同一类故障。</p>
      */
     @PostMapping("/group")
-    public Result<Void> createGroup(@RequestBody LoanGroupDTO dto) {
-        loanGroupService.createGroup(UserContext.currentUserId(), dto);
-        return Result.success();
+    public Result<LoanGroupCreateVO> createGroup(@RequestBody LoanGroupDTO dto) {
+        return Result.success(loanGroupService.createGroup(UserContext.currentUserId(), dto));
     }
 
     /**

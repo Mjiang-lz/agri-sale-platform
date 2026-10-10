@@ -9,7 +9,7 @@ import com.rxt.security.UserContext;
 import com.rxt.service.FinanceApplyService;
 import com.rxt.service.impl.FinanceApplyAssembler;
 import com.rxt.vo.FinanceApplyVO;
-import com.rxt.vo.UserVO;
+import com.rxt.vo.GuarantorCandidateVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -72,10 +72,17 @@ public class FinanceApplyController {
     }
 
     /**
-     * 联合融资人智能推荐。
+     * 联合融资人智能推荐（REQ-07）。
+     *
+     * <p>按经营特征（品类 / 地区 / 额度 / 期限 / 经营年限）算出的绝对匹配度倒序返回，
+     * 并<b>过滤掉已经在进行中小组里的农户</b> —— 推一个已经组好队的人，
+     * 用户点下去必然失败。</p>
+     *
+     * <p>申请人尚未填写农户经营档案时返回 500 + 明确提示，而不是空列表：
+     * 「平台里没有别的农户」与「你自己缺档案」是两回事，不该用同一个响应表达。</p>
      */
     @GetMapping("/recommend")
-    public Result<List<UserVO>> recommend() {
+    public Result<List<GuarantorCandidateVO>> recommend() {
         Long userId = UserContext.currentUserId();
         return Result.success(financeApplyService.recommendGuarantors(userId));
     }

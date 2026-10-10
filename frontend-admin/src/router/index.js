@@ -19,7 +19,9 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  // BASE_URL 来自 vite 的 base 配置（部署到 /admin/ 下时为 '/admin/'，本地开发为 '/'）。
+  // 写死 '/' 的话，Nginx 分流部署后刷新 /admin/user/list 会被当成根路径路由匹配不上。
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 

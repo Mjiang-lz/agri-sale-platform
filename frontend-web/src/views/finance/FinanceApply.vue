@@ -7,7 +7,6 @@
         <p>选择贷款产品，填写额度、期限和资金用途。提交后系统将推荐经营特征相近的联保候选人。</p>
       </div>
       <div class="head-tags">
-        <el-tag type="success" effect="plain">接口：POST /api/finance/apply</el-tag>
         <el-tag v-if="demoMode" type="warning" effect="dark">演示数据</el-tag>
       </div>
     </div>
@@ -88,7 +87,7 @@
                 :auto-upload="false"
                 :limit="5"
                 accept=".pdf,.jpg,.jpeg,.png"
-                on-exceed="handleFileExceed"
+                :on-exceed="handleFileExceed"
               >
                 <el-button>选择资料</el-button>
                 <template #tip>
@@ -135,9 +134,29 @@
     </el-row>
 
     <el-dialog v-model="recommendVisible" title="推荐联保人" width="min(760px, 94vw)" :close-on-click-modal="false">
-      <!-- 推荐数据优先使用真实接口；仅显式开启演示模式时才允许回退。 -->
-      <p class="dialog-tip">请选择希望邀请的农户。{{ useDemo ? '当前建议列表来自显式开启的演示数据。' : '推荐结果来自系统匹配。' }}</p>
-      <el-checkbox-group v-model="selectedFarmerIds" class="candidate-list">
+      <p class="dialog-tip">
+        按经营特征匹配度排序。已经在小队里的农户不会出现在这里；
+        若某位候选人本次未能入组，创建小组时会告诉你具体原因。
+      </p>
+
+      <!-- 推荐接口失败时如实呈现，不再用演示数据顶替：
+           把「后端没给出结果」换成看起来正常的假名单，正是这次要修掉的那类静默故障。 -->
+      <el-alert
+        v-if="recommendError"
+        class="recommend-alert"
+        type="error"
+        :closable="false"
+        show-icon
+        title="推荐联保人获取失败"
+        :description="recommendError"
+      />
+
+      <el-checkbox-group
+        v-else
+        v-model="selectedFarmerIds"
+        class="candidate-list"
+        :max="maxSelectable"
+      >
         <el-checkbox
           v-for="candidate in candidates"
           :key="candidate.userId"
@@ -146,21 +165,33 @@
         >
           <span class="candidate-main">
             <strong>{{ candidate.realName }}</strong>
-            <small>{{ candidate.farmerProfile?.mainProduct || candidate.mainProduct || '农产品经营' }}</small>
+            <small>
+              {{ candidate.mainProduct || '农产品经营' }}
+              <template v-if="candidate.region"> · {{ candidate.region }}</template>
+            </small>
+            <em v-if="candidate.matchReason" class="candidate-reason">{{ candidate.matchReason }}</em>
           </span>
-          <el-tag size="small" type="success">
-            {{ Math.round((candidate.matchRate || 0.8) * 100) }}% 匹配
-          </el-tag>
+          <el-tag size="small" type="success">{{ candidate.matchRate ?? 0 }}% 匹配</el-tag>
         </el-checkbox>
       </el-checkbox-group>
-      <el-empty v-if="!candidates.length" description="暂未获取到推荐联保人，请稍后重试或联系后端负责人" />
+
+      <el-empty
+        v-if="!recommendError && !candidates.length"
+        description="暂时没有可推荐的联保候选人（可能其他农户都已在小组中，或尚未提交该产品的融资申请）"
+      />
+
       <el-alert
-        v-if="selectedProduct"
-        type="warning"
+        v-if="selectedProduct && !recommendError"
+        class="group-size-alert"
+        :type="groupSizeEnough ? 'success' : 'warning'"
         :closable="false"
         show-icon
-        :title="`当前产品最低需要 ${selectedProduct.minGroupSize} 人，已选择 ${selectedFarmerIds.length + 1} 人（含申请人）`"
+        :title="`${selectedProduct.productName} 起贷需 ${selectedProduct.minGroupSize} 户，当前 ${selectedFarmerIds.length + 1} 户（含你）`"
+        :description="groupSizeEnough
+          ? '人数已达标，可以直接创建小组。'
+          : '人数不足也可以先创建：小组会停留在「组建中」，其他农户提交同产品申请后即可加入。'"
       />
+
       <template #footer>
         <el-button @click="recommendVisible = false">稍后组队</el-button>
         <el-button type="primary" :loading="groupSubmitting" @click="handleCreateGroup">确认创建小组</el-button>
@@ -172,7 +203,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createLoanGroup,
   getLoanProducts,
@@ -199,6 +230,8 @@ const fileList = ref([])
 const recommendVisible = ref(false)
 const candidates = ref([])
 const selectedFarmerIds = ref([])
+/** 推荐接口的失败原因。非空时弹窗内展示错误态，而不是展示一份空名单 */
+const recommendError = ref('')
 
 const form = reactive({
   loanProductId: null,
@@ -225,6 +258,22 @@ const termOptions = computed(() => {
   const max = Number(selectedProduct.value?.termMonths || 36)
   return [6, 12, 24, 36].filter((item) => item <= max)
 })
+
+/**
+ * 本产品最多还能邀请几位候选人。
+ *
+ * <p>起贷人数同时也是人数上限（t_loan_product 没有「最大组队人数」列，
+ * 可贷总额 = 起贷人数 × 单户额度，凑满即封组 —— 见后端 LoanGroupServiceImpl）。
+ * 组长本人占一个名额，所以候选人上限要减 1。</p>
+ */
+const maxSelectable = computed(() =>
+  Math.max(0, Number(selectedProduct.value?.minGroupSize || 1) - 1)
+)
+
+/** 人数是否已达起贷下限（组长本人也算一户） */
+const groupSizeEnough = computed(() =>
+  selectedFarmerIds.value.length + 1 >= Number(selectedProduct.value?.minGroupSize || 1)
+)
 
 /** 后端分页对象统一转成数组。 */
 function normalizePage(data) {
@@ -286,15 +335,6 @@ async function loadProducts() {
   if (productList.value.length) selectProduct(productList.value[0])
 }
 
-/** 演示推荐人数据，仅在后端推荐接口暂时没有算法结果时使用。 */
-function demoCandidates() {
-  return [
-    { userId: 3, realName: '王建国', farmerProfile: { mainProduct: '水稻种植' }, matchRate: 0.92 },
-    { userId: 4, realName: '张桂芳', farmerProfile: { mainProduct: '家禽养殖' }, matchRate: 0.87 },
-    { userId: 2, realName: '李官杏', farmerProfile: { mainProduct: '柑橘种植' }, matchRate: 0.84 }
-  ]
-}
-
 async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -307,20 +347,26 @@ async function handleSubmit() {
       applyPurpose: form.applyPurpose
     })
     ElMessage.success('融资申请提交成功')
+
+    // 个体贷款（起贷人数 ≤ 1）没有联保的必要：小组只会有一位成员，
+    // 后端也会直接拒绝建组，所以这里不进入组队流程
+    const minGroupSize = Number(selectedProduct.value?.minGroupSize || 1)
+    if (minGroupSize <= 1) {
+      ElMessage.info(`${selectedProduct.value?.productName || '该产品'} 为个体贷款，无需组建联保小组`)
+      router.push('/finance/my')
+      return
+    }
+
+    recommendError.value = ''
     try {
       const recommended = await getRecommendedGuarantors()
-      const list = Array.isArray(recommended) ? recommended : normalizePage(recommended)
-      if (list.length) {
-        candidates.value = list
-      } else if (useDemo) {
-        candidates.value = demoCandidates()
-        demoMode.value = true
-      } else {
-        candidates.value = []
-      }
-    } catch {
-      candidates.value = useDemo ? demoCandidates() : []
-      if (useDemo) demoMode.value = true
+      candidates.value = Array.isArray(recommended) ? recommended : normalizePage(recommended)
+    } catch (err) {
+      // 这里<不再>回退到 demoCandidates()：把一个失败的后端请求替换成
+      // 看起来正常的假名单，会让「推荐功能挂了」表现为「推荐功能好着呢」。
+      // 错误提示已由 request.js 统一弹过，弹窗内再给一份可读的说明。
+      candidates.value = []
+      recommendError.value = err?.message || '推荐联保人获取失败，请稍后重试'
     }
     selectedFarmerIds.value = []
     recommendVisible.value = true
@@ -331,27 +377,61 @@ async function handleSubmit() {
 
 async function handleCreateGroup() {
   if (!selectedFarmerIds.value.length) {
-    ElMessage.warning('请至少选择一位推荐联保人')
+    ElMessage.warning('请至少选择一位推荐联保人；若暂时无人可选，可点「稍后组队」')
     return
   }
-  const names = candidates.value
-    .filter((item) => selectedFarmerIds.value.includes(item.userId))
-    .map((item) => item.realName)
-    .join('、')
-
   groupSubmitting.value = true
   try {
-    await createLoanGroup({
+    // 传 memberIds 而不是把成员姓名写进 description：
+    // 后者在 t_loan_group 里根本没有对应列，收下之后无处可写
+    const result = await createLoanGroup({
       groupName: `${selectedProduct.value?.productName || '联合贷款'}小组`,
-      // 当前后端 DTO 尚未提供 memberIds，先把成员名写入描述；后端扩展后替换为 memberIds 数组。
-      description: `拟邀请联保人：${names}`
+      memberIds: [...selectedFarmerIds.value],
+      loanProductId: form.loanProductId
     })
     recommendVisible.value = false
-    ElMessage.success('联合贷款小组已创建')
+    await showCreateResult(result)
     router.push('/finance/my')
+  } catch (err) {
+    // 失败原因（例如「你已在一个进行中的联合贷款小组中」）由 request.js 统一提示
+    console.error('创建联合贷款小组失败：', err)
   } finally {
     groupSubmitting.value = false
   }
+}
+
+/**
+ * 如实展示建组结果。
+ *
+ * <p>「部分候选人没进来」不算失败（组长的组队动作本身合法），但绝不能静默 ——
+ * 不说明的话发起人会以为小组已经凑齐，实际小组里可能只有自己一个人。</p>
+ *
+ * <p>用纯文本而不是 HTML 拼接：候选人姓名与未入组原因虽然来自自家后端，
+ * 但姓名是用户可填字段，走 HTML 渲染就等于开了一个注入口。</p>
+ */
+async function showCreateResult(result) {
+  const required = Number(result?.minGroupSize ?? selectedProduct.value?.minGroupSize ?? 1)
+  const count = Number(result?.memberCount ?? 1)
+  const joined = (result?.joined || [])
+    .map((member) => member.realName)
+    .filter(Boolean)
+    .join('、')
+  const skipped = result?.skipped || []
+
+  let text = `小组「${result?.groupName || '联合贷款小组'}」已创建：当前 ${count} 户，起贷需 ${required} 户。`
+  if (joined) {
+    text += ` 已入组：${joined}。`
+  }
+  if (skipped.length) {
+    const details = skipped
+      .map((item) => `${item.realName || `用户 ${item.userId}`}：${item.reason}`)
+      .join('；')
+    text += ` 未入组 ${skipped.length} 人 —— ${details}。`
+  }
+
+  await ElMessageBox.alert(text, skipped.length ? '小组已创建，部分候选人未入组' : '小组创建成功', {
+    confirmButtonText: '去我的融资查看'
+  })
 }
 
 function resetForm() {
@@ -365,12 +445,6 @@ onMounted(loadProducts)
 
 <style scoped>
 .finance-apply-page { color: var(--el-text-color-primary); }
-.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 18px; }
-.page-head h2 { margin: 0; font-size: 24px; }
-.page-head p { margin: 8px 0 0; color: var(--el-text-color-secondary); line-height: 1.7; }
-.head-tags { display: flex; align-items: center; gap: 8px; }
-.content-card { border-radius: 14px; }
-.card-title { display: flex; justify-content: space-between; align-items: center; }
 .card-title span { color: var(--el-text-color-secondary); font-size: 12px; }
 .product-list { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .product-card { padding: 14px; border: 1px solid var(--el-border-color); border-radius: 12px; background: #fff; text-align: left; cursor: pointer; transition: .2s; }
@@ -387,7 +461,10 @@ onMounted(loadProducts)
 .candidate-list { display: grid; gap: 10px; margin-bottom: 16px; }
 .candidate-item { width: 100%; height: auto; margin: 0; padding: 12px; border: 1px solid var(--el-border-color); border-radius: 10px; }
 .candidate-item :deep(.el-checkbox__label) { width: 100%; display: flex; justify-content: space-between; align-items: center; }
-.candidate-main strong, .candidate-main small { display: block; }
+.candidate-main strong, .candidate-main small, .candidate-main em { display: block; }
+.candidate-main em { margin-top: 5px; color: var(--el-text-color-secondary); font-size: 12px; font-style: normal; line-height: 1.6; }
+.recommend-alert, .group-size-alert { margin-top: 4px; }
+.group-size-alert { margin-top: 14px; }
 .candidate-main small { margin-top: 4px; color: var(--el-text-color-secondary); }
 @media (max-width: 900px) { .product-list { grid-template-columns: 1fr; } }
 @media (max-width: 680px) { .page-head { flex-direction: column; } .form-actions { flex-direction: column; } .form-actions .el-button { width: 100%; margin-left: 0; } }

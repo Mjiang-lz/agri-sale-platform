@@ -47,10 +47,19 @@ npm run build
 - `public/hero-field.mp4` —— 首页背景视频成片（7.4MB，CRF30 / 16s / 已加 `+faststart`）。
 - `media-src/` —— 原片与备选档，**该目录不入库**（见 `.gitignore`）。
 - `public/products/`、`public/farmers/` —— 商品与农户示意配图。
+- `public/landing/` —— Section 4/5/6 用的装饰贴图（噪点、侧阴影、卡片底、栏目插图），
+  已从第三方 CDN 本地化并压缩（原图 16.7MB → 1.4MB，WebP 保留透明通道）。
+- `public/fonts/` —— 全站字体 Inter Tight（可变字重 200–900）的 latin / latin-ext 两个
+  子集，共 132KB。`@font-face` 写在 `src/styles.css`。
 - `verify/` —— 页面验收截图留档。
 
 ## 已知待办
 
-- `public/` 下仍保留若干 Ceptral 模板时期的外链资源
-  （`gather.svg`、`Mstar-logo.svg`、`intel.svg` 等，`*.asset.json` 里指向 `qclay.design`）。
-  这些是装饰性资源，与品牌无关，待清理。
+- ~~`public/` 下仍保留若干 Ceptral 模板时期的外链资源~~ ✅ **已清理（2026-10-09）**：
+  删掉 71 个指向 `qclay.design` 的 `*.asset.json`，以及 10 个无人引用的模板 svg
+  （`Mstar-logo.svg` / `intel.svg` / `nutanix.svg` / `oracle.svg` / `clutch.svg` /
+  `In.svg` / `inst.svg` / `X.svg` / `gofound.svg` / `RedArrow.svg`）。
+- ~~字体的 `fonts.googleapis.com` 靠 `media="print"` 降级~~ ✅ **已改为自托管（2026-10-09）**，
+  见 `public/fonts/` 与 `src/styles.css`。原先那行是 `<head>` 里的阻塞外链，
+  对方一旦挂起会**同时**阻塞渲染和 `type="module"` 脚本执行 —— 整页白屏且控制台无报错。
+  **至此落地页源码里已无任何外部域名依赖**，断网也能完整渲染。

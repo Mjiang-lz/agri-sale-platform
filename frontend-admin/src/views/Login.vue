@@ -13,7 +13,6 @@
           <el-button type="primary" :loading="loading" style="width: 100%" @click="onSubmit">登录</el-button>
         </el-form-item>
       </el-form>
-      <el-alert type="info" :closable="false" title="接口：POST /api/auth/login" />
     </el-card>
   </div>
 </template>

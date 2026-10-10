@@ -390,8 +390,12 @@
         容易被读成「这些是平台用户」。要不要保留、要不要去掉随机重排，属设计口径。</li>
       <li>§6 左卡配图：<code>imageTower.png</code>，装饰性插图（知识条目在库里没有配图），
         <code>alt</code> 已改为「农业知识栏目装饰插图」，不再冒充该条知识的实拍图。</li>
-      <li><code>Section5.tsx</code> 仍在从 <code>qclay.design</code> 取两张装饰图（<code>Noise.png</code>、
-        <code>Side-Image-Container.png</code>）—— 答辩环境若不外网会缺这两层纹理，属既有遗留项。</li>
+      <li><s><code>Section5.tsx</code> 仍在从 <code>qclay.design</code> 取两张装饰图（<code>Noise.png</code>、
+        <code>Side-Image-Container.png</code>）—— 答辩环境若不外网会缺这两层纹理，属既有遗留项。</s>
+        <b>✅ 已修复（2026-10-09）：</b>两张图连同 §4/§6 的其余外链素材一起本地化到
+        <code>public/landing/</code>（WebP，16.7MB → 1.4MB）；同一轮把 <code>&lt;head&gt;</code> 里
+        阻塞渲染的 <code>fonts.googleapis.com</code> 样式表也改成自托管（<code>public/fonts/</code>）。
+        现在落地页源码中已无任何外部域名依赖。</li>
     </ul>
   </div>
 
