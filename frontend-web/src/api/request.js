@@ -29,7 +29,12 @@ request.interceptors.response.use(
       router.push('/login')
     }
     const message = body.message || '请求失败'
-    ElMessage.error(message)
+    // silent:true 的请求由调用方自己渲染错误态，不弹全局 toast。
+    // 首页一次并发拉五组数据，若接口都断，叠加的 toast 会糊住页头，
+    // 而那里要的是干净的降级（订单为 0 是合法状态），不是提示。
+    if (!response.config?.silent) {
+      ElMessage.error(message)
+    }
     // 标记「已提示过」：页面 catch 里不要再弹一次，否则同一次失败会刷出两条提示。
     // 页面拿到这个标记后应改为渲染行内错误态（带重试按钮），而不是再弹 toast。
     const err = new Error(message)
@@ -37,7 +42,9 @@ request.interceptors.response.use(
     return Promise.reject(err)
   },
   (error) => {
-    ElMessage.error('网络异常，请稍后重试')
+    if (!error.config?.silent) {
+      ElMessage.error('网络异常，请稍后重试')
+    }
     // 同上：网络层错误已统一提示过，页面只负责渲染错误态
     error.notified = true
     return Promise.reject(error)
