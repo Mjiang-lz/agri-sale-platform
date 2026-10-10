@@ -69,6 +69,18 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
+    public List<Knowledge> myKnowledge(Long userId) {
+        ExpertInfo expert = expertInfoMapper.selectOne(new LambdaQueryWrapper<ExpertInfo>()
+                .eq(ExpertInfo::getUserId, userId));
+        if (expert == null) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可查看自己的知识投稿");
+        }
+        return knowledgeMapper.selectList(new LambdaQueryWrapper<Knowledge>()
+                .eq(Knowledge::getAuthorId, expert.getExpertId())
+                .orderByDesc(Knowledge::getCreateTime));
+    }
+
+    @Override
     public Knowledge getDetail(Long id) {
         Knowledge k = knowledgeMapper.selectOne(new LambdaQueryWrapper<Knowledge>()
                 .eq(Knowledge::getKnowledgeId, id)

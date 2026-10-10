@@ -30,3 +30,8 @@ export function getKnowledgeDetail(id) {
 export function createKnowledge(payload) {
   return request.post('/knowledge', payload)
 }
+
+/** 农业知识页：查询当前专家自己的全部知识投稿及审核状态。 */
+export function getMyKnowledge() {
+  return request.get('/knowledge/my')
+}

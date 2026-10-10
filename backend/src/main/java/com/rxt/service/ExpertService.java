@@ -1,6 +1,7 @@
 package com.rxt.service;
 
 import com.rxt.dto.AppointmentDTO;
+import com.rxt.dto.AppointmentHandleDTO;
 import com.rxt.vo.AppointmentVO;
 import com.rxt.vo.ExpertVO;
 
@@ -25,6 +26,12 @@ public interface ExpertService {
      * @return 该农户的全部预约，按提交时间倒序
      */
     List<AppointmentVO> myAppointments(Long farmerId);
+
+    /** 专家侧预约列表，按当前登录专家过滤。 */
+    List<AppointmentVO> expertAppointments(Long userId, String status);
+
+    /** 专家接受或拒绝预约。 */
+    void handleAppointment(Long userId, Long apptId, AppointmentHandleDTO dto);
 
     /**
      * 专家一览（概设 UI-EXP-03「专家介绍」）。

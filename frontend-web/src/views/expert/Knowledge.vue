@@ -12,7 +12,7 @@
       </div>
     </div>
 
-    <ExpertKnowledgeEditor v-if="isExpert" :submissions="mySubmissions" @created="handleKnowledgeCreated" />
+    <ExpertKnowledgeEditor v-if="isExpert" :submissions="visibleSubmissions" @created="handleKnowledgeCreated" @dismiss="handleKnowledgeDismiss" />
 
     <el-alert
       v-if="demoMode"
@@ -99,16 +99,18 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import ExpertKnowledgeEditor from '@/components/expert/ExpertKnowledgeEditor.vue'
-import { getKnowledgeDetail, getKnowledgeList } from '@/api/knowledge'
+import { getKnowledgeDetail, getKnowledgeList, getMyKnowledge } from '@/api/knowledge'
 import { useUserStore } from '@/store/user'
 
 const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
 const userStore = useUserStore()
 const isExpert = computed(() => userStore.profile?.roleName === '专家')
 const mySubmissions = ref([])
-const mySubmissionKey = 'rxt_expert_knowledge_submissions'
+const hiddenSubmissionIds = ref([])
+const hiddenSubmissionKey = 'rxt_hidden_knowledge_submission_ids'
+let refreshTimer = null
 const demoMode = ref(false)
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -146,6 +148,7 @@ const pagedList = computed(() => {
   const start = (page.value - 1) * pageSize.value
   return filteredList.value.slice(start, start + pageSize.value)
 })
+const visibleSubmissions = computed(() => mySubmissions.value.filter((item) => !hiddenSubmissionIds.value.includes(Number(item.knowledgeId))))
 
 /**
  * 从本地后端读取 rxt.t_knowledge 数据。
@@ -212,19 +215,42 @@ function formatDateTime(value) {
   return String(value).replace('T', ' ').slice(0, 16)
 }
 
-function handleKnowledgeCreated(item) {
-  mySubmissions.value.unshift(item)
-  localStorage.setItem(mySubmissionKey, JSON.stringify(mySubmissions.value))
-  loadList()
+async function loadMyKnowledge() {
+  if (!isExpert.value) return
+  try {
+    const data = await getMyKnowledge()
+    mySubmissions.value = Array.isArray(data) ? data : data?.records || []
+  } catch {
+    mySubmissions.value = []
+  }
+}
+
+async function handleKnowledgeCreated() {
+  await loadMyKnowledge()
+  await loadList()
+}
+
+function handleKnowledgeDismiss(item) {
+  const id = Number(item.knowledgeId)
+  if (!hiddenSubmissionIds.value.includes(id)) {
+    hiddenSubmissionIds.value.push(id)
+    localStorage.setItem(hiddenSubmissionKey, JSON.stringify(hiddenSubmissionIds.value))
+  }
 }
 
 onMounted(() => {
   try {
-    mySubmissions.value = JSON.parse(localStorage.getItem(mySubmissionKey) || '[]')
+    hiddenSubmissionIds.value = JSON.parse(localStorage.getItem(hiddenSubmissionKey) || '[]').map(Number)
   } catch {
-    mySubmissions.value = []
+    hiddenSubmissionIds.value = []
   }
   loadList()
+  loadMyKnowledge()
+  refreshTimer = window.setInterval(loadMyKnowledge, 30000)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
 })
 </script>
 

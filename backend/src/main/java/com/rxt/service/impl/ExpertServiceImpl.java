@@ -3,6 +3,7 @@ package com.rxt.service.impl;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
 import com.rxt.dto.AppointmentDTO;
+import com.rxt.dto.AppointmentHandleDTO;
 import com.rxt.entity.Appointment;
 import com.rxt.entity.ExpertInfo;
 import com.rxt.mapper.AppointmentMapper;
@@ -119,6 +120,96 @@ public class ExpertServiceImpl implements ExpertService {
             result.add(vo);
         }
         return result;
+    }
+
+    /**
+     * 专家侧预约列表。
+     *
+     * <p>专家身份由登录用户映射到 t_expert，前端不能传 expertId。
+     * 状态为空时返回全部预约，否则按预约状态过滤。</p>
+     */
+    @Override
+    public List<AppointmentVO> expertAppointments(Long userId, String status) {
+        ExpertInfo expert = expertInfoMapper.selectOne(Wrappers.<ExpertInfo>lambdaQuery()
+                .eq(ExpertInfo::getUserId, userId));
+        if (expert == null) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可查看预约工作台");
+        }
+
+        List<Appointment> appointments = appointmentMapper.selectList(
+                Wrappers.<Appointment>lambdaQuery()
+                        .eq(Appointment::getExpertId, expert.getExpertId())
+                        .eq(StringUtils.hasText(status), Appointment::getApptStatus, status)
+                        .orderByDesc(Appointment::getApptId));
+        if (appointments.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Set<Long> farmerIds = appointments.stream()
+                .map(Appointment::getFarmerId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(HashSet::new));
+        Map<Long, User> farmers = farmerIds.isEmpty() ? Collections.emptyMap()
+                : userMapper.selectBatchIds(farmerIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, Function.identity(), (a, b) -> a));
+
+        User expertUser = userMapper.selectById(expert.getUserId());
+        String expertName = expertUser == null ? "" : expertUser.getRealName();
+
+        List<AppointmentVO> result = new ArrayList<>(appointments.size());
+        for (Appointment appointment : appointments) {
+            AppointmentVO vo = new AppointmentVO();
+            vo.setApptId(appointment.getApptId());
+            vo.setExpertId(appointment.getExpertId());
+            vo.setExpertName(expertName);
+            vo.setExpertDomain(expert.getExpertDomain());
+            vo.setFarmerId(appointment.getFarmerId());
+            User farmer = appointment.getFarmerId() == null ? null : farmers.get(appointment.getFarmerId());
+            vo.setFarmerName(farmer == null ? "" : farmer.getRealName());
+            vo.setApptTime(appointment.getApptTime());
+            vo.setApptTopic(appointment.getApptTopic());
+            vo.setApptStatus(appointment.getApptStatus());
+            vo.setRemark(appointment.getRemark());
+            vo.setCreateTime(appointment.getCreateTime());
+            result.add(vo);
+        }
+        return result;
+    }
+
+    /**
+     * 专家接受或拒绝预约。
+     *
+     * <p>仅允许处理“待处理”预约；接受时可省略备注，拒绝时必须说明原因。
+     * 同时校验预约归属，防止专家处理其他专家的预约。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void handleAppointment(Long userId, Long apptId, AppointmentHandleDTO dto) {
+        ExpertInfo expert = expertInfoMapper.selectOne(Wrappers.<ExpertInfo>lambdaQuery()
+                .eq(ExpertInfo::getUserId, userId));
+        if (expert == null) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可处理预约");
+        }
+
+        Appointment appointment = appointmentMapper.selectById(apptId);
+        if (appointment == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "预约不存在");
+        }
+        if (!expert.getExpertId().equals(appointment.getExpertId())) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "不能处理其他专家的预约");
+        }
+        if (!"待处理".equals(appointment.getApptStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "该预约已处理，请刷新后查看");
+        }
+        if ("已拒绝".equals(dto.getApptStatus()) && !StringUtils.hasText(dto.getRemark())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "拒绝预约时必须填写原因");
+        }
+
+        appointment.setApptStatus(dto.getApptStatus());
+        appointment.setRemark(StringUtils.hasText(dto.getRemark())
+                ? dto.getRemark().trim()
+                : "专家已接受预约，请按约定时间联系。");
+        appointmentMapper.updateById(appointment);
     }
 
     /**

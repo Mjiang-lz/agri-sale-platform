@@ -24,6 +24,12 @@ public class AppointmentVO implements Serializable {
     /** 被预约专家主键 */
     private Long expertId;
 
+    /** 预约农户用户主键，专家侧列表使用 */
+    private Long farmerId;
+
+    /** 预约农户姓名，专家侧列表使用 */
+    private String farmerName;
+
     /** 专家姓名（查 t_expert.user_id → t_user.real_name） */
     private String expertName;
 

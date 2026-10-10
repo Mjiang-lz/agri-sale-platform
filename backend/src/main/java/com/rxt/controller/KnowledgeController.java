@@ -28,6 +28,12 @@ public class KnowledgeController {
         return Result.success(knowledgeService.pageQuery(category, keyword, page, size));
     }
 
+    /** 当前专家自己的知识投稿，含待审核、已通过、未通过全部状态。 */
+    @GetMapping("/my")
+    public Result<List<Knowledge>> myKnowledge() {
+        return Result.success(knowledgeService.myKnowledge(UserContext.currentUserId()));
+    }
+
     // 详情接口
     @GetMapping("/{id}")
     public Result<Knowledge> detail(@PathVariable Long id) {

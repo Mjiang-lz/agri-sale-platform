@@ -11,4 +11,7 @@ public interface KnowledgeService {
 
     /** 专家新增知识，返回知识主键。 */
     Long createKnowledge(Long userId, KnowledgeCreateDTO dto);
+
+    /** 当前专家自己的全部知识投稿。 */
+    List<Knowledge> myKnowledge(Long userId);
 }
