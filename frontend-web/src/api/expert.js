@@ -74,3 +74,15 @@ export function getExpertPendingQuestions() {
 export function submitExpertAnswer(payload) {
   return request.post('/expert/qa/answer', payload)
 }
+
+/** 专家工作台：查询当前专家自己的预约列表。 */
+export function getExpertAppointments(status) {
+  return request.get('/expert/appointment/expert', {
+    params: status && status !== '全部' ? { status } : {}
+  })
+}
+
+/** 专家工作台：接受或拒绝预约。 */
+export function handleExpertAppointment(apptId, payload) {
+  return request.post(`/expert/appointment/${apptId}/handle`, payload)
+}

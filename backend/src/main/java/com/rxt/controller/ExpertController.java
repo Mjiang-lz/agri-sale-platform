@@ -14,6 +14,7 @@ import com.rxt.vo.AppointmentVO;
 import com.rxt.vo.ExpertVO;
 import jakarta.validation.Valid;
 import com.rxt.dto.AppointmentDTO;
+import com.rxt.dto.AppointmentHandleDTO;
 
 @RestController
 @RequestMapping("/expert")
@@ -47,6 +48,26 @@ public class ExpertController {
     public Result<List<AppointmentVO>> myAppointments() {
         permissionChecker.requireRole(RoleConstant.FARMER);
         return Result.success(expertService.myAppointments(UserContext.currentUserId()));
+    }
+
+    /**
+     * 专家侧预约列表，只返回当前登录专家自己的预约。
+     */
+    @GetMapping("/appointment/expert")
+    public Result<List<AppointmentVO>> expertAppointments(@RequestParam(required = false) String status) {
+        permissionChecker.requireRole(RoleConstant.EXPERT);
+        return Result.success(expertService.expertAppointments(UserContext.currentUserId(), status));
+    }
+
+    /**
+     * 专家接受或拒绝预约。预约状态与备注真实写回 t_appointment。
+     */
+    @PostMapping("/appointment/{apptId}/handle")
+    public Result<Void> handleAppointment(@PathVariable Long apptId,
+                                          @RequestBody @Valid AppointmentHandleDTO dto) {
+        permissionChecker.requireRole(RoleConstant.EXPERT);
+        expertService.handleAppointment(UserContext.currentUserId(), apptId, dto);
+        return Result.success();
     }
 
     /**

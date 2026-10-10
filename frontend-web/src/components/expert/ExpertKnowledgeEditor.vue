@@ -7,20 +7,30 @@
           <strong>专家知识投稿</strong>
           <span>新知识先进入审核队列，管理员通过后才会公开展示</span>
         </div>
-        <el-button type="primary" @click="openEditor">发布知识</el-button>
+        <div class="head-actions">
+          <el-button text @click="expanded = !expanded">投稿记录（{{ submissions.length }}）{{ expanded ? '收起' : '展开' }}</el-button>
+          <el-button type="primary" @click="openEditor">发布知识</el-button>
+        </div>
       </div>
     </template>
 
-    <div v-if="submissions.length" class="submission-list">
-      <div v-for="item in submissions" :key="item.knowledgeId" class="submission-item">
-        <div>
-          <strong>{{ item.title }}</strong>
-          <span>{{ item.category }} · {{ formatDateTime(item.createTime) }}</span>
+    <el-collapse-transition>
+      <div v-show="expanded" class="submission-list-wrap">
+        <div v-if="submissions.length" class="submission-list">
+          <div v-for="item in submissions" :key="item.knowledgeId" class="submission-item">
+            <div>
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.category }} · {{ formatDateTime(item.createTime) }}</span>
+            </div>
+            <div class="submission-actions">
+              <el-tag :type="statusType(item.auditStatus)">{{ statusText(item.auditStatus) }}</el-tag>
+              <el-button circle text class="close-button" aria-label="关闭投稿记录" @click="$emit('dismiss', item)">×</el-button>
+            </div>
+          </div>
         </div>
-        <el-tag type="warning">{{ item.auditStatus }}</el-tag>
+        <el-empty v-else description="还没有知识投稿记录" :image-size="70" />
       </div>
-    </div>
-    <el-empty v-else description="还没有通过本页提交的知识投稿" :image-size="70" />
+    </el-collapse-transition>
 
     <el-dialog v-model="visible" title="发布农业知识" width="min(760px, 95vw)" destroy-on-close>
       <el-alert type="info" :closable="false" show-icon title="投稿后会进入待审核状态，审核通过后在农业知识列表公开。" />
@@ -58,9 +68,10 @@ import { uploadKnowledgeImage } from '@/api/common'
 import { createKnowledge } from '@/api/knowledge'
 
 defineProps({ submissions: { type: Array, default: () => [] } })
-const emit = defineEmits(['created'])
+const emit = defineEmits(['created', 'dismiss'])
 
 const visible = ref(false)
+const expanded = ref(false)
 const uploading = ref(false)
 const submitting = ref(false)
 const formRef = ref()
@@ -109,18 +120,25 @@ async function submit() {
   submitting.value = true
   try {
     const knowledgeId = await createKnowledge({ ...form })
-    emit('created', {
-      knowledgeId,
-      title: form.title,
-      category: form.category,
-      auditStatus: '待审核',
-      createTime: new Date().toISOString().slice(0, 19)
-    })
+    emit('created', { knowledgeId })
+    expanded.value = true
     visible.value = false
     ElMessage.success('知识已投稿，等待管理员审核')
   } finally {
     submitting.value = false
   }
+}
+
+function statusText(status) {
+  if (status === '已通过') return '已通过'
+  if (status === '未通过') return '未通过'
+  return '待审核'
+}
+
+function statusType(status) {
+  if (status === '已通过') return 'success'
+  if (status === '未通过') return 'danger'
+  return 'warning'
 }
 
 function formatDateTime(value) {
@@ -133,6 +151,10 @@ function formatDateTime(value) {
 .editor-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .editor-head strong, .editor-head span { display: block; }
 .editor-head span { margin-top: 4px; color: #6f7e76; font-size: 12px; }
+.head-actions { display: flex; align-items: center; gap: 8px; }
+.submission-list-wrap { min-height: 80px; }
+.submission-actions { display: flex; align-items: center; gap: 4px; }
+.close-button { color: #8b978f; font-size: 18px; }
 .submission-list { display: grid; gap: 9px; }
 .submission-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #dcebe0; border-radius: 11px; background: #fff; }
 .submission-item strong, .submission-item span { display: block; }

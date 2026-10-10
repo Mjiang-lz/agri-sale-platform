@@ -33,6 +33,15 @@ export default defineConfig({
       }
     }
   },
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: API_TARGET,
+        changeOrigin: true
+      }
+    }
+  },
   build: {
     outDir: 'dist',
     sourcemap: false
