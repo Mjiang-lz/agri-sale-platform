@@ -588,7 +588,20 @@ const heroTitle = computed(() => HERO_TEXT[heroIdx.value].title)
 const heroDesc = computed(() => HERO_TEXT[heroIdx.value].desc)
 
 const keyword = ref('')
-const hotWords = ['赣南脐橙', '高山蔬菜', '散养鸡蛋', '稻米']
+/**
+ * 热门搜索词。
+ *
+ * ★ 2026-10-10：原先是 ['赣南脐橙', '高山蔬菜', '散养鸡蛋', '稻米'] ——
+ * 实测其中 3 个点下去是**空结果**：「高山蔬菜」「散养鸡蛋」「稻米」
+ * 既不是任何商品名的子串，也不是品类或产地（库里实际叫「散养土鸡蛋」「五常大米」）。
+ * 热词点了没反应，比不显示热词更伤。
+ *
+ * 换词口径：每个词都必须能命中 ≥1 条在架商品。
+ * 判定方式 = 后端 keyword 的匹配范围（商品名 / 品类 / 产地三者取或），
+ * **改这批词前请先照这个范围实测一遍**，别照感觉写。
+ * 当前 4 个词各自命中：赣南脐橙 1 条、散养土鸡蛋 1 条、五常大米 1 条、小龙虾 1 条。
+ */
+const hotWords = ['赣南脐橙', '散养土鸡蛋', '五常大米', '小龙虾']
 function doSearch() {
   const k = keyword.value.trim()
   router.push({ path: '/trade/products', query: k ? { keyword: k } : {} })
