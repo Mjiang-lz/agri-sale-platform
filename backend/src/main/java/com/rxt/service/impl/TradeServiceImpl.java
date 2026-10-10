@@ -20,8 +20,10 @@ import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
 import com.rxt.security.PermissionChecker;
 import com.rxt.security.RoleConstant;
+import com.rxt.service.AddressService;
 import com.rxt.service.CommentService;
 import com.rxt.service.TradeService;
+import com.rxt.vo.AddressVO;
 import com.rxt.vo.CartVO;
 import com.rxt.vo.CommentVO;
 import com.rxt.vo.OrderVO;
@@ -90,6 +92,7 @@ public class TradeServiceImpl implements TradeService {
     private final UserMapper userMapper;
     private final FarmerProfileMapper farmerProfileMapper;
     private final CommentService commentService;
+    private final AddressService addressService;
     private final PermissionChecker permissionChecker;
 
     @Override
@@ -217,7 +220,9 @@ public class TradeServiceImpl implements TradeService {
         }
         wrapper.orderByDesc(Product::getCreateTime);
 
-        return productMapper.selectPage(page, wrapper).convert(this::convertToProductVO);
+        // 用 convertToMyProductVO 而不是 convertToProductVO：前者多带 description 与 images，
+        // 编辑表单要用它们回显。前台列表用后者，避免一页 12 条各带一段 500 字描述
+        return productMapper.selectPage(page, wrapper).convert(this::convertToMyProductVO);
     }
 
     /**
@@ -368,7 +373,14 @@ public class TradeServiceImpl implements TradeService {
             throw new BizException(ResultCode.BAD_REQUEST.getCode(), "购买数量至少为 1");
         }
 
-        // 2. 校验商品：存在、已通过、已上架
+        // 2. 校验收货地址：必须存在且属于当前买家。
+        //    loadOwned 内部已做归属校验，传别人的 addressId 会在这里被挡下
+        //    （否则可以把货发到任意地址上）。
+        //    放在扣库存之前：这是「调用方输入」层面的校验，一次单行读就能完成，
+        //    没必要先锁住商品行再报错。
+        AddressVO address = addressService.loadOwned(buyerId, dto.getAddressId());
+
+        // 3. 校验商品：存在、已通过、已上架
         //    这两条与下面的库存不足都显式用 400：它们都是「调用方可以自行修正」的问题
         //    （换商品、少买点），若用 BizException(String) 会落到 BIZ_ERROR(500)，
         //    和真正的服务端故障混成同一类，误导日志排查与前端提示
@@ -378,7 +390,7 @@ public class TradeServiceImpl implements TradeService {
             throw new BizException(ResultCode.BAD_REQUEST.getCode(), "商品不存在或已下架");
         }
 
-        // 3. 原子扣减库存：判断「够不够」与扣减在同一条 UPDATE 里完成。
+        // 4. 原子扣减库存：判断「够不够」与扣减在同一条 UPDATE 里完成。
         //    ⚠️ 不能改成「先读 stock 判断、再 updateById 回写」——那是读-改-写，
         //    两个并发下单会读到同一个旧库存而双双通过，最终卖出的比库存还多（超卖）。
         //    rows == 0 即表示库存不足（或商品刚被删），两者都按「库存不足」处理。
@@ -388,10 +400,14 @@ public class TradeServiceImpl implements TradeService {
             throw new BizException(ResultCode.BAD_REQUEST.getCode(), "库存不足");
         }
 
-        // 4. 生成唯一订单编号：RX + 年月日时分秒 + 4 位随机数
+        // 5. 生成唯一订单编号：RX + 年月日时分秒 + 4 位随机数
         String orderNo = generateOrderNo();
 
-        // 5. 组装订单（unitPrice 做价格快照，避免后续改价影响老订单）
+        // 6. 组装订单
+        //    unitPrice 做价格快照，避免后续改价影响老订单；
+        //    收货人 / 电话 / 地址同样做**下单时快照**（不是存 addressId），
+        //    理由见 Order 实体上 consignee 字段的注释 —— 地址改了删了都不该
+        //    影响历史订单里记的「当时发到哪」。
         Order order = new Order();
         order.setOrderNo(orderNo);
         order.setBuyerId(buyerId);
@@ -400,10 +416,28 @@ public class TradeServiceImpl implements TradeService {
         order.setQuantity(dto.getQuantity());
         order.setUnitPrice(product.getPrice());
         order.setOrderAmount(product.getPrice().multiply(BigDecimal.valueOf(dto.getQuantity())));
+        order.setConsignee(address.getConsignee());
+        order.setConsigneePhone(address.getPhone());
+        order.setReceiverAddress(address.getFullAddress());
+        order.setOrderRemark(StringUtils.hasText(dto.getOrderRemark()) ? dto.getOrderRemark().trim() : null);
         order.setOrderStatus(ORDER_PENDING_PAY);
 
-        // 6. 写入订单
+        // 7. 写入订单
         orderMapper.insert(order);
+
+        // 8. 把这一条从购物车里清掉。
+        //    放在 createOrder 里而不是让前端下单成功后再调一次删除接口，有两个原因：
+        //      ① 事务性 —— 下单与清车在同一次事务里。前端分两步做的话，
+        //         用户在网络慢时关掉页面，订单已生成、购物车里还留着同一件货，
+        //         下次进来会再买一遍；
+        //      ② 「立即购买」（不走购物车）这条路径同样安全 ——
+        //         t_cart 对 (buyer_id, product_id) 有唯一键 uk_cart_buyer_product，
+        //         删除命中 0 行不会报错，也不需要先判断存不存在。
+        //    只在订单真正落库后执行，所以下单失败（库存不足等）时购物车原样保留。
+        LambdaQueryWrapper<Cart> cartWrapper = new LambdaQueryWrapper<>();
+        cartWrapper.eq(Cart::getBuyerId, buyerId).eq(Cart::getProductId, dto.getProductId());
+        cartMapper.delete(cartWrapper);
+
         return order.getOrderId();
     }
 
@@ -689,6 +723,11 @@ public class TradeServiceImpl implements TradeService {
         vo.setQuantity(order.getQuantity());
         vo.setUnitPrice(order.getUnitPrice());
         vo.setOrderAmount(order.getOrderAmount());
+        // 收货信息（下单时快照）。历史订单这几列为 NULL，前端按「未填写」展示
+        vo.setConsignee(order.getConsignee());
+        vo.setConsigneePhone(order.getConsigneePhone());
+        vo.setReceiverAddress(order.getReceiverAddress());
+        vo.setOrderRemark(order.getOrderRemark());
         vo.setOrderStatus(order.getOrderStatus());
         vo.setPayTime(order.getPayTime());
         vo.setDeliverTime(order.getDeliverTime());
@@ -755,6 +794,21 @@ public class TradeServiceImpl implements TradeService {
         vo.setSellerId(product.getSellerId());
         vo.setAuditStatus(product.getAuditStatus());
         vo.setStatus(product.getStatus());
+        return vo;
+    }
+
+    /**
+     * 「我的商品」列表专用：在列表字段之外补上 description 与 images。
+     *
+     * <p>为什么不让 {@link #convertToProductVO} 一并带上：那个方法是前台商品列表
+     * 共用的（一页 12 条），带上 500 字的描述只是白白撑大响应体。
+     * 而农户的编辑表单必须回显这两项 —— 不回显的话，农户点「编辑」看到的是空描述框，
+     * 一保存就把原文案清掉了，而保存又会触发重新审核、把商品下架。</p>
+     */
+    private ProductVO convertToMyProductVO(Product product) {
+        ProductVO vo = convertToProductVO(product);
+        vo.setDescription(product.getDescription());
+        vo.setImages(product.getImages());
         return vo;
     }
 }

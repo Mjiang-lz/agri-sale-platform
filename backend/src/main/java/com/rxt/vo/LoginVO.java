@@ -37,4 +37,15 @@ public class LoginVO implements Serializable {
      * 仅供展示，不构成安全边界 —— 真正的越权判定始终在后端服务层。</p>
      */
     private String menuPerms;
+
+    /**
+     * 头像地址（本地模式形如 /api/files/avatar/2026/10/xxx.jpg；从未设置过则为 null）。
+     *
+     * <p>必须随登录一起下发。此前漏了这个字段，链路是：
+     * 个人中心传头像 → 保存成功（库里 avatar_url 已更新）→
+     * 但前端 saveLogin 会用登录响应**整体覆盖**本地 profile，
+     * 而登录响应里没有头像地址 —— 于是重新登录后顶栏又退回昵称首字，
+     * 用户看到的就是「上传了但头像框没变化」。</p>
+     */
+    private String avatarUrl;
 }
