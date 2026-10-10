@@ -45,24 +45,30 @@
       <el-header class="header">
         <span>{{ $route.meta.title || '融销通 · 管理后台' }}</span>
       </el-header>
-      <el-main>
+      <el-main class="main">
         <router-view />
       </el-main>
+      <el-footer class="footer">
+        <span class="footer-text">融销通 · 农产品产销融资管理平台</span>
+        <span class="footer-text">Copyright © {{ year }} 融销通 · 管理后台</span>
+      </el-footer>
     </el-container>
   </el-container>
 </template>
 
 <script setup>
-import RxtIcon from '@/components/RxtIcon.vue'
-import RxtLogo from '@/components/RxtLogo.vue'
+
 </script>
 
 <style scoped>
 .layout {
-  height: 100%;
+  /* 不锁高度：让内容自然撑开，页脚跟在内容末尾、滚到底才出现 */
+  min-height: 100vh;
 }
 .aside {
   border-right: 1px solid var(--el-border-color-light);
+  display: flex;
+  flex-direction: column;
 }
 .brand {
   height: 60px;
@@ -99,5 +105,30 @@ import RxtLogo from '@/components/RxtLogo.vue'
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--el-border-color-light);
+}
+.main {
+  /* 让滚动交给整个页面：el-main 默认 overflow:auto 会自己开一个滚动区，
+     那样 footer 会被固定在框内。改成 visible 后页面整体滚动，页脚自然落在内容末尾 */
+  overflow: visible;
+  min-height: 0;
+}
+.footer {
+  flex-shrink: 0;
+  height: auto;
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--el-border-color-light);
+  background: var(--el-bg-color);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.footer-text + .footer-text::before {
+  content: '|';
+  margin-right: 12px;
+  color: var(--el-border-color);
 }
 </style>
