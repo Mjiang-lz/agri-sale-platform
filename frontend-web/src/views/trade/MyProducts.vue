@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>我的商品</h2>
-        <p>发布并管理你自己上架的农产品。新发布的商品先进入审核队列，管理员通过后自动上架，之后你可以随时手动下架。</p>
+        <p>发布并管理你自己上架的农产品。新发布的商品先进入审核队列，管理员通过后自动上架，之后你可以随时手动下架</p>
       </div>
       <div class="head-actions">
         <el-button :loading="loading" @click="loadList">刷新</el-button>

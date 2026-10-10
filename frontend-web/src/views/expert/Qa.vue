@@ -7,7 +7,7 @@
       <div>
         <span class="eyebrow">专家在线答疑</span>
         <h2>有问题，交给懂农业的人</h2>
-        <p>描述作物或养殖情况，选择擅长领域的专家，也可以让平台自动分派。</p>
+        <p>描述作物或养殖情况，选择擅长领域的专家，也可以让平台自动分派</p>
       </div>
       <div class="hero-metrics">
         <div><strong>{{ questions.length }}</strong><span>我的提问</span></div>

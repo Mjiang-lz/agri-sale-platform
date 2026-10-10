@@ -4,7 +4,7 @@
       <div>
         <span class="eyebrow">农业知识库</span>
         <h2>把实用的农业经验送到每一块田里</h2>
-        <p>按分类和关键词检索平台已审核通过的种植、养殖、病虫害防治、市场行情与政策知识。</p>
+        <p>按分类和关键词检索平台已审核通过的种植、养殖、病虫害防治、市场行情与政策知识</p>
       </div>
       <div class="hero-stat">
         <strong>{{ filteredList.length }}</strong>
@@ -60,7 +60,20 @@
       </div>
     </el-card>
 
-    <el-drawer v-model="detailVisible" title="农业知识详情" size="min(700px, 96%)">
+    <!-- ★ 2026-10-10：由右侧抽屉改为居中弹窗（用户要求「不要采用抽屉式」）。
+         抽屉的问题是形态本身：700px 宽的竖长条贴在屏幕右边，正文被压进窄栏，
+         长文章要滚很久，读者视线也始终偏在屏幕一侧。
+         弹窗居中后宽度更接近正文的舒适阅读宽度，配合 body 限高滚动，更像在读文章。
+         注意 el-dialog 默认 teleport 到 body，`.el-dialog__body` 的限高规则
+         只能写在文件末尾那个**非 scoped** 的 style 块里 —— scoped 选择器够不着组件内部结构。 -->
+    <el-dialog
+      v-model="detailVisible"
+      title="农业知识详情"
+      width="min(760px, 94%)"
+      top="6vh"
+      class="knowledge-detail-dialog"
+      destroy-on-close
+    >
       <div v-loading="detailLoading">
         <template v-if="detail">
           <el-tag>{{ detail.category }}</el-tag>
@@ -81,7 +94,7 @@
           />
         </template>
       </div>
-    </el-drawer>
+    </el-dialog>
   </div>
 </template>
 
@@ -250,4 +263,21 @@ onMounted(() => {
 .content-tip { margin-top: 28px; }
 @media (max-width: 980px) { .knowledge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 680px) { .hero, .toolbar { flex-direction: column; align-items: stretch; } .toolbar .el-input { width: 100% !important; } .knowledge-grid { grid-template-columns: 1fr; } }
+</style>
+
+<!--
+  这个块**故意不加 scoped**。
+  el-dialog 默认 teleport 到 body，弹窗内部的 `.el-dialog__body` 由 Element Plus
+  自己渲染，不带本组件的 data-v 属性，scoped 选择器一律选不中。
+  用 dialog 自己的 class（.knowledge-detail-dialog）做命名空间，避免污染全局版本。
+  限高 + 滚动的理由：知识正文长度不一（实测最长 112 字，还可能更长），
+  不限高的话弹窗会顶出视口，底部的「内容说明」永远看不到。
+-->
+<style>
+.knowledge-detail-dialog .el-dialog__body {
+  max-height: 68vh;
+  overflow-y: auto;
+}
+/* 正文行高偏大（2.0），首尾留白在滚动容器里会显得空，收一点 */
+.knowledge-detail-dialog .el-dialog__body > div { padding-bottom: 4px; }
 </style>

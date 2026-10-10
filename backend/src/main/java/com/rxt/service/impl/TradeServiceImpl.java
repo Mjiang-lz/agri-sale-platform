@@ -114,7 +114,25 @@ public class TradeServiceImpl implements TradeService {
                 .eq(Product::getStatus, STATUS_ON);
 
         if (StringUtils.hasText(keyword)) {
-            wrapper.like(Product::getProductName, keyword);
+            // 关键词同时匹配 商品名 / 品类 / 产地。
+            // 首页的搜索框与热门标签是「一个框搜全站」的用法，用户会输入「水果」
+            // 「水产」这类品类词、或「赣州」这类产地词；只 like 商品名的话
+            // 这些词一条都命中不了（实测首页 4 个热词里 3 个得 0 条）。
+            //
+            // ★ 必须用 and(...) 把三个 or 裹成一组。
+            // LambdaQueryWrapper 是把条件平铺拼 AND 的，如果写成
+            //   wrapper.like(name,kw).or().like(category,kw).or().like(origin,kw)
+            // 生成的 SQL 会是
+            //   ... AND audit_status='已通过' AND status=1 AND name LIKE ?
+            //       OR category LIKE ? OR origin LIKE ?
+            // —— OR 优先级低于 AND，会把上面「只展示已通过且上架」的约束整个冲掉，
+            // 待审核、已下架的商品会一起被查出来。包一层 and(...) 才是
+            //   ... AND audit_status='已通过' AND status=1
+            //       AND (name LIKE ? OR category LIKE ? OR origin LIKE ?)
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(Product::getProductName, kw)
+                    .or().like(Product::getCategory, kw)
+                    .or().like(Product::getOrigin, kw));
         }
         if (StringUtils.hasText(category)) {
             wrapper.eq(Product::getCategory, category);

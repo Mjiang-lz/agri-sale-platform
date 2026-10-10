@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>商品货源</h2>
-        <p>平台在架的农产品货源，支持按品类、产地与价格区间筛选。</p>
+        <p>平台在架的农产品货源，支持按品类、产地与价格区间筛选</p>
       </div>
       <div class="head-actions">
         <el-button :loading="loading" @click="loadProducts">刷新</el-button>
@@ -120,8 +120,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getTradeProducts } from '@/api/trade'
 import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
@@ -140,6 +140,7 @@ import { productImage, productFallbackBg, productFallbackText } from '@/utils/im
  * 「没有商品」和「拿不到商品」在页面上必须能区分开。
  */
 const router = useRouter()
+const route = useRoute()
 
 const loading = ref(false)
 const products = ref([])
@@ -246,7 +247,38 @@ function goDetail(p) {
   router.push(`/trade/product/${p.productId}`)
 }
 
-onMounted(loadProducts)
+/**
+ * ★ 2026-10-10 修复：本页原先**从不读 route.query**。
+ *
+ * 上游其实都正确地传了参数 —— 首页搜索框 `push({ query: { keyword } })`、
+ * 品类圆形入口 `goCategory()` `push({ query: { category } })` —— 但本页只有
+ * 一个自己的 `query` 对象，初值全空，于是表现成「搜什么都只出全量列表」。
+ * 看起来像搜索坏了，实际是参数在这一跳被丢掉了。
+ *
+ * `pick` 把非字符串（数组 / null / undefined）挡掉：query 在地址栏里用户可手改，
+ * `?keyword=a&keyword=b` 会被解析成数组，直接塞进 el-input 会渲染成 "a,b"。
+ */
+function syncFromRoute() {
+  const pick = (v) => (typeof v === 'string' ? v : '')
+  query.keyword = pick(route.query.keyword)
+  query.category = pick(route.query.category)
+  query.origin = pick(route.query.origin)
+}
+
+// 同一个组件实例里再次从首页跳进来时 onMounted 不会再跑，所以必须监听路由。
+watch(
+  () => route.query,
+  () => {
+    syncFromRoute()
+    pageNum.value = 1
+    loadProducts()
+  }
+)
+
+onMounted(() => {
+  syncFromRoute()
+  loadProducts()
+})
 </script>
 
 <style scoped>

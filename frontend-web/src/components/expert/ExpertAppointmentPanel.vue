@@ -9,7 +9,7 @@
       <div>
         <span class="eyebrow">专家工作台 · 线下预约</span>
         <h2>{{ expert.realName }}，请及时处理农户预约</h2>
-        <p>接受后可与农户确认服务时间，暂不能提供服务的预约请填写原因并拒绝。</p>
+        <p>接受后可与农户确认服务时间，暂不能提供服务的预约请填写原因并拒绝</p>
       </div>
       <div class="hero-metric"><strong>{{ pendingCount }}</strong><span>待处理预约</span></div>
     </section>

@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>融资审批</h2>
-        <p>这里是已推送至银行侧的融资申请。查看农户信息与资金用途后给出审批结论，结论会实时回传到农户的「我的融资」。</p>
+        <p>这里是已推送至银行侧的融资申请。查看农户信息与资金用途后给出审批结论，结论会实时回传到农户的「我的融资」</p>
       </div>
       <div class="head-actions">
         <el-button :loading="loading" @click="loadList">刷新</el-button>

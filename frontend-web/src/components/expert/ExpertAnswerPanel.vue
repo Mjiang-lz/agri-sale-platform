@@ -5,7 +5,7 @@
       <div>
         <span class="eyebrow">专家工作台 · 在线答疑</span>
         <h2>{{ expert.realName }}，待回复问题都在这里</h2>
-        <p>公开问题任何专家可认领，指定给你的问题只有你可以回复。提交后问题状态会自动更新为“已回复”。</p>
+        <p>公开问题任何专家可认领，指定给你的问题只有你可以回复。提交后问题状态会自动更新为“已回复”</p>
       </div>
       <div class="hero-metric">
         <strong>{{ pendingQuestions.length }}</strong>
