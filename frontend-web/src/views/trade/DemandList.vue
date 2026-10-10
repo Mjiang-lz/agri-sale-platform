@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>求购需求</h2>
-        <p>采购方与农户发布的求购需求，可按品类和收货地区筛选。</p>
+        <p>采购方与农户发布的求购需求，可按品类和收货地区筛选</p>
       </div>
       <div class="head-actions">
         <el-button :loading="loading" @click="loadDemands">刷新</el-button>

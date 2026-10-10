@@ -17,7 +17,7 @@
       <div>
         <span class="eyebrow">线下专家服务</span>
         <h2>预约专家，获得面对面指导</h2>
-        <p>选择领域专家，填写预约时间和咨询主题。预约提交后会进入专家待处理队列。</p>
+        <p>选择领域专家，填写预约时间和咨询主题。预约提交后会进入专家待处理队列</p>
       </div>
       <div class="hero-badge"><strong>{{ experts.length }}</strong><span>位专家可预约</span></div>
     </section>

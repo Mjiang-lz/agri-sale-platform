@@ -4,7 +4,7 @@
       <div>
         <span class="eyebrow">农业知识库</span>
         <h2>把实用的农业经验送到每一块田里</h2>
-        <p>按分类和关键词检索平台已审核通过的种植、养殖、病虫害防治、市场行情与政策知识。</p>
+        <p>按分类和关键词检索平台已审核通过的种植、养殖、病虫害防治、市场行情与政策知识</p>
       </div>
       <div class="hero-stat">
         <strong>{{ filteredList.length }}</strong>

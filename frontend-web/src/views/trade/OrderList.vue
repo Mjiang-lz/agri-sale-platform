@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>我的订单</h2>
-        <p>查看订单状态流转，支持支付、确认收货与取消。</p>
+        <p>查看订单状态流转，支持支付、确认收货与取消</p>
       </div>
       <div class="head-actions">
         <el-radio-group v-model="viewMode" size="small">
