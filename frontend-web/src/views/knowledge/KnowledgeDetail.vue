@@ -60,12 +60,20 @@
         配图用 contain 不用 cover：知识配图可能是竖图（实测有一张 810×1440），
         cover 会把竖图裁成中间一条，读者看不到全貌。
         容器居中 + 限高，横图竖图都不会把页面撑坏；点图可放大看细节。
+
+        ★ 2026-10-12 修：原来 v-if 只看 `knowledge.imageUrl`，于是出现
+        「首页卡片有图、点进来却没有」的割裂 —— 首页卡片走的是 `knowledgeImage()`
+        三级兜底，而详情页只认第一级（数据库字段），可库里 19 条有 18 条该字段是 NULL。
+        现在两边同源：都用 `knowledgePhoto()`，作者传了图就用作者的，
+        没有则退到标题命中的实拍主题图。
+        但**不含**分类渐变封面那一级 —— 渐变块在文章页没有信息量，
+        配「点击图片可放大」更荒谬，所以没有真图就干脆不显示配图块。
       -->
-      <div v-if="knowledge.imageUrl" class="cover-box">
+      <div v-if="photo" class="cover-box">
         <el-image
           class="cover-image"
-          :src="knowledge.imageUrl"
-          :preview-src-list="[knowledge.imageUrl]"
+          :src="photo"
+          :preview-src-list="[photo]"
           preview-teleported
           fit="contain"
         />
@@ -94,15 +102,21 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getKnowledgeDetail } from '@/api/knowledge'
+import { knowledgePhoto } from '@/utils/imagery'
 
 const route = useRoute()
 const router = useRouter()
 
 const loading = ref(true)
 const knowledge = ref(null)
+/**
+ * 配图（作者上传的 或 标题命中的实拍主题图）。
+ * 没有真图时为空串 ⇒ 模板整个配图块不渲染，而不是退化成一张渐变横幅。
+ */
+const photo = computed(() => knowledgePhoto(knowledge.value))
 const errorMessage = ref('')
 /** 'ok' | 'missing'（404，重试无意义）| 'error'（可重试） */
 const status = ref('ok')

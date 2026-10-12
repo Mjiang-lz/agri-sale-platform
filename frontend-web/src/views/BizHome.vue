@@ -432,11 +432,15 @@
          「田间求购」保持同一套体系，不另外造一套标题样式。
 
          数据源：GET /home/knowledge（t_knowledge），按 createTime 倒序取 4 条。
-         配图：k.imageUrl 优先，为空走 knowledgeImage()。
-         （t_knowledge.image_url 目前 18 条全是 NULL，实际都会走前端映射：
+         配图：统一走 knowledgeImage(k)（接口图 → 标题命中实拍图 → 分类渐变封面）。
+         （t_knowledge.image_url 19 条里有 18 条是 NULL，实际都会走前端映射：
            标题里带具象农产品/养殖词 → 配对应实拍图；政策、认证这类
            本就没有对应实物的 → 配分类渐变封面。**不要**再按分类随机取模，
            那会让「畜禽粪污资源化」配上一碗小米。）
+
+         ★ 单篇详情页（/knowledge/:id）用的是另一个函数 knowledgePhoto() ——
+           它只返回前两级，**不含渐变封面**，没有真图就不显示配图块。
+           卡片能接受渐变块当装饰，文章页不能：那是纯噪音。两处别混用。
          ================================================================ -->
     <section class="news">
       <div class="sec-head">
@@ -459,8 +463,12 @@
           @click="goKnowledge(k)"
         >
           <div class="nc-cover">
+            <!--
+              knowledgeImage() 内部已经优先取 k.imageUrl，所以这里不必再 `k.imageUrl ||` ——
+              那样写会让人误以为"要先把接口图挡在前面"，而实际上后者永远不会被触发到。
+            -->
             <img
-              :src="k.imageUrl || knowledgeImage(k)"
+              :src="knowledgeImage(k)"
               :alt="k.title"
               loading="lazy"
               @error="onImgError"
