@@ -127,22 +127,7 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item disabled>账号身份：{{ actualRole || '未同步' }}</el-dropdown-item>
-              <!-- 当前身份从顶栏撤进了这个菜单：顶栏那个位置让给昵称。
-                   菜单项的文案随当前视角变化 —— 否则顶栏只剩昵称，
-                   用户切了身份之后没有任何地方能看出切换生效了。
-                   （登录角色 = 后端下发的 roleName，改不了；
-                     当前视角 = 前端可切的 activeRole，只影响导航。） -->
-              <el-dropdown-item v-if="canSwitchRole" command="role:农户" :disabled="activeRole === '农户'">
-                {{ activeRole === '农户' ? '当前视角：农户' : '切换为农户' }}
-              </el-dropdown-item>
-              <el-dropdown-item v-if="canSwitchRole" command="role:采购方" :disabled="activeRole === '采购方'">
-                {{ activeRole === '采购方' ? '当前视角：采购方' : '切换为采购方' }}
-              </el-dropdown-item>
-              <!-- 这句是给「能切」的人看的说明；银行/专家根本无从切换，
-                   显示出来只会让人以为漏看了什么入口 -->
-              <el-dropdown-item v-if="canSwitchRole" disabled>
-                切换仅影响前端导航，接口权限仍按登录账号
-              </el-dropdown-item>
+              
               <el-dropdown-item divided command="profile">个人中心</el-dropdown-item>
               <el-dropdown-item command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
