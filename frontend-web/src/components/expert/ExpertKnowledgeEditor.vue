@@ -41,7 +41,20 @@
       </div>
     </el-collapse-transition>
 
-    <el-dialog v-model="visible" :title="editingId ? '编辑农业知识' : '发布农业知识'" width="min(760px, 95vw)" destroy-on-close>
+    <!--
+      宽度：用户要求「占页面布局的 70%」⇒ 用视口比例而不是固定像素。
+      1200px 是上限，只在超宽屏生效（视口 ≤1714px 时严格等于 70%，本机 1600px 视口 = 1120px）——
+      不加上限的话 2560px 屏上正文会长到一行放 90 个字，反而更难读。
+      top 配合调小：弹窗变宽后正文行数也加了，15vh 的默认顶部留白会让高度溢出视口。
+    -->
+    <el-dialog
+      v-model="visible"
+      class="knowledge-editor-dialog"
+      :title="editingId ? '编辑农业知识' : '发布农业知识'"
+      width="min(1200px, 70vw)"
+      top="5vh"
+      destroy-on-close
+    >
       <el-alert
         :key="editingId || 'create'"
         type="info"
@@ -61,7 +74,8 @@
           </el-select>
         </el-form-item>
         <el-form-item label="知识正文" prop="content">
-          <el-input v-model="form.content" type="textarea" :rows="10" maxlength="5000" show-word-limit placeholder="请填写完整、可执行的农业技术内容" />
+          <!-- 行数从 10 提到 14：只把弹窗拉宽不加高，编辑区会显得被横向抻长 -->
+          <el-input v-model="form.content" type="textarea" :rows="14" maxlength="5000" show-word-limit placeholder="请填写完整、可执行的农业技术内容" />
         </el-form-item>
         <el-form-item label="知识配图（选填）">
           <el-upload action="#" :show-file-list="false" accept=".jpg,.jpeg,.png" :http-request="handleUpload" :before-upload="beforeUpload">
@@ -255,6 +269,18 @@ function formatDateTime(value) {
 .submission-item strong, .submission-item span { display: block; }
 .submission-item span { margin-top: 3px; color: #75827a; font-size: 12px; }
 .editor-form { margin-top: 18px; }
-.preview { display: block; width: 220px; height: 130px; margin-top: 12px; border-radius: 11px; }
+.preview { display: block; width: 300px; height: 176px; margin-top: 12px; border-radius: 11px; }
 @media (max-width: 680px) { .editor-head { align-items: stretch; flex-direction: column; } }
+</style>
+
+<style>
+/*
+ * 非 scoped 块 —— el-dialog 会 teleport 到 body，scoped 的属性选择器够不到它。
+ * 弹窗加宽加高后（70vw / 正文 14 行），加上配图预览一屏放不下。
+ * 让内容区自己滚，标题栏和底部按钮留在原地，不然滚动时「取消/提交」会跟着滑走。
+ */
+.knowledge-editor-dialog .el-dialog__body {
+  max-height: 66vh;
+  overflow-y: auto;
+}
 </style>
