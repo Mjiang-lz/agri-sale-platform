@@ -11,6 +11,19 @@ spring:
     name: rxt-backend
   profiles:
     active: dev
+    #
+    # ★ 2026-10-12 补：让 application-local.yml 真的会被加载。
+    #
+    # 改前只有 `active: dev`，而 application-dev.yml 又没有 include local ——
+    # 于是 application.yml 里那句「密钥可改用 application-local.yml 注入」是**空头承诺**：
+    # 文件建了也不会被读，密钥不生效，排查起来毫无线索（文件在、名字对、就是不生效）。
+    #
+    # 用 include 而不是把它塞进 `active`：include 是**追加**语义，
+    # 别人若用 SPRING_PROFILES_ACTIVE 覆盖 active，local 依然会在。
+    #
+    # local 这个 profile 不存在对应文件时，Spring 只是找不到配置、不会报错，
+    # 所以对没建该文件的队友完全无影响。
+    include: local
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
@@ -37,15 +50,31 @@ rxt:
     expire-hours: 24
   obs:
     # 华为云对象存储，承载商品图片 / 知识配图 / 用户头像
-    # false = 文件写本地磁盘（演示环境默认，无需密钥即可跑通上传链路）
-    # true  = 转存 OBS（须先配好下面的 access-key / secret-key）
-    enabled: false
+    #
+    # ★ 开关也走环境变量（默认 false），理由与下面密钥一致：
+    #   仓库里保持"clone 下来就能跑"——队友没有 AK/SK 也能起后端、走本地磁盘。
+    #   要启用 OBS 时在启动前 export RXT_OBS_ENABLED=true 即可，不必改这个文件。
+    #   （OS 环境变量的优先级高于任何 application*.yml，见 application-dev.yml 的同类说明）
+    #
+    # false = 文件写本地磁盘（默认，无需密钥即可跑通上传链路）
+    # true  = 转存 OBS，启动时会强校验 endpoint / bucket / access-key / secret-key，
+    #         缺任何一个**直接启动失败**（这是有意设计：让配置问题在部署阶段暴露，
+    #         而不是等演示到一半用户传图时才报错）
+    enabled: ${RXT_OBS_ENABLED:false}
     endpoint: obs.cn-north-4.myhuaweicloud.com
     bucket: rxt-oss
-    # 密钥不进版本库（《概要设计说明书》§8.3）：留空，改用环境变量或
-    # application-local.yml（已在 .gitignore 中）注入
-    access-key: ""
-    secret-key: ""
+    #
+    # ★ 密钥不进版本库（《概要设计说明书》§8.3）：这里只声明**变量名**，值一律留空。
+    #   改前是字面量 `access-key: ""`，注释虽说"用环境变量注入"，
+    #   但全仓没有任何地方写出这两个变量该叫什么名字 —— 等于说了方法没给钥匙孔。
+    #   改成占位符后名字就定死了，也省得去猜 Spring 的 relaxed binding 会怎么映射。
+    #
+    #   export RXT_OBS_ACCESS_KEY=你的AK
+    #   export RXT_OBS_SECRET_KEY=你的SK
+    #
+    # 冒号后留空 = 未配置时的默认值；enabled=false 时压根不会被读到。
+    access-key: ${RXT_OBS_ACCESS_KEY:}
+    secret-key: ${RXT_OBS_SECRET_KEY:}
     # 本地兜底存储目录，相对「进程启动时的工作目录」，不是相对 backend 模块：
     #   IDEA 里直接 Run（工作目录 = 项目根）→ <项目根>/uploads
     #   cd backend && mvn spring-boot:run        → backend/uploads
