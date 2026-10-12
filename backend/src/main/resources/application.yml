@@ -45,8 +45,16 @@ mybatis-plus:
 
 rxt:
   jwt:
-    # 生产环境务必替换为随机长密钥（不少于 32 字节），并通过环境变量注入
-    secret: rxt-platform-dev-secret-key-please-change-in-production
+    # 生产环境务必替换为随机长密钥（不少于 32 字节），并通过环境变量注入。
+    # ★ 公网暴露前**必须**注入 RXT_JWT_SECRET：scripts/share-backend.sh 会把本机后端
+    #   挂上临时公网隧道共享给队友，而下面这个默认值是**公开在版本库里的** ——
+    #   拿它签发 token 等于任何人都能伪造登录态（含管理员）。
+    #   share-backend.sh 起隧道前会先用这个默认值伪造一个管理员 token 打
+    #   /api/user/profile 做安全闸自检；只要检出「还在用默认密钥」就拒绝共享。
+    #   用法：export RXT_JWT_SECRET=$(openssl rand -base64 48) 后再重启后端。
+    #   （与 application-docker.yml 的写法保持一致，只是默认值不同：容器版默认值
+    #    本身就标注了不安全，本地版这里保留原默认值，避免影响没配环境变量的人。）
+    secret: ${RXT_JWT_SECRET:rxt-platform-dev-secret-key-please-change-in-production}
     expire-hours: 24
   obs:
     # 华为云对象存储，承载商品图片 / 知识配图 / 用户头像

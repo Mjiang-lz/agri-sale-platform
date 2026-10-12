@@ -79,7 +79,9 @@ agri-sale-platform/
 ├── frontend-admin/             # rxt-admin：管理后台（平台管理员）
 ├── frontend-landing/           # rongxiaotong-landing：官网落地页（React 19 + TanStack Router，独立静态站点）
 ├── scripts/
-│   └── demo-start.sh           # 演示/答辩一键启动（后端 + 三个前端，含就绪校验与统一收尾）
+│   ├── demo-start.sh           # 演示/答辩一键启动（后端 + 三个前端，含就绪校验与统一收尾）
+│   ├── setup-obs-local.sh      # 把华为云 OBS 的 AK/SK 写进本机私有配置（静默读入，不进版本库）
+│   └── share-backend.sh        # 把本机后端挂上临时公网隧道共享给队友（含 JWT 密钥安全闸）
 ├── deploy/                     # 容器部署：两个 Dockerfile + Nginx 分流配置
 │   ├── web.Dockerfile          # 三个前端构建 + Nginx 静态托管（一个镜像一个端口）
 │   ├── backend.Dockerfile      # 后端构建与运行镜像
@@ -268,6 +270,57 @@ docker compose down -v
 
 > 本机没有 Docker 时，用 `scripts/demo-start.sh` 跑本地四进程版本即可，功能一致
 > （区别是本地版三个前端各占一个端口，没有路径分流）。
+
+## 把本机后端共享给队友（临时公网隧道）
+
+**场景**：队友不在同一局域网（访问不到你的 `192.168.x.x`），但需要看到
+**和你完全一致的图片与数据**。
+
+**为什么这是唯一「零同步」的做法**：一张图要能被队友看到，得同时满足两件事 ——
+① 文件能被下载（OBS 公共读已经解决）；② **队友的数据库里得有这条地址**。
+而本项目 `data.sql` 在仓库里、**成员各自建库**，所以第 ② 件没有任何自动机制：
+你上传时写的是**你自己那份库**，队友的库里不会凭空多出一行。
+与其每次人工同步，不如**只留一份后端、一份库**，让队友连过来。
+
+```bash
+# 1. 先换随机 JWT 密钥（必须，原因见下），带它重启后端
+export RXT_JWT_SECRET=$(openssl rand -base64 48)
+BACKEND_PORT=18080 scripts/demo-start.sh
+
+# 2. 起隧道，按提示把地址发给队友。Ctrl+C 结束共享
+scripts/share-backend.sh
+```
+
+队友侧只需要一行环境变量：
+
+```bash
+cd frontend-web   && NODE_OPTIONS= VITE_API_TARGET=https://xxx.trycloudflare.com npm run dev
+cd frontend-admin && NODE_OPTIONS= VITE_API_TARGET=https://xxx.trycloudflare.com npm run dev
+# 落地页还要知道业务端在哪，指向队友**本机**的 5173
+cd frontend-landing && NODE_OPTIONS= VITE_API_TARGET=https://xxx.trycloudflare.com \
+    VITE_PLATFORM_BASE_URL=http://localhost:5173 npm run dev
+```
+
+队友**不需要**配 OBS、不需要建库、不需要跑 `data.sql` —— OBS 由你这一台机器负责，
+所以他们也不需要关心「图片同步」这件事。
+
+**为什么必须先换 JWT 密钥**：`application.yml` 里 `rxt.jwt.secret` 的默认值是
+**公开在版本库里的**。后端一旦挂上公网，知道仓库的人就能用它伪造任意用户
+（含管理员）的登录态。`share-backend.sh` 起隧道前会**用这个默认密钥伪造一个管理员
+token 去打 `/api/user/profile`** 做安全闸自检，只要检出「还在用默认密钥」就直接拒绝
+共享（换完密钥会让所有人的登录态失效一次，重新登录即可）。
+
+**代价与限制**：
+
+- 免费快速隧道**每次启动域名都会变**，重启后要重新通知队友。要固定域名得改用
+  命名隧道（需要 Cloudflare 账号 + 自己的域名），本项目不做。
+- 你这台机器必须常开，关机即断。
+- 公网可达 = 全世界可达。演示数据是假的，但不要把它当生产环境。
+- 隧道只暴露后端；图片是 OBS 绝对地址，由队友浏览器**直连对象存储**，不经过隧道。
+- 队友的浏览器只经由他自己本地的 vite 代理访问后端，所以**不涉及跨域**。
+
+> 想长期共享（域名固定、不依赖你的机器）就别用隧道，改用上面的 Docker Compose
+> 部署，放到一台有公网 IP 的机器上。
 
 ## 分层约定
 
