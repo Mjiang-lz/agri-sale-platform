@@ -1,6 +1,7 @@
 package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
@@ -162,13 +163,30 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Knowledge getDetail(Long id) {
         Knowledge k = knowledgeMapper.selectOne(new LambdaQueryWrapper<Knowledge>()
                 .eq(Knowledge::getKnowledgeId, id)
                 .eq(Knowledge::getAuditStatus, AUDIT_APPROVED));
         if (k == null) {
+            // 待审核 / 未通过的 id 也落这里，对外一律表现为「不存在」——
+            // 不泄露未过审正文（前端据此走 el-result 终态，两个分支共用一条路径）。
             throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在或未通过审核");
         }
+
+        // ★ 真实累加浏览量（2026-10-12）。
+        //
+        // 两个实现要点，都不是可省的细节：
+        //   1) 用 `view_count = view_count + 1` 把这个加法交给数据库执行，**不能**
+        //      先 select 出来 +1 再 updateById —— 那是「读-改-写」，并发下两个请求
+        //      会读到同一个旧值、各自写回同一个数（丢更新）。交给 DB 才是原子的。
+        //   2) 返回给前端的对象也要跟着 +1。否则第一次访问拿到的仍是加之前的数，
+        //      用户体感还是「我看了但没变」——得再刷新一次才看到变化，很怪。
+        knowledgeMapper.update(null, new LambdaUpdateWrapper<Knowledge>()
+                .setSql("view_count = view_count + 1")
+                .eq(Knowledge::getKnowledgeId, id));
+        k.setViewCount((k.getViewCount() == null ? 0 : k.getViewCount()) + 1);
+
         return k;
     }
 }
