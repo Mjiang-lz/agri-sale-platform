@@ -224,6 +224,37 @@ public class TradeServiceImpl implements TradeService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String deleteProduct(Long sellerId, Long productId) {
+        // 与编辑 / 上下架一致：本接口农户专用。先卡角色再校验参数，
+        // 免得非农户拿到「商品不存在」这种误导性提示
+        permissionChecker.requireRole(RoleConstant.FARMER);
+
+        // 归属校验：不存在 404、非本人 403。返回值本身不再使用，只做校验
+        requireOwnProduct(sellerId, productId);
+
+        // SRS「我的发布 · 例外流程」：删除已被订单引用的商品时，系统改为执行下架
+        // 并提示不可删除的原因 —— 订单是已经发生的交易，商品行被删掉以后
+        // 「我买到的订单」里那条记录就会指不到货，历史订单说不清。
+        Long orderRefs = orderMapper.selectCount(
+                new LambdaQueryWrapper<Order>().eq(Order::getProductId, productId));
+        if (orderRefs != null && orderRefs > 0) {
+            Product offShelf = new Product();
+            offShelf.setProductId(productId);
+            offShelf.setStatus(STATUS_OFF);
+            productMapper.updateById(offShelf);
+            return DELETE_RESULT_OFF_SHELF;
+        }
+
+        // 购物车引用不阻止删除（理由见 TradeService#deleteProduct），但
+        // t_cart.product_id 有外键指向 t_product，必须先清掉这些行才删得动商品 ——
+        // 否则会撞 FK 约束，报出来的是一句跟用户操作毫无关系的数据库错误。
+        cartMapper.delete(new LambdaQueryWrapper<Cart>().eq(Cart::getProductId, productId));
+        productMapper.deleteById(productId);
+        return DELETE_RESULT_DELETED;
+    }
+
+    @Override
     public IPage<ProductVO> pageMyProducts(Long sellerId, long pageNum, long pageSize, String auditStatus) {
         // 农户管理页专用。不卡角色的话采购方会拿到空列表，看起来像「商品丢了」
         permissionChecker.requireRole(RoleConstant.FARMER);

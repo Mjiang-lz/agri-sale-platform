@@ -13,6 +13,7 @@ import com.rxt.vo.DemandVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -101,6 +102,21 @@ public class DemandServiceImpl implements DemandService {
         }
         demand.setStatus(0);
         demandMapper.updateById(demand);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteDemand(Long publisherId, Long demandId) {
+        Demand demand = demandMapper.selectById(demandId);
+        if (demand == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "求购需求不存在");
+        }
+        // 归属校验与 updateDemand / closeDemand 同一口径：不存在 404、非本人 403
+        if (!demand.getPublisherId().equals(publisherId)) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "无权删除他人发布的需求");
+        }
+        // 求购不参与下单链路，全库无外键指向 t_demand，直接删行即可（理由见 DemandService#deleteDemand）
+        demandMapper.deleteById(demandId);
     }
 
     private DemandVO convertToDemandVO(Demand demand) {

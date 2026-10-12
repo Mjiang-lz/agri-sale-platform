@@ -9,6 +9,13 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,6 +48,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class LocalFileStorageServiceImpl implements FileStorageService {
 
     private final FileStorageProperties properties;
+
+    /** 遍历本地存储目录的最大深度，见 {@link #list} */
+    private static final int MAX_SCAN_DEPTH = 5;
 
     /** 存储根目录的绝对路径，启动时解析一次缓存下来 */
     private Path root;
@@ -93,5 +103,85 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
 
         log.info("本地文件写入成功 bizType={} objectKey={} size={}B", bizType.name(), objectKey, file.getSize());
         return new StoredFile(LOCAL_URL_PREFIX + "/" + objectKey, objectKey, file.getSize(), "local");
+    }
+
+    /**
+     * 列出本地 {@code uploads/} 下的文件。
+     *
+     * <p>深度限制为 5 层：本实现写出的对象键固定是 {@code 业务目录/年/月/文件名}（3 层），
+     * 留两层余量给将来可能出现的子目录。用 {@code Integer.MAX_VALUE} 全量遍历没有意义，
+     * 只会让一次误配置（比如把 local-dir 指到用户主目录）变成一次目录炸弹。</p>
+     */
+    @Override
+    public List<StoredObject> list(String prefix) {
+        String normalizedPrefix = prefix == null ? "" : prefix.replace('\\', '/');
+        try (Stream<Path> walk = Files.walk(root, MAX_SCAN_DEPTH)) {
+            return walk.filter(Files::isRegularFile)
+                    .map(path -> toStoredObject(path))
+                    .filter(java.util.Objects::nonNull)
+                    .filter(object -> object.objectKey().startsWith(normalizedPrefix))
+                    .sorted(Comparator.comparing(StoredObject::objectKey))
+                    .limit(MAX_LIST_SIZE)
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            // 列不出来通常是权限或目录被挪走。这里不抛 500：管理页拿不到列表应当看到空态 + 日志，
+            // 而不是一个把整页打断的异常
+            log.error("列出本地文件失败，目录 = {}，prefix = {}", root, prefix, e);
+            return new ArrayList<>();
+        }
+    }
+
+    @Override
+    public void delete(String objectKey) {
+        Path target = resolveSafely(objectKey);
+        try {
+            // deleteIfExists 而不是 delete：本方法的契约是幂等（见接口注释）
+            if (Files.deleteIfExists(target)) {
+                log.info("本地文件已删除 objectKey={}", objectKey);
+            } else {
+                log.info("本地文件不存在，视为删除成功 objectKey={}", objectKey);
+            }
+        } catch (IOException e) {
+            log.error("本地文件删除失败 objectKey={}", objectKey, e);
+            throw new BizException(ResultCode.SYSTEM_ERROR.getCode(), "删除失败，请稍后重试");
+        }
+    }
+
+    @Override
+    public String urlOf(String objectKey) {
+        return LOCAL_URL_PREFIX + "/" + objectKey;
+    }
+
+    /**
+     * 把对象键解析成根目录下的绝对路径，并挡住越界。
+     *
+     * <p>与 {@link #store} 里的那道断言同源：{@code store} 的 objectKey 由服务端生成，
+     * 而 {@link #delete} 的 objectKey <b>来自客户端请求参数</b> —— 这里才是真正需要防御的地方。
+     * 少了它，一个 {@code ../../application-local.yml} 就能把配置文件删掉。</p>
+     */
+    private Path resolveSafely(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "缺少参数：objectKey");
+        }
+        Path target = root.resolve(objectKey).normalize();
+        if (!target.startsWith(root) || target.equals(root)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "对象键不合法");
+        }
+        return target;
+    }
+
+    /** 磁盘文件 → {@link StoredObject}；相对路径统一转成 {@code /} 分隔，与对象键拼法一致 */
+    private StoredObject toStoredObject(Path path) {
+        try {
+            String objectKey = root.relativize(path).toString().replace('\\', '/');
+            long size = Files.size(path);
+            LocalDateTime lastModified = LocalDateTime.ofInstant(
+                    Files.getLastModifiedTime(path).toInstant(), ZoneId.systemDefault());
+            return new StoredObject(objectKey, urlOf(objectKey), size, lastModified);
+        } catch (IOException e) {
+            // 单个文件读不到属性不该让整个列表失败（并发删除时常见）
+            log.warn("读取文件属性失败，已跳过：{}", path, e);
+            return null;
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.rxt.storage;
 
+import java.util.List;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -52,4 +53,50 @@ public interface FileStorageService {
      * @return 存储结果，含可访问 url
      */
     StoredFile store(MultipartFile file, FileBizType bizType);
+
+    /**
+     * 列出某前缀下的对象，按对象键升序。
+     *
+     * <p><b>为什么需要它：</b>在补这个方法之前，{@code FileStorageService} 只有
+     * {@code store()} —— 存进去的东西<b>既列不出来也删不掉</b>。于是「用户换头像后旧图永远是孤儿」
+     * 这类问题连"看得见"都做不到，更谈不上治理。后台图片管理页的列表就靠本方法。</p>
+     *
+     * <p><b>结果有上限、且不做真分页：</b>两个实现最多各返回 {@link #MAX_LIST_SIZE} 条，
+     * 超出时截断并打 WARN 日志。演示环境的对象量级是百位数，做游标分页纯属过度设计；
+     * 真到需要分页的量级，应当由对象存储侧的生命周期规则先做归档，而不是把列表接口做复杂。</p>
+     *
+     * @param prefix 对象键前缀，如 {@code product/}；null 或空串表示不限
+     * @return 对象列表；无内容时返回空列表（不是 null）
+     */
+    List<StoredObject> list(String prefix);
+
+    /**
+     * 删除一个对象。
+     *
+     * <p><b>幂等</b>：对象本来就不存在时视为成功，不抛异常 ——
+     * 调用方（图片管理页）要的是「删完之后它不在了」，而不是「本次是否真的删掉了一个」。</p>
+     *
+     * <p><b>本方法不做引用检查。</b>「这个对象还有没有业务行在用」是业务层的知识
+     * （要查 t_user / t_product / t_knowledge），不属于存储抽象的职责。
+     * 引用检查在 {@code MediaService} 里做，见 {@code docs/接口约定-M6平台治理.md}。</p>
+     *
+     * @param objectKey 对象键，不得含 {@code ..} 等越界片段（本地实现会做归一化校验）
+     */
+    void delete(String objectKey);
+
+    /**
+     * 对象键 → 对外可访问地址。与 {@link #store} 返回的 url 同一套拼法。
+     *
+     * <p>列表场景需要给每个已有对象补 url，而这些对象不是本次上传产生的，
+     * 拿不到 {@link StoredFile}，所以单独留一个。</p>
+     */
+    String urlOf(String objectKey);
+
+    /**
+     * {@link #list} 的结果上限。超出即截断 + WARN 日志，不报错。
+     *
+     * <p>不按前缀细分上限：多个前缀各列 1000 条仍然可能把内存撑起来，
+     * 但那种量级已经该换方案了，届时改这里一处即可。</p>
+     */
+    int MAX_LIST_SIZE = 1000;
 }

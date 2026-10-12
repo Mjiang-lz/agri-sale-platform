@@ -18,6 +18,23 @@ import java.math.BigDecimal;
 public interface TradeService {
 
     /**
+     * 删除商品的结果：整行已物理删除。
+     *
+     * <p>与 {@link #DELETE_RESULT_OFF_SHELF} 一起构成 {@link #deleteProduct} 的返回值契约。
+     * 前端 {@code request.js} 会把 {@code Result.data} 原样透出（{@code message} 被丢弃），
+     * 所以「到底删掉了还是只下架了」只能靠这个值区分，不能靠文案。</p>
+     */
+    String DELETE_RESULT_DELETED = "DELETED";
+
+    /**
+     * 删除商品的结果：因已被订单引用，改判为下架。
+     *
+     * <p>依据 SRS「我的发布 · 例外流程」：删除已被订单引用的商品时，
+     * 系统改为执行下架并提示不可删除的原因。</p>
+     */
+    String DELETE_RESULT_OFF_SHELF = "OFF_SHELF";
+
+    /**
      * 分页检索商品货源，各条件可任意组合（都为 null 时返回全部在架商品）。
      *
      * @param keyword  商品名称模糊匹配
@@ -52,6 +69,22 @@ public interface TradeService {
      * @param status 1 上架，0 下架
      */
     void updateProductStatus(Long sellerId, Long productId, Integer status);
+
+    /**
+     * 删除商品（我的发布 · 删除）。仅商品归属农户可操作。
+     *
+     * <p><b>不保证真的删掉了行</b> —— 依据 SRS 例外流程，被订单引用的商品不物理删除，
+     * 而是置为下架。调用方必须看返回值再决定提示什么。</p>
+     *
+     * <p>{@code t_cart.product_id} 有外键指向 {@code t_product}，所以未被订单引用时
+     * 会连同该商品在所有人购物车里的条目一起清掉再删行；购物车只是「还没下单的意向」，
+     * 若它也能拦住删除，任何人把商品丢进购物车就能让农户永远删不掉自己的商品。</p>
+     *
+     * @param sellerId  当前登录农户（取自登录态）
+     * @param productId 商品主键
+     * @return {@link #DELETE_RESULT_DELETED} 或 {@link #DELETE_RESULT_OFF_SHELF}
+     */
+    String deleteProduct(Long sellerId, Long productId);
 
     /**
      * 分页查询我发布的商品（含待审核 / 未通过 / 已下架），供农户管理页使用。

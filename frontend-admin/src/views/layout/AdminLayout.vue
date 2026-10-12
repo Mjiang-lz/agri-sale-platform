@@ -39,6 +39,20 @@
           <RxtIcon name="ico-finance" />
           <span>融资管理</span>
         </el-menu-item>
+        <el-sub-menu index="resource">
+          <template #title>
+            <RxtIcon name="ico-resource" />
+            <span>资源管理</span>
+          </template>
+          <el-menu-item index="/expert/manage">
+            <RxtIcon name="ico-expert" />
+            <span>专家资源管理</span>
+          </el-menu-item>
+          <el-menu-item index="/media/manage">
+            <RxtIcon name="ico-media" />
+            <span>图片资源管理</span>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
     <el-container>
@@ -57,7 +71,19 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import RxtIcon from '@/components/RxtIcon.vue'
+import RxtLogo from '@/components/RxtLogo.vue'
 
+/*
+ * ★ 2026-10-12 修复：这两个组件此前**既没 import、也没全局注册**。
+ *   <script setup> 是空的，main.js 里也没有 app.component(...)，
+ *   于是模板里的 <RxtLogo> / <RxtIcon> 全部解析失败 —— Vue 把它们当未知自定义元素
+ *   渲染，控制台刷「Failed to resolve component」，侧边栏**从头到尾没有图标**。
+ *   同一处还有 `{{ year }}` 未定义（页脚年份位置一直是空的）。
+ *   修法就是最直白的那种：显式 import + 补一个 year。
+ */
+const year = computed(() => new Date().getFullYear())
 </script>
 
 <style scoped>

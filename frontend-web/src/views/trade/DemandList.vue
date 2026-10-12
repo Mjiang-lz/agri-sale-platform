@@ -72,6 +72,19 @@
             <span class="unit">/ {{ d.unit || '件' }}</span>
           </div>
           <small class="contact">联系方式：{{ d.contact || '—' }}</small>
+          <!--
+            自己的求购才给管理按钮（「我的发布」的求购侧）。
+            判据是 publisherId === 当前登录用户 id —— 服务端也会独立校验一次归属，
+            这里只是不把不属于你的操作摆在你面前。
+          -->
+          <div v-if="isMine(d)" class="owner-actions">
+            <el-button
+              v-if="d.status === 1"
+              size="small"
+              @click.stop="handleClose(d)"
+            >关闭</el-button>
+            <el-button size="small" type="danger" plain @click.stop="handleRemove(d)">删除</el-button>
+          </div>
           <el-button type="primary" size="small" @click.stop="openDetail(d)">查看详情</el-button>
         </div>
       </el-card>
@@ -126,8 +139,9 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { getDemandDetail, getDemandList } from '@/api/trade'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getDemandDetail, getDemandList, closeDemand, removeDemand } from '@/api/trade'
+import { useUserStore } from '@/store/user'
 import { formatDateTime, summary as sliceText } from '@/utils/text'
 
 /**
@@ -161,6 +175,29 @@ const regionOptions = ['江西赣州', '湖北荆州', '黑龙江五常']
 
 const detailVisible = ref(false)
 const currentDemand = ref(null)
+
+const userStore = useUserStore()
+
+/**
+ * 当前登录用户 id。
+ *
+ * 用登录返回的 userId（store/user.js 的 profile 快照），不另拉接口 ——
+ * 顶栏、个人中心读的都是这一份。
+ */
+const myUserId = computed(() => userStore.profile?.userId ?? null)
+
+/**
+ * 这条求购是不是我发的。
+ *
+ * 用 == 而不是 === 是有意的：后端 JSON 里 userId 是数字、demand 的 publisherId
+ * 也是数字，取到 undefined 时两边都是 undefined 会被误判成"是我的"，
+ * 所以先做 null 判断再比。这里显式排除 null，避免未登录/未加载完时
+ * 把别人的求购都标成自己的。
+ */
+function isMine(demand) {
+  if (myUserId.value == null || demand?.publisherId == null) return false
+  return String(demand.publisherId) === String(myUserId.value)
+}
 
 const hasFilter = computed(() => Boolean(query.category || query.region))
 const emptyText = computed(() =>
@@ -242,6 +279,69 @@ function handleSizeChange() {
   loadDemands()
 }
 
+/**
+ * 关闭自己的求购。
+ *
+ * 这是**可逆**操作：状态置 0（「已关闭」）后行还在，重新编辑提交就能再开。
+ * 所以确认文案不能吓唬人，也别用 danger 色调。
+ */
+async function handleClose(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要关闭「${categoryLabel(row)}」这条求购需求吗？关闭后不再展示给供应商，可以重新编辑再开。`,
+      '关闭求购需求',
+      { type: 'warning', confirmButtonText: '确定关闭', cancelButtonText: '取消' }
+    )
+  } catch {
+    return // 用户点了取消，不是错误
+  }
+
+  try {
+    await closeDemand(row.demandId)
+    ElMessage.success('求购需求已关闭')
+    await loadDemands()
+  } catch (err) {
+    console.error('关闭求购需求失败：', err)
+  }
+}
+
+/**
+ * 删除自己的求购。
+ *
+ * 与「关闭」是两个不同的动作，不能合并按钮：
+ *   关闭 = 可逆的撤下；删除 = 不可逆的移除记录。
+ * 后端对求购一律物理删行（全库无外键指向 t_demand），删了就找不回来，
+ * 所以这里必须二次确认且明确写出「不可撤销」。
+ */
+async function handleRemove(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除「${categoryLabel(row)}」这条求购需求吗？删除后无法恢复，需要重新发布。`,
+      '删除求购需求',
+      {
+        type: 'error',
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await removeDemand(row.demandId)
+    ElMessage.success('求购需求已删除')
+    // 删的可能是本页最后一条，删完必须回到第 1 页重新拉，否则会停在空页
+    if (demands.value.length === 1 && pageNum.value > 1) {
+      pageNum.value -= 1
+    }
+    await loadDemands()
+  } catch (err) {
+    console.error('删除求购需求失败：', err)
+  }
+}
+
 onMounted(loadDemands)
 </script>
 
@@ -318,6 +418,22 @@ onMounted(loadDemands)
 .expect-price .unit  { font-size: 12px; color: #909399; }
 .contact { color: var(--el-text-color-secondary); font-size: 12px; }
 
+/*
+ * 自己的求购才出现的「关闭 / 删除」。用虚线分隔，把它和上面的
+ * 报价、联系方式区分开 —— 上面是需求内容，下面是管理动作。
+ */
+.owner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  padding-top: 8px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+/* Element Plus 给相邻按钮加了 margin-left，和这里的 gap 会叠加成 20px */
+.owner-actions :deep(.el-button + .el-button) { margin-left: 0; }
+
 
 .error-alert { margin-top: 4px; }
 .error-alert :deep(.el-alert__content) { width: 100%; }
@@ -342,5 +458,6 @@ onMounted(loadDemands)
     border-left: none;
     border-top: 1px dashed var(--el-border-color-light);
   }
+  .owner-actions { justify-content: flex-start; }
 }
 </style>

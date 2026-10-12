@@ -1,8 +1,11 @@
 package com.rxt.service;
 
+import com.rxt.dto.AdminExpertUpdateDTO;
 import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
+import com.rxt.dto.ExpertProfileUpdateDTO;
 import com.rxt.vo.AppointmentVO;
+import com.rxt.vo.ExpertProfileVO;
 import com.rxt.vo.ExpertVO;
 
 import java.util.List;
@@ -40,4 +43,56 @@ public interface ExpertService {
      * @return 已通过审核的入驻专家，按专家主键升序；无数据时返回空列表（不是 null）
      */
     List<ExpertVO> listExperts(String domain);
+
+    /**
+     * 专家查看本人的档案。
+     *
+     * <p>对应《软件需求规格说明书》「个人信息 → 专家信息管理」。
+     * 查询范围由登录态决定，不接受按他人 id 查询。</p>
+     *
+     * @param userId 当前登录用户主键
+     * @return 档案视图，含 {@code auditStatus} 供本人了解过审情况
+     */
+    ExpertProfileVO getProfile(Long userId);
+
+    /**
+     * 专家编辑本人的档案（擅长领域、简介与服务范围）。
+     *
+     * <p>{@code workloadStat} / {@code auditStatus} / {@code userId} 不在 DTO 里，
+     * 因此传了也不生效 —— 审核状态只能由管理员改，工作量统计由系统算。</p>
+     *
+     * @param userId 当前登录用户主键
+     * @param dto    待更新字段；两个字段都为空时抛 400（避免"提交成功但什么都没改"）
+     */
+    void updateProfile(Long userId, ExpertProfileUpdateDTO dto);
+
+    /**
+     * 管理员：专家资源列表（SRS 管理员职责「专家资源管理」）。
+     *
+     * @param auditStatus 审核状态筛选；null 或空串表示不限
+     * @param domain      专业领域筛选；null 或空串表示不限
+     * @return 全部专家的档案，按创建时间、专家主键升序（先到先审，与审核队列口径一致）
+     */
+    List<ExpertProfileVO> listProfilesForAdmin(String auditStatus, String domain);
+
+    /**
+     * 管理员：编辑专家档案。
+     *
+     * <p>与专家本人编辑的差别只有一处 —— 这里可以改 {@code auditStatus}，
+     * 因为审核是管理员职责。但<b>资料维护不等于审核动作</b>：本方法不写
+     * {@code t_audit} 审核留痕，所以从这里改的审核状态不会计入
+     * {@code GET /api/audit/statistics} 的审核工作量。</p>
+     *
+     * <p><b>为什么不留痕还得走这里</b>：内容审核模块（{@code AuditServiceImpl}）
+     * 刻意只管辖 PRODUCT / KNOWLEDGE / COMMENT 三类内容，传 EXPERT 会被
+     * {@code requireValidTargetType} 以 400「内容类型不合法」拒掉 ——
+     * 因为 t_audit 里的 EXPERT 流水属 M1 主体审核，混进内容审核列表会是一批
+     * 没有标题的记录。也就是说 {@code POST /api/audit/content/EXPERT/{id}}
+     * <b>当前并不存在</b>，本方法是今天唯一能改专家审核状态的路径。
+     * 后续若要补留痕，应该新开主体审核接口，而不是放宽内容审核的类型白名单。</p>
+     *
+     * @param expertId 专家主键
+     * @param dto      待更新字段，比专家侧多一个 {@code auditStatus}
+     */
+    void updateProfileForAdmin(Long expertId, AdminExpertUpdateDTO dto);
 }

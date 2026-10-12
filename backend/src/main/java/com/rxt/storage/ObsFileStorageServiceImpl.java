@@ -3,7 +3,10 @@ package com.rxt.storage;
 import com.obs.services.ObsClient;
 import com.obs.services.ObsConfiguration;
 import com.obs.services.exception.ObsException;
+import com.obs.services.model.ListObjectsRequest;
+import com.obs.services.model.ObjectListing;
 import com.obs.services.model.ObjectMetadata;
+import com.obs.services.model.ObsObject;
 import com.obs.services.model.PutObjectRequest;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
@@ -11,6 +14,11 @@ import com.rxt.config.FileStorageProperties;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -119,6 +127,85 @@ public class ObsFileStorageServiceImpl implements FileStorageService {
      */
     private String publicUrl(String objectKey) {
         return "https://" + properties.getBucket() + "." + endpointHost() + "/" + objectKey;
+    }
+
+    @Override
+    public String urlOf(String objectKey) {
+        return publicUrl(objectKey);
+    }
+
+    /**
+     * 列出桶内对象，按对象键升序。
+     *
+     * <p>单次请求 {@code maxKeys} 设成上限值；万一桶里对象更多（{@code isTruncated=true}），
+     * 打 WARN 后截断返回，<b>不做翻页</b> —— 理由见 {@link FileStorageService#list}。
+     * 这里刻意不沿 {@code nextMarker} 循环：那会把「偶发的一次全量遍历」变成
+     * 「每开一次管理页就把整个桶拉一遍」，而这个页面的用途是清理，不是审计。</p>
+     */
+    @Override
+    public List<StoredObject> list(String prefix) {
+        ListObjectsRequest request = new ListObjectsRequest(properties.getBucket());
+        if (StringUtils.hasText(prefix)) {
+            request.setPrefix(prefix);
+        }
+        request.setMaxKeys(MAX_LIST_SIZE);
+
+        try {
+            ObjectListing listing = obsClient.listObjects(request);
+            if (listing.isTruncated()) {
+                log.warn("OBS 对象数超过上限 {}，列表已截断（prefix={}）。"
+                                + "按前缀分批查询，或改用对象存储的生命周期规则做归档",
+                        MAX_LIST_SIZE, prefix);
+            }
+            List<StoredObject> result = new ArrayList<>();
+            for (ObsObject object : listing.getObjects()) {
+                result.add(toStoredObject(object));
+            }
+            return result;
+        } catch (ObsException e) {
+            // 同 store()：SDK 异常里带着状态码与错误码，落日志；对外给可操作提示
+            log.error("OBS 列举对象失败 prefix={} status={} errorCode={} errorMessage={}",
+                    prefix, e.getResponseCode(), e.getErrorCode(), e.getErrorMessage(), e);
+            throw new BizException(ResultCode.SYSTEM_ERROR.getCode(), "读取图片列表失败，请稍后重试");
+        }
+    }
+
+    /**
+     * 删除对象。
+     *
+     * <p>OBS 的 DELETE 本身对不存在的对象就返回 204（幂等），与接口契约天然一致，
+     * 无需额外判断。</p>
+     */
+    @Override
+    public void delete(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "缺少参数：objectKey");
+        }
+        // 挡住 ../ 之类的越界键：OBS 侧不会真的删到别处，但放行一个明显不合法的键
+        // 会让本地实现与 OBS 实现行为分裂（本地会 400、OBS 会静默成功）
+        if (objectKey.contains("..") || objectKey.startsWith("/")) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "对象键不合法");
+        }
+        try {
+            obsClient.deleteObject(properties.getBucket(), objectKey);
+            log.info("OBS 对象已删除 objectKey={}", objectKey);
+        } catch (ObsException e) {
+            log.error("OBS 删除对象失败 objectKey={} status={} errorCode={} errorMessage={}",
+                    objectKey, e.getResponseCode(), e.getErrorCode(), e.getErrorMessage(), e);
+            throw new BizException(ResultCode.SYSTEM_ERROR.getCode(), "删除失败，请稍后重试");
+        }
+    }
+
+    /** OBS 对象 → {@link StoredObject}；大小与时间取不到时用 0 / null 兜底，不让列表失败 */
+    private StoredObject toStoredObject(ObsObject object) {
+        String objectKey = object.getObjectKey();
+        ObjectMetadata metadata = object.getMetadata();
+        long size = metadata == null || metadata.getContentLength() == null
+                ? 0L : metadata.getContentLength();
+        Date lastModified = metadata == null ? null : metadata.getLastModified();
+        LocalDateTime modified = lastModified == null ? null
+                : LocalDateTime.ofInstant(lastModified.toInstant(), ZoneId.systemDefault());
+        return new StoredObject(objectKey, publicUrl(objectKey), size, modified);
     }
 
     /** 取 endpoint 的纯主机名：允许配置里带 {@code https://} 前缀或结尾斜杠，这里统一抹掉 */

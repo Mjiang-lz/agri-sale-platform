@@ -86,3 +86,38 @@ export function getExpertAppointments(status) {
 export function handleExpertAppointment(apptId, payload) {
   return request.post(`/expert/appointment/${apptId}/handle`, payload)
 }
+
+/**
+ * 个人中心：专家查看**本人**档案（《SRS》个人信息 → 专家信息管理）。
+ *
+ * 档案由登录态定位，不需要（也不允许）传 expertId —— 传了就等于让任何专家
+ * 都能按 id 翻别人的档案。
+ *
+ * @returns {Promise<Object>} ExpertProfileVO：
+ *   { expertId, userId, realName, avatarUrl, expertDomain, introduction,
+ *     workloadStat, auditStatus, createTime }
+ *   比 getExperts() 多 auditStatus / createTime，供本人了解过审情况；
+ *   不含 phone（手机号走 GET /user/profile）。
+ */
+export function getExpertProfile() {
+  return request.get('/expert/profile')
+}
+
+/**
+ * 个人中心：专家编辑本人档案。
+ *
+ * 请求体只有两个字段，别试图加别的：
+ *   { expertDomain?, introduction? }
+ * `workloadStat` 由系统统计、`auditStatus` 由管理员审核，后端 DTO 里根本没有
+ * 这两个字段，传了也不生效。
+ *
+ * 两个字段**全空**时后端返回 400「请至少填写一项要修改的内容」（避免假成功），
+ * 所以调用方在提交前应当先判断是否有实际改动。
+ *
+ * 字段语义差异（踩过就别再踩）：
+ *   expertDomain 传空串 = **跳过**（不清空已有领域），要改必须给非空值；
+ *   introduction 传空串 = **清空简介**，传 undefined = 不改。
+ */
+export function updateExpertProfile(payload) {
+  return request.put('/expert/profile', payload)
+}

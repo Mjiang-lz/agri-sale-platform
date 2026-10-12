@@ -90,7 +90,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="150" fixed="right">
+          <el-table-column label="操作" width="210" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="openForm(row)">编辑</el-button>
               <!--
@@ -116,6 +116,12 @@
               >
                 {{ row.status === 1 ? '下架' : '上架' }}
               </el-button>
+              <!--
+                删除。后端不保证真的删掉了行：被订单引用的商品会按 SRS 例外流程
+                改为下架（返回 OFF_SHELF）。提示文案由 handleRemove 按返回值决定，
+                这里不要写死「删除成功」。
+              -->
+              <el-button link type="danger" @click="handleRemove(row)">删除</el-button>
             </template>
           </el-table-column>
 
@@ -237,6 +243,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getMyProducts,
   publishProduct,
+  removeMyProduct,
   updateMyProduct,
   updateMyProductStatus
 } from '@/api/trade'
@@ -479,6 +486,45 @@ async function toggleStatus(row) {
   // 无论成败都重新拉列表：失败原因可能是「商品刚好被管理员改了审核状态」，
   // 此时本地那一行是过期的，刷新才能让用户看到真实状态。
   // 不做乐观更新 —— 状态以后端为准。
+  await loadList()
+}
+
+/**
+ * 删除商品（SRS「我的发布：新增、编辑、上架／下架、删除」的最后一项）。
+ *
+ * ★ 关键点：`removeMyProduct` 返回的是**结果标记**，不是「成功/失败」——
+ *   'DELETED'   整行已被移除
+ *   'OFF_SHELF' 该商品已被订单引用，按 SRS 例外流程改为下架，**行还在**
+ * 所以不能一律提示「删除成功」：用户点的是删除，回头在列表里又看到它，
+ * 只会以为是 bug。OFF_SHELF 用 warning 级提示并说明原因。
+ *
+ * ⚠️ 为什么必须先二次确认：这是本页唯一**不可逆**的操作。
+ *   编辑、上下架都能改回来，删除不能。所以确认文案里点明「不可撤销」，
+ *   并且和「下架」区分开 —— 下架是把商品藏起来，删除是把记录拿走。
+ */
+async function handleRemove(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${row.productName}」吗？此操作不可撤销。\n` +
+      '若该商品已经产生订单，系统会改为将其下架，以保留历史订单的可追溯性。',
+      '删除商品',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  try {
+    const outcome = await removeMyProduct(row.productId)
+    if (outcome === 'OFF_SHELF') {
+      ElMessage.warning('该商品已被订单引用，不能删除，已改为下架')
+    } else {
+      ElMessage.success('商品已删除')
+    }
+  } catch (err) {
+    console.error('删除商品失败：', err)
+  }
+  // 两种结果都要刷新：OFF_SHELF 时行还在，但状态已变成下架，不刷新会显示成删除失败
   await loadList()
 }
 
