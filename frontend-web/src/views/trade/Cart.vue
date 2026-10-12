@@ -19,7 +19,7 @@
       show-icon
       :closable="false"
       title="购物车加载失败"
-      description="无法连接后端服务，请确认后端已启动（默认 8080 端口）后重试。"
+      description="无法连接后端服务，请确认后端已启动（默认 8080 端口）后重试"
       class="error-alert"
     >
       <template #default>

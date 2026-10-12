@@ -99,7 +99,7 @@ async function loadAppointments() {
 
 async function accept(row) {
   await ElMessageBox.confirm(`确认接受“${row.apptTopic}”这条预约吗？`, '受理预约', { type: 'success' })
-  await handleExpertAppointment(row.apptId, { apptStatus: '已接受', remark: '专家已接受预约，请按约定时间联系。' })
+  await handleExpertAppointment(row.apptId, { apptStatus: '已接受', remark: '专家已接受预约，请按约定时间联系' })
   ElMessage.success('预约已接受')
   await loadAppointments()
 }

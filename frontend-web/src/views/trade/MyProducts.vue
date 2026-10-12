@@ -28,7 +28,7 @@
         show-icon
         :closable="false"
         title="商品列表加载失败"
-        description="无法连接后端服务，或当前账号不是农户角色（本接口仅农户可用）。"
+        description="无法连接后端服务，或当前账号不是农户角色（本接口仅农户可用）"
         class="error-alert"
       >
         <template #default>
@@ -162,7 +162,7 @@
         :closable="false"
         class="form-alert"
         title="改动商品内容会重新进入审核"
-        :description="`修改商品名称、品类、描述、产地或主图后，商品会被打回「待审核」并自动下架，需管理员重新审核通过才会上架。只调价格和库存不触发重新审核。`"
+        :description="`修改商品名称、品类、描述、产地或主图后，商品会被打回「待审核」并自动下架，需管理员重新审核通过才会上架。只调价格和库存不触发重新审核`"
       />
 
       <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" @submit.prevent>
@@ -222,7 +222,7 @@
             <el-image v-if="form.imageUrl" class="upload-preview" :src="form.imageUrl" fit="cover" />
             <!-- 主图不是必填：没有图时前台会按商品名匹配实拍图兜底（见 utils/imagery.js），
                  不会出现碎图。所以这里如实说明，不逼用户先去找图 -->
-            <span v-if="!form.imageUrl" class="upload-tip">选填。不上传时前台会用同类实拍图兜底展示。</span>
+            <span v-if="!form.imageUrl" class="upload-tip">选填。不上传时前台会用同类实拍图兜底展示</span>
           </div>
         </el-form-item>
       </el-form>
@@ -468,8 +468,8 @@ async function toggleStatus(row) {
   try {
     await ElMessageBox.confirm(
       toOn
-        ? `把「${row.productName}」重新上架？上架后采购方可立即看到并下单。`
-        : `把「${row.productName}」下架？下架后采购方在货源列表里看不到它，已生成的订单不受影响。`,
+        ? `把「${row.productName}」重新上架？上架后采购方可立即看到并下单`
+        : `把「${row.productName}」下架？下架后采购方在货源列表里看不到它，已生成的订单不受影响`,
       toOn ? '上架商品' : '下架商品',
       { type: 'warning', confirmButtonText: toOn ? '确认上架' : '确认下架', cancelButtonText: '取消' }
     )
@@ -506,7 +506,7 @@ async function handleRemove(row) {
   try {
     await ElMessageBox.confirm(
       `确定删除「${row.productName}」吗？此操作不可撤销。\n` +
-      '若该商品已经产生订单，系统会改为将其下架，以保留历史订单的可追溯性。',
+      '若该商品已经产生订单，系统会改为将其下架，以保留历史订单的可追溯性',
       '删除商品',
       { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
     )

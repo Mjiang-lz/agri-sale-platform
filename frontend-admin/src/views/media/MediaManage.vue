@@ -10,7 +10,7 @@
       <div>
         <span class="eyebrow">M6 · 图片资源治理</span>
         <h2>图片资源管理</h2>
-        <p>查看存储中的图片对象、清理无人引用的孤儿文件。仍被商品、头像或知识引用的图片会被服务端拒绝删除，并把引用方列出来。</p>
+        <p>查看存储中的图片对象、清理无人引用的孤儿文件。仍被商品、头像或知识引用的图片会被服务端拒绝删除，并把引用方列出来</p>
       </div>
       <div class="hero-status">
         <span>可清理</span>
@@ -59,7 +59,7 @@
       :closable="false"
       class="truncate-alert"
       :title="`对象数已达单次上限 ${MAX_LIST_SIZE}`"
-      description="列表被截断，统计与「可清理」数只反映前 1000 个对象。请用前缀筛选分批处理。"
+      description="列表被截断，统计与「可清理」数只反映前 1000 个对象。请用前缀筛选分批处理"
     />
 
     <el-card shadow="never" class="table-card">
@@ -265,7 +265,7 @@ function handleSizeChange() {
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除对象「${row.objectKey}」吗？删除后无法恢复，引用它的页面会显示破图。`,
+      `确定要删除对象「${row.objectKey}」吗？删除后无法恢复，引用它的页面会显示破图`,
       '删除图片对象',
       {
         type: 'warning',

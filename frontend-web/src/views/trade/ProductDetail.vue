@@ -69,7 +69,7 @@
               <el-descriptions-item label="审核状态">{{ product.auditStatus || '—' }}</el-descriptions-item>
             </el-descriptions>
 
-            <p class="description">{{ product.description || '卖家暂未填写商品描述。' }}</p>
+            <p class="description">{{ product.description || '卖家暂未填写商品描述' }}</p>
 
             <div class="buy-row">
               <el-input-number
@@ -108,7 +108,7 @@
               :closable="false"
               show-icon
               title="登录后即可加入购物车"
-              description="游客可以浏览商品与评价；加购、下单需要先登录或注册。"
+              description="游客可以浏览商品与评价；加购、下单需要先登录或注册"
             />
           </el-card>
         </el-col>
@@ -127,7 +127,7 @@
                 <small>{{ product.sellerMainProduct || '农产品经营' }}</small>
               </div>
             </div>
-            <p class="seller-scale">{{ product.sellerScaleDesc || '该农户暂未填写经营规模。' }}</p>
+            <p class="seller-scale">{{ product.sellerScaleDesc || '该农户暂未填写经营规模' }}</p>
           </el-card>
         </el-col>
 
@@ -251,7 +251,7 @@ async function load() {
     errorState.value = true
     // request.js 已经把后端 message 弹过 toast（err.notified），这里只渲染行内错误态，
     // 因此不再弹第二次，避免同一次失败刷出两条提示
-    errorMessage.value = err?.message || '无法连接后端服务，请确认后端已启动后重试。'
+    errorMessage.value = err?.message || '无法连接后端服务，请确认后端已启动后重试'
   } finally {
     loading.value = false
   }

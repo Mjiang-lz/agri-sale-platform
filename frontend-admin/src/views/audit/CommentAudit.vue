@@ -8,7 +8,7 @@
       <div>
         <span class="eyebrow">M6 · 用户互动治理</span>
         <h2>评论审核</h2>
-        <p>检查评论是否包含侮辱谩骂、广告导流、站外交易引导等不合规内容，驳回需给出明确理由。</p>
+        <p>检查评论是否包含侮辱谩骂、广告导流、站外交易引导等不合规内容，驳回需给出明确理由</p>
       </div>
       <div class="hero-status">
         <span>当前待办</span>
@@ -129,8 +129,8 @@
     </el-drawer>
 
     <el-dialog v-model="rejectVisible" title="填写评论驳回理由" width="min(540px, 92vw)">
-      <p class="reject-tip">理由会写入 t_audit.audit_remark，并反馈给评论用户。</p>
-      <el-input v-model="rejectRemark" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="例如：评论包含侮辱性言论，请修改后重新提交。" />
+      <p class="reject-tip">理由会写入 t_audit.audit_remark，并反馈给评论用户</p>
+      <el-input v-model="rejectRemark" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="例如：评论包含侮辱性言论，请修改后重新提交" />
       <template #footer>
         <el-button @click="rejectVisible = false">取消</el-button>
         <el-button type="danger" :loading="submitting" @click="confirmReject">确认驳回</el-button>
@@ -252,7 +252,7 @@ async function openDetail(row) {
 }
 
 async function approve(row) {
-  await ElMessageBox.confirm(`确认通过该评论吗？通过后评论将在对应内容下公开展示。`, '审核确认', {
+  await ElMessageBox.confirm(`确认通过该评论吗？通过后评论将在对应内容下公开展示`, '审核确认', {
     type: 'warning',
     confirmButtonText: '确认通过',
     cancelButtonText: '取消'
