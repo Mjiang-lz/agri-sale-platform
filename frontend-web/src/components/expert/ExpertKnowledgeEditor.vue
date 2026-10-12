@@ -9,7 +9,7 @@
         </div>
         <div class="head-actions">
           <el-button text @click="expanded = !expanded">投稿记录（{{ submissions.length }}）{{ expanded ? '收起' : '展开' }}</el-button>
-          <el-button type="primary" @click="openEditor">发布知识</el-button>
+          <el-button type="primary" @click="openEditor()">发布知识</el-button>
         </div>
       </div>
     </template>
@@ -24,6 +24,7 @@
             </div>
             <div class="submission-actions">
               <el-tag :type="statusType(item.auditStatus)">{{ statusText(item.auditStatus) }}</el-tag>
+              <el-button link type="primary" @click="openEditor(item)">编辑</el-button>
               <el-button circle text class="close-button" aria-label="关闭投稿记录" @click="$emit('dismiss', item)">×</el-button>
             </div>
           </div>
@@ -32,8 +33,16 @@
       </div>
     </el-collapse-transition>
 
-    <el-dialog v-model="visible" title="发布农业知识" width="min(760px, 95vw)" destroy-on-close>
-      <el-alert type="info" :closable="false" show-icon title="投稿后会进入待审核状态，审核通过后在农业知识列表公开。" />
+    <el-dialog v-model="visible" :title="editingId ? '编辑农业知识' : '发布农业知识'" width="min(760px, 95vw)" destroy-on-close>
+      <el-alert
+        :key="editingId || 'create'"
+        type="info"
+        :closable="false"
+        show-icon
+        :title="editingId
+          ? '保存后该条知识将回到「待审核」状态，需管理员重新审核通过后才会再次公开。'
+          : '投稿后会进入待审核状态，审核通过后在农业知识列表公开。'"
+      />
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="editor-form">
         <el-form-item label="知识标题" prop="title">
           <el-input v-model="form.title" maxlength="100" show-word-limit placeholder="例如：柑橘膨果期水分管理要点" />
@@ -55,7 +64,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submit">提交审核</el-button>
+        <el-button type="primary" :loading="submitting" @click="submit">{{ editingId ? '保存并重新送审' : '提交审核' }}</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -63,9 +72,9 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { uploadKnowledgeImage } from '@/api/common'
-import { createKnowledge } from '@/api/knowledge'
+import { createKnowledge, updateKnowledge } from '@/api/knowledge'
 
 defineProps({ submissions: { type: Array, default: () => [] } })
 const emit = defineEmits(['created', 'dismiss'])
@@ -75,6 +84,10 @@ const expanded = ref(false)
 const uploading = ref(false)
 const submitting = ref(false)
 const formRef = ref()
+/** 非空表示当前弹窗处于「编辑」模式，值为被编辑的知识主键 */
+const editingId = ref(null)
+/** 编辑模式下该条的原始审核状态，用于决定要不要二次确认 */
+const editingStatus = ref('')
 const categories = ['种植技术', '养殖技术', '病虫害防治', '市场行情', '政策解读']
 const form = reactive({ title: '', category: '', content: '', imageUrl: '' })
 const rules = {
@@ -83,8 +96,24 @@ const rules = {
   content: [{ required: true, message: '请输入知识正文', trigger: 'blur' }]
 }
 
-function openEditor() {
-  Object.assign(form, { title: '', category: '', content: '', imageUrl: '' })
+/**
+ * 打开投稿弹窗。传 item 即编辑，不传即新建。
+ *
+ * 编辑时用投稿列表里已有的字段回填，不再单独拉一次详情 ——
+ * `GET /api/knowledge/my` 返回的就是 Knowledge 实体，正文（content）与配图
+ * （imageUrl）都在，多打一次请求只是重复。
+ */
+function openEditor(item) {
+  editingId.value = item?.knowledgeId ?? null
+  editingStatus.value = item?.auditStatus ?? ''
+  Object.assign(form, {
+    title: item?.title ?? '',
+    // 历史数据的 category 可能是列表页没有的取值，直接塞进 el-select 会显示成空。
+    // 这里保留原值（而不是替换成默认分类）：静默改掉用户的分类比显示不安更糟。
+    category: item?.category ?? '',
+    content: item?.content ?? '',
+    imageUrl: item?.imageUrl ?? ''
+  })
   visible.value = true
 }
 
@@ -114,16 +143,42 @@ async function handleUpload(options) {
   }
 }
 
+/** 编辑「已通过」的知识要二次确认：这条当前对所有人可见，保存后会立刻从列表消失 */
+async function confirmRepublish() {
+  if (editingStatus.value !== '已通过') return true
+  try {
+    await ElMessageBox.confirm(
+      '该条知识当前已审核通过并对所有人可见。保存修改后它会回到「待审核」状态，' +
+      '在管理员重新审核通过之前不会出现在农业知识列表里。确定继续吗？',
+      '保存后需要重新审核',
+      { type: 'warning', confirmButtonText: '确定保存', cancelButtonText: '取消' }
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function submit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
+  if (editingId.value && !(await confirmRepublish())) return
+
   submitting.value = true
   try {
-    const knowledgeId = await createKnowledge({ ...form })
-    emit('created', { knowledgeId })
-    expanded.value = true
-    visible.value = false
-    ElMessage.success('知识已投稿，等待管理员审核')
+    if (editingId.value) {
+      await updateKnowledge(editingId.value, { ...form })
+      emit('created', { knowledgeId: editingId.value })
+      expanded.value = true
+      visible.value = false
+      ElMessage.success('修改已保存，该条知识回到待审核，等待管理员重新审核')
+    } else {
+      const knowledgeId = await createKnowledge({ ...form })
+      emit('created', { knowledgeId })
+      expanded.value = true
+      visible.value = false
+      ElMessage.success('知识已投稿，等待管理员审核')
+    }
   } finally {
     submitting.value = false
   }

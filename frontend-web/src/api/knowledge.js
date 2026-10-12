@@ -31,6 +31,22 @@ export function createKnowledge(payload) {
   return request.post('/knowledge', payload)
 }
 
+/**
+ * 农业知识页：专家编辑自己的知识。
+ *
+ * 请求体与新增完全一致（KnowledgeCreateDTO，标题 / 分类 / 正文 / 配图）。
+ *
+ * ⚠️ 后端会**无条件**把该条知识的审核状态置回「待审核」并下架，
+ * 哪怕是刚审核通过的也一样 —— 知识口径是「审核通过后才公开」，
+ * 改了正文就必须重新过审，否则等于开了一条绕过审核的改稿通道。
+ * 所以调用方在提交前应当二次确认。
+ *
+ * 越权 / 不存在的情况后端分别返回 403 / 404（body 里的 code，HTTP 恒为 200）。
+ */
+export function updateKnowledge(id, payload) {
+  return request.put(`/knowledge/${id}`, payload)
+}
+
 /** 农业知识页：查询当前专家自己的全部知识投稿及审核状态。 */
 export function getMyKnowledge() {
   return request.get('/knowledge/my')

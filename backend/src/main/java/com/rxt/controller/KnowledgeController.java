@@ -48,4 +48,19 @@ public class KnowledgeController {
     public Result<Long> create(@RequestBody @Valid KnowledgeCreateDTO dto) {
         return Result.success(knowledgeService.createKnowledge(UserContext.currentUserId(), dto));
     }
+
+    /**
+     * 专家编辑自己的农业知识。
+     *
+     * <p>对应《软件需求规格说明书》「个人信息 → 专家管理」的处理项<b>「新增与编辑知识」</b>。
+     * 归属由服务端按登录态校验（只能改自己的），且**编辑后审核状态一律回到「待审核」** ——
+     * 已通过的内容改了正文必须重新过审，否则等于开了一条绕过审核的改稿通道。</p>
+     *
+     * <p>入参复用 {@link KnowledgeCreateDTO}，字段约束与新增完全一致。</p>
+     */
+    @PutMapping("/{id}")
+    public Result<Void> update(@PathVariable Long id, @RequestBody @Valid KnowledgeCreateDTO dto) {
+        knowledgeService.updateKnowledge(UserContext.currentUserId(), id, dto);
+        return Result.success();
+    }
 }

@@ -18,6 +18,9 @@ import java.util.List;
 @Service
 public class KnowledgeServiceImpl implements KnowledgeService {
 
+    private static final String AUDIT_PENDING = "待审核";
+    private static final String AUDIT_APPROVED = "已通过";
+
     @Autowired
     private KnowledgeMapper knowledgeMapper;
 
@@ -34,7 +37,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             wrapper.and(w -> w.like(Knowledge::getTitle, keyword)
                     .or().like(Knowledge::getContent, keyword));
         }
-        wrapper.eq(Knowledge::getAuditStatus, "已通过")
+        wrapper.eq(Knowledge::getAuditStatus, AUDIT_APPROVED)
                 .orderByDesc(Knowledge::getCreateTime);
 
         // B2 修复：不传分页参数时返回全量，兼容前端内存切片
@@ -62,10 +65,48 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         knowledge.setContent(dto.getContent().trim());
         knowledge.setImageUrl(dto.getImageUrl());
         knowledge.setAuthorId(expert.getExpertId());
-        knowledge.setAuditStatus("待审核");
+        knowledge.setAuditStatus(AUDIT_PENDING);
         knowledge.setViewCount(0);
         knowledgeMapper.insert(knowledge);
         return knowledge.getKnowledgeId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateKnowledge(Long userId, Long knowledgeId, KnowledgeCreateDTO dto) {
+        // 归属校验的先决条件：当前用户必须有一份专家档案。
+        // author_id 存的是 t_expert.expert_id（不是 user_id），所以必须先换算。
+        ExpertInfo expert = expertInfoMapper.selectOne(new LambdaQueryWrapper<ExpertInfo>()
+                .eq(ExpertInfo::getUserId, userId));
+        if (expert == null) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可编辑农业知识");
+        }
+
+        Knowledge exist = knowledgeMapper.selectById(knowledgeId);
+        if (exist == null) {
+            // 不存在与不属于自己刻意给不同的码：同项目 TradeServiceImpl.requireOwnProduct
+            // 也是这么分的 —— 报「不存在」会让作者以为自己那条丢了。
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在");
+        }
+        if (!exist.getAuthorId().equals(expert.getExpertId())) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "只能编辑自己发布的知识");
+        }
+
+        Knowledge update = new Knowledge();
+        update.setKnowledgeId(knowledgeId);
+        update.setTitle(dto.getTitle().trim());
+        update.setCategory(dto.getCategory().trim());
+        update.setContent(dto.getContent().trim());
+        update.setImageUrl(dto.getImageUrl());
+
+        // 改动一律重新送审。与 TradeServiceImpl.updateProduct 同一口径（那边是
+        // 「改了内容类字段就回待审核」），差别只在于：商品有价格/库存这类经营信息
+        // 可以免审，而知识的所有可编辑字段都是内容，所以这里不做字段级判断。
+        // 已通过的知识一旦被编辑，会立刻从前台列表消失（pageQuery 只查 已通过），
+        // 这是有意的：改正文必须重新过审，否则就是一条绕过审核的改稿通道。
+        update.setAuditStatus(AUDIT_PENDING);
+
+        knowledgeMapper.updateById(update);
     }
 
     @Override
@@ -84,7 +125,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     public Knowledge getDetail(Long id) {
         Knowledge k = knowledgeMapper.selectOne(new LambdaQueryWrapper<Knowledge>()
                 .eq(Knowledge::getKnowledgeId, id)
-                .eq(Knowledge::getAuditStatus, "已通过"));
+                .eq(Knowledge::getAuditStatus, AUDIT_APPROVED));
         if (k == null) {
             throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在或未通过审核");
         }
