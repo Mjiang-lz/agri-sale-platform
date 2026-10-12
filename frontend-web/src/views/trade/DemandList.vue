@@ -32,10 +32,10 @@
       show-icon
       :closable="false"
       title="求购需求加载失败"
-      description="无法连接后端服务，请确认后端已启动（默认 8080 端口）后重试"
       class="error-alert"
     >
       <template #default>
+        <div class="error-desc">无法连接后端服务，请确认后端已启动（默认 8080 端口）后重试</div>
         <div class="error-actions">
           <el-button type="danger" size="small" @click="loadDemands">重新加载</el-button>
         </div>

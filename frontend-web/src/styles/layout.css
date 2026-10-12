@@ -124,3 +124,25 @@
     flex-wrap: wrap;
   }
 }
+
+/* ===== el-alert 错误态的说明文字（见 docs/方案-…-20261012.md §10.5）=========
+ *
+ * Element Plus 把说明文字渲染在**默认插槽**里：
+ *     <p class="el-alert__description"><slot>{{ description }}</slot></p>
+ * 于是只要外面传了 `#default`（这几页放的都是「重新加载」按钮），
+ * `description` 就整段不渲染 —— 用户只看到「XX 加载失败」+ 一个按钮，
+ * 看不到「后端没起来、点这里重试」这个关键信息，而且页面不报任何错。
+ *
+ * 约定：错误提示的说明文字一律写进插槽，用 .error-desc 承载。
+ * .error-actions 是紧随其后的操作行。
+ * ------------------------------------------------------------------------- */
+.error-desc {
+  margin: 0 0 10px;
+  line-height: 1.6;
+}
+
+.error-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

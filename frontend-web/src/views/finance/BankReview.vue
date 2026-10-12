@@ -35,11 +35,13 @@
         show-icon
         :closable="false"
         title="融资申请加载失败"
-        description="无法连接后端服务，或当前账号不是银行用户角色（本接口仅银行用户可用）"
         class="error-alert"
       >
         <template #default>
-          <el-button type="danger" size="small" @click="loadList">重新加载</el-button>
+          <div class="error-desc">无法连接后端服务，或当前账号不是银行用户角色（本接口仅银行用户可用）</div>
+          <div class="error-actions">
+            <el-button type="danger" size="small" @click="loadList">重新加载</el-button>
+          </div>
         </template>
       </el-alert>
 

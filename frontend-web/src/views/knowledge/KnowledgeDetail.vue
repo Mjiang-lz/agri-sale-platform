@@ -35,10 +35,10 @@
       show-icon
       :closable="false"
       title="知识内容加载失败"
-      :description="errorMessage"
       class="error-alert"
     >
       <template #default>
+        <div class="error-desc">{{ errorMessage }}</div>
         <div class="error-actions">
           <el-button type="danger" size="small" @click="load">重新加载</el-button>
           <el-button size="small" @click="goList">返回列表</el-button>
