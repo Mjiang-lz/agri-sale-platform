@@ -192,9 +192,24 @@ const KNOWLEDGE_TITLE_IMG = [
   { keys: ['酸化', '土壤改良', '土壤健康'], img: '/knowledge/soil-health.jpg' },                               // pexels 3696170
   { keys: ['稻瘟', '水稻', '稻田', '育秧'], img: '/knowledge/rice-paddy.jpg' },                                // pexels 9272061
 
+  // —— 2026-10-12 第八轮补的 8 张 ——
+  // 动因：这 8 个主题原先只能落到**农产品商品照**上，而且多组共用同一张
+  //   （1/3/5 全是 p03 柑橘树、11/15/17 全是 p20 鲤鱼、12/18 全是 p19 螃蟹），
+  //   卡片列表上「同一张图出现三次」，且 #12/#18 配螃蟹是**物种就不对**。
+  // 现在每个主题有自己的图；关键词从下面的商品照分组里**移走**，不要两处都留。
+  // 全部 Pexels License（免费商用、无需署名），已裁成 900×396。
+  { keys: ['修剪', '剪枝', '整形', '嫁接'], img: '/knowledge/orchard-pruning.jpg' },          // pexels 11257617
+  { keys: ['基肥', '秋施', '施肥'], img: '/knowledge/orchard-base-fertilizer.jpg' },          // pexels 33995853
+  { keys: ['家禽', '鸡群', '禽舍', '呼吸道'], img: '/knowledge/poultry-flock.jpg' },           // pexels 34795500
+  { keys: ['饲料', '日粮', '育肥', '蛋白能量'], img: '/knowledge/animal-feed.jpg' },           // pexels 7781984
+  { keys: ['尾水', '生态化处理', '人工湿地', '养殖废水'], img: '/knowledge/aquaculture-tailwater.jpg' }, // pexels 36345997
+  { keys: ['越冬', '冬管'], img: '/knowledge/fish-pond.jpg' },                                 // pexels 5774415
+  { keys: ['水草', '浮萍'], img: '/knowledge/duckweed-pond.jpg' },                             // pexels 38289921
+  { keys: ['小龙虾', '龙虾'], img: '/knowledge/crayfish.jpg' },                                // pexels 34486954
+
   // ================= 农产品实拍图（按标题里的具象词匹配）=================
-  // —— 果园 / 果树 ——
-  { keys: ['柑橘', '脐橙', '柚子', '蜜柚', '裂果', '果园', '果树', '修剪', '嫁接'], img: '/products/p03.jpg' },
+  // —— 果园 / 果树 ——（修剪/嫁接 已上移到专题组）
+  { keys: ['柑橘', '脐橙', '柚子', '蜜柚', '裂果', '果园', '果树'], img: '/products/p03.jpg' },
   { keys: ['猕猴桃', '奇异果'], img: '/products/p11.jpg' },
   // —— 蔬菜 ——
   { keys: ['大白菜', '白菜'], img: '/products/p25.jpg' },
@@ -209,14 +224,12 @@ const KNOWLEDGE_TITLE_IMG = [
   { keys: ['小米', '谷子'], img: '/products/g03.png' },
   { keys: ['玉米'], img: '/products/g07.png' },
   { keys: ['菜籽油', '榨油', '油菜'], img: '/products/g01.png' },
-  // —— 水产 ——
-  { keys: ['小龙虾', '龙虾'], img: '/products/p19.jpg' },
+  // —— 水产 ——（小龙虾 已上移到专题组；原先这里指向的是「螃蟹」，物种就不对）
   { keys: ['大闸蟹', '螃蟹'], img: '/products/g08.png' },
-  { keys: ['鱼塘', '淡水鱼', '缺氧', '尾水', '越冬', '水质'], img: '/products/p20.jpg' },
-  // —— 畜禽 ——
-  { keys: ['土鸡', '散养', '家禽', '鸡'], img: '/products/p27.jpg' },
+  { keys: ['鱼塘', '淡水鱼', '缺氧', '水质'], img: '/products/p20.jpg' },
+  // —— 畜禽 ——（家禽 已上移到专题组）
+  { keys: ['土鸡', '散养', '鸡'], img: '/products/p27.jpg' },
   { keys: ['蛋鸡', '鸡蛋'], img: '/products/p17.jpg' },
-  { keys: ['饲料', '育肥'], img: '/products/g07.png' },
   // —— 食用菌 ——
   { keys: ['香菇', '食用菌', '菌菇'], img: '/products/g04.png' },
   { keys: ['松茸', '牛肝菌'], img: '/products/g09.png' },
@@ -224,7 +237,7 @@ const KNOWLEDGE_TITLE_IMG = [
   // 注意：`大棚`/`连作` 已上移到专题组，`酸化`/`盐碱` 同理，这里不再重复定义，
   // 避免「同一关键词出现在两组、靠数组顺序决定结果」这种隐式依赖。
   { keys: ['蔬菜'], img: '/products/p05.jpg' },
-  { keys: ['土壤', '整地', '基肥', '施肥'], img: '/products/p15.jpg' },
+  { keys: ['土壤', '整地'], img: '/products/p15.jpg' },
   { keys: ['田间', '农事', '栽培', '管理'], img: '/products/p07.jpg' }
 ]
 
