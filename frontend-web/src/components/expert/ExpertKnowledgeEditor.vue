@@ -25,7 +25,15 @@
             <div class="submission-actions">
               <el-tag :type="statusType(item.auditStatus)">{{ statusText(item.auditStatus) }}</el-tag>
               <el-button link type="primary" @click="openEditor(item)">编辑</el-button>
-              <el-button circle text class="close-button" aria-label="关闭投稿记录" @click="$emit('dismiss', item)">×</el-button>
+              <el-button link type="danger" @click="removeSubmission(item)">删除</el-button>
+              <!--
+                这个 × 是**本地隐藏**（写 localStorage 的 hiddenSubmissionIds），不删数据。
+                用户上次就是把它当成了删除，所以这里必须有可见提示把两件事分开 ——
+                两个按钮挨着、看起来都能让记录消失，不写清楚一定会再误会一次。
+              -->
+              <el-tooltip content="仅从我的列表里隐藏，不删除数据" placement="top">
+                <el-button circle text class="close-button" aria-label="从我的列表隐藏（不删除数据）" @click="$emit('dismiss', item)">×</el-button>
+              </el-tooltip>
             </div>
           </div>
         </div>
@@ -74,7 +82,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { uploadKnowledgeImage } from '@/api/common'
-import { createKnowledge, updateKnowledge } from '@/api/knowledge'
+import { createKnowledge, deleteKnowledge, updateKnowledge } from '@/api/knowledge'
 
 defineProps({ submissions: { type: Array, default: () => [] } })
 const emit = defineEmits(['created', 'dismiss'])
@@ -182,6 +190,38 @@ async function submit() {
   } finally {
     submitting.value = false
   }
+}
+
+/**
+ * 删除自己的一条知识投稿（真删除，不可撤销）。
+ *
+ * 与旁边那个 × 的区别（用户上次就是把它当成了删除）：
+ *   · ×  = 本地隐藏，只往 localStorage 的 hiddenSubmissionIds 里记一笔 id，数据一条不动；
+ *   · 本函数 = 调 DELETE /api/knowledge/{id}，后端物理删行。
+ * 两者都会让记录从「我的投稿」里消失，所以提示文案必须把「不可撤销」说在前面。
+ *
+ * 为什么文案里要专门提「评论一并清除、审核记录保留」——这两件事用户看不见，
+ * 但事后去后台翻审核列表时会看到那条流水的标题变成「（内容已删除）」，
+ * 不提前说会被当成 bug 报回来。
+ */
+async function removeSubmission(item) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${item.title}」这条知识吗？此操作不可撤销，删除后无法恢复。\n\n` +
+      '该知识的评论会一并清除；管理员那边的审核记录会保留，' +
+      '标题显示为「（内容已删除）」。',
+      '删除知识投稿',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  await deleteKnowledge(item.knowledgeId)
+  ElMessage.success('知识已删除')
+  // 借父组件已有的刷新入口：handleKnowledgeCreated 会重新拉「我的投稿」+ 公开列表
+  emit('created', { knowledgeId: item.knowledgeId })
+  expanded.value = true
 }
 
 function statusText(status) {
