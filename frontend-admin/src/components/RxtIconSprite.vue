@@ -130,6 +130,19 @@
       <path d="M12 3.2l7.6 2.7v6.1c0 4.3-3.2 7.5-7.6 8.8-4.4-1.3-7.6-4.5-7.6-8.8V5.9z" />
       <path d="M8.9 11.8l2.3 2.3 4.1-4.7" />
     </symbol>
+
+    <!-- 图片资源管理：相框 + 远山 + 日头 -->
+    <symbol id="ico-media" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3.2" y="4.6" width="17.6" height="14.8" rx="2.6" />
+      <circle cx="8.8" cy="9.6" r="1.6" />
+      <path d="M4.6 17.4l4.2-4.7 3.1 3.4 2.6-2.2 4.9 3.5" />
+    </symbol>
+
+    <!-- 资源管理（父级）：文件夹 -->
+    <symbol id="ico-resource" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.2 7.4a2 2 0 012-2h3.4l1.9 2.4h8.3a2 2 0 012 2v7.8a2 2 0 01-2 2H5.2a2 2 0 01-2-2z" />
+      <path d="M3.2 11.4h17.6" />
+    </symbol>
   </svg>
 </template>
 

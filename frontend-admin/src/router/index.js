@@ -14,7 +14,11 @@ const routes = [
       { path: 'audit/product', component: () => import('@/views/audit/ProductAudit.vue'), meta: { title: '商品审核' } },
       { path: 'audit/knowledge', component: () => import('@/views/audit/KnowledgeAudit.vue'), meta: { title: '知识审核' } },
       { path: 'audit/comment', component: () => import('@/views/audit/CommentAudit.vue'), meta: { title: '评论审核' } },
-      { path: 'finance/manage', component: () => import('@/views/finance/FinanceManage.vue'), meta: { title: '融资管理' } }
+      { path: 'finance/manage', component: () => import('@/views/finance/FinanceManage.vue'), meta: { title: '融资管理' } },
+      // 资源管理：与上面的「内容审核」分开 —— 审核是给内容下结论（写 t_audit 留痕），
+      // 资源管理是维护主体资料与存储对象，两者职责不同，导航上也别合并
+      { path: 'expert/manage', component: () => import('@/views/expert/ExpertManage.vue'), meta: { title: '专家资源管理' } },
+      { path: 'media/manage', component: () => import('@/views/media/MediaManage.vue'), meta: { title: '图片资源管理' } }
     ]
   }
 ]
