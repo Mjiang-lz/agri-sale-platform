@@ -66,6 +66,14 @@ public class AuditServiceImpl implements AuditService {
      */
     private static final List<String> CONTENT_TYPES = List.of(TYPE_PRODUCT, TYPE_KNOWLEDGE, TYPE_COMMENT);
 
+    /**
+     * 已审记录里「被审对象已不存在」时的标题占位。
+     *
+     * <p>出现场景：作者删掉了自己发布的知识，但 t_audit 的审核流水按留痕要求保留，
+     * 于是回表补标题时查不到。这不是错误，是预期内的一种状态，所以要给一句人话。</p>
+     */
+    private static final String TARGET_DELETED_LABEL = "（内容已删除）";
+
     /** 业务表使用的审核状态词表 */
     private static final String STATUS_PENDING = "待审核";
     private static final String STATUS_PASSED = "已通过";
@@ -359,6 +367,7 @@ public class AuditServiceImpl implements AuditService {
                 AuditTaskVO item = newPendingVO(TYPE_PRODUCT, product.getProductId(),
                         product.getProductName(), product.getSellerId(), product.getCreateTime());
                 item.setContent(product.getDescription());
+                item.setImageUrl(product.getImageUrl());
                 item.setAuditStatus(product.getAuditStatus());
                 yield item;
             }
@@ -371,6 +380,7 @@ public class AuditServiceImpl implements AuditService {
                         knowledge.getTitle(), toUserIdByExpertId(knowledge.getAuthorId()),
                         knowledge.getCreateTime());
                 item.setContent(knowledge.getContent());
+                item.setImageUrl(knowledge.getImageUrl());
                 item.setAuditStatus(knowledge.getAuditStatus());
                 yield item;
             }
@@ -739,6 +749,11 @@ public class AuditServiceImpl implements AuditService {
      *
      * <p>做法：先按类型分组，每类只发一次 IN 查询，再用 Map 回填。
      * 若逐条 vo 去查业务表，一页 10 条就是 10 次 SQL，这就是 N+1。</p>
+     *
+     * <p><b>查不到被审对象是正常的，不是异常</b>：知识被作者删除后审核流水会保留
+     * （留痕不能因为对象没了就抹掉），于是这里必然补不到标题。这类行统一标成
+     * 「（内容已删除）」，而不是留一个空白格 —— 空白会让人以为是接口出错，
+     * 而"内容已删除"是一句可解释、可核对的事实。</p>
      */
     private void fillTargetInfo(List<AuditTaskVO> vos) {
         if (vos == null || vos.isEmpty()) {
@@ -816,6 +831,14 @@ public class AuditServiceImpl implements AuditService {
                 default -> {
                     // 未知类型不处理：可能是历史脏数据，静默跳过好过让整个列表接口 500
                 }
+            }
+        }
+
+        // 3) 兜底：上面补不到标题的，说明被审对象已经不存在了（如专家删掉了自己那条知识）。
+        //    统一给一句可解释的说明，别把空白格留给页面。
+        for (AuditTaskVO vo : vos) {
+            if (!StringUtils.hasText(vo.getTargetTitle())) {
+                vo.setTargetTitle(TARGET_DELETED_LABEL);
             }
         }
     }

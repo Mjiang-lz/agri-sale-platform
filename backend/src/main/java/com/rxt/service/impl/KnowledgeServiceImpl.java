@@ -1,12 +1,15 @@
 package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
 import com.rxt.dto.KnowledgeCreateDTO;
+import com.rxt.entity.Comment;
 import com.rxt.entity.ExpertInfo;
 import com.rxt.entity.Knowledge;
+import com.rxt.mapper.CommentMapper;
 import com.rxt.mapper.ExpertInfoMapper;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.service.KnowledgeService;
@@ -21,11 +24,17 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private static final String AUDIT_PENDING = "待审核";
     private static final String AUDIT_APPROVED = "已通过";
 
+    /** t_comment.target_type 的知识取值。与 AuditServiceImpl.TYPE_KNOWLEDGE 同一个词表 */
+    private static final String COMMENT_TARGET_KNOWLEDGE = "KNOWLEDGE";
+
     @Autowired
     private KnowledgeMapper knowledgeMapper;
 
     @Autowired
     private ExpertInfoMapper expertInfoMapper;
+
+    @Autowired
+    private CommentMapper commentMapper;
 
     @Override
     public Page<Knowledge> pageQuery(String category, String keyword, Integer page, Integer size) {
@@ -110,6 +119,38 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteKnowledge(Long userId, Long knowledgeId) {
+        ExpertInfo expert = expertInfoMapper.selectOne(new LambdaQueryWrapper<ExpertInfo>()
+                .eq(ExpertInfo::getUserId, userId));
+        if (expert == null) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可删除农业知识");
+        }
+
+        Knowledge exist = knowledgeMapper.selectById(knowledgeId);
+        if (exist == null) {
+            // 与 updateKnowledge 同一口径：404 与 403 分开报。
+            // 报「不存在」会让作者以为自己那条丢了，报 403 才是"它在，但不是你的"。
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在");
+        }
+        if (!exist.getAuthorId().equals(expert.getExpertId())) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "只能删除自己发布的知识");
+        }
+
+        // 先清评论再删正文。t_comment.target_id 是多态关联、没有外键，所以不清也不会
+        // 撞约束 —— 但会留下「评论还在、被评论的知识没了」的孤儿行：从此查不到、
+        // 也没人再能删掉它。评论模块目前只写 PRODUCT 评论，这条清理覆盖的是历史/种子数据。
+        commentMapper.delete(new LambdaQueryWrapper<Comment>()
+                .eq(Comment::getTargetType, COMMENT_TARGET_KNOWLEDGE)
+                .eq(Comment::getTargetId, knowledgeId));
+
+        knowledgeMapper.deleteById(knowledgeId);
+
+        // t_audit 流水刻意不删（理由见 KnowledgeService#deleteKnowledge）：
+        // 审核确实发生过，删掉它等于篡改管理员的工作量统计。
+    }
+
+    @Override
     public List<Knowledge> myKnowledge(Long userId) {
         ExpertInfo expert = expertInfoMapper.selectOne(new LambdaQueryWrapper<ExpertInfo>()
                 .eq(ExpertInfo::getUserId, userId));
@@ -122,13 +163,30 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Knowledge getDetail(Long id) {
         Knowledge k = knowledgeMapper.selectOne(new LambdaQueryWrapper<Knowledge>()
                 .eq(Knowledge::getKnowledgeId, id)
                 .eq(Knowledge::getAuditStatus, AUDIT_APPROVED));
         if (k == null) {
+            // 待审核 / 未通过的 id 也落这里，对外一律表现为「不存在」——
+            // 不泄露未过审正文（前端据此走 el-result 终态，两个分支共用一条路径）。
             throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在或未通过审核");
         }
+
+        // ★ 真实累加浏览量（2026-10-12）。
+        //
+        // 两个实现要点，都不是可省的细节：
+        //   1) 用 `view_count = view_count + 1` 把这个加法交给数据库执行，**不能**
+        //      先 select 出来 +1 再 updateById —— 那是「读-改-写」，并发下两个请求
+        //      会读到同一个旧值、各自写回同一个数（丢更新）。交给 DB 才是原子的。
+        //   2) 返回给前端的对象也要跟着 +1。否则第一次访问拿到的仍是加之前的数，
+        //      用户体感还是「我看了但没变」——得再刷新一次才看到变化，很怪。
+        knowledgeMapper.update(null, new LambdaUpdateWrapper<Knowledge>()
+                .setSql("view_count = view_count + 1")
+                .eq(Knowledge::getKnowledgeId, id));
+        k.setViewCount((k.getViewCount() == null ? 0 : k.getViewCount()) + 1);
+
         return k;
     }
 }

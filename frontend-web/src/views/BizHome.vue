@@ -432,11 +432,20 @@
          「田间求购」保持同一套体系，不另外造一套标题样式。
 
          数据源：GET /home/knowledge（t_knowledge），按 createTime 倒序取 4 条。
-         配图：k.imageUrl 优先，为空走 knowledgeImage()。
-         （t_knowledge.image_url 目前 18 条全是 NULL，实际都会走前端映射：
-           标题里带具象农产品/养殖词 → 配对应实拍图；政策、认证这类
-           本就没有对应实物的 → 配分类渐变封面。**不要**再按分类随机取模，
-           那会让「畜禽粪污资源化」配上一碗小米。）
+         配图：统一走 knowledgeImage(k)（接口图 → 标题命中实拍图 → 分类渐变封面）。
+         （★ 2026-10-12 第六轮起 t_knowledge.image_url 已经不是 NULL 了 ——
+           1~18 号回填成了 OBS 绝对地址，所以正常情况下第一级就命中，
+           显示的是一张真照片。后两级是给「OBS 取不到 / 断网」和
+           演示数据兜底的：标题里带具象农产品/养殖词 → 配对应本地实拍图；
+           政策、认证这类本就没有对应实物的 → 配分类渐变封面。
+           **不要**再按分类随机取模，那会让「畜禽粪污资源化」配上一碗小米。）
+
+         ★ 单篇详情页（/knowledge/:id）用的是另一个函数 knowledgePhoto() ——
+           它只返回前两级，**不含渐变封面**，没有真图就不显示配图块。
+           卡片能接受渐变块当装饰，文章页不能：那是纯噪音。两处别混用。
+         ★ 卡片 `<img>` 还挂了 onKnowledgeImgError：OBS 图挂了就退本地图
+           （已回填，等于把「静态资源永不裂图」的保证换成了「依赖公网」，
+           所以必须补这层兜底）。见该函数定义处的注释。
          ================================================================ -->
     <section class="news">
       <div class="sec-head">
@@ -459,11 +468,15 @@
           @click="goKnowledge(k)"
         >
           <div class="nc-cover">
+            <!--
+              knowledgeImage() 内部已经优先取 k.imageUrl，所以这里不必再 `k.imageUrl ||` ——
+              那样写会让人误以为"要先把接口图挡在前面"，而实际上后者永远不会被触发到。
+            -->
             <img
-              :src="k.imageUrl || knowledgeImage(k)"
+              :src="knowledgeImage(k)"
               :alt="k.title"
               loading="lazy"
-              @error="onImgError"
+              @error="onKnowledgeImgError($event, k)"
             />
           </div>
           <div class="nc-body">
@@ -499,7 +512,8 @@ import {
   demandFallbackBg,
   demandInitial,
   expertBanner,
-  knowledgeImage
+  knowledgeImage,
+  knowledgeLocalImage
 } from '@/utils/imagery'
 
 /* ====================================================================
@@ -554,6 +568,28 @@ function cut(s, n) {
 /** 图片 404 时就地隐藏，露出下层的首字/品类底色，不留碎图图标 */
 function onImgError(e) {
   e.target.style.opacity = '0'
+}
+
+/**
+ * 知识卡配图加载失败时的兜底。
+ *
+ * 为什么要单独一个：2026-10-12 把 `t_knowledge.image_url` 回填成了 OBS 绝对地址，
+ * 这带来一个改前没有的依赖 —— **图文要靠公网**。断网 / 对象被删时，如果不接住，
+ * 首页知识区会整排变成空白图框（改前它们是前端静态资源，反而断网也能显示）。
+ *
+ * 退到 `knowledgeLocalImage()`：本地实拍图，再不行就是分类渐变封面，恒非空。
+ * ⚠️ 关键是**不能再走一遍 `knowledgeImage()`** —— 它第一步又是那个坏掉的 OBS 地址，
+ * 会变成「失败→换成同一个 URL→再失败」的循环。所以用 dataset 打一次标记，
+ * 本地兜底也失败时（理论上不会）才真的置空。
+ */
+function onKnowledgeImgError(e, k) {
+  const img = e.target
+  if (img.dataset.localFallback === '1') {
+    img.style.opacity = '0'
+    return
+  }
+  img.dataset.localFallback = '1'
+  img.src = knowledgeLocalImage(k)
 }
 
 /* ---------------- 首屏轮播 ---------------- */
@@ -1060,7 +1096,12 @@ function goProduct(p) {
   if (p?.productId) router.push(`/trade/product/${p.productId}`)
 }
 function goKnowledge(k) {
-  if (k?.knowledgeId) router.push({ path: '/expert/knowledge', query: { knowledgeId: k.knowledgeId } })
+  // ★ 2026-10-12 改：原来推的是 `/expert/knowledge?knowledgeId=xxx`，
+  //   而 Knowledge.vue 里**根本没有 useRoute** —— 那个 query 从来没被读过，
+  //   于是点一张知识卡的效果是「跳到专家助力板块的列表页，什么都没打开」，
+  //   参数被静默丢掉（本仓库第二次踩「上游传参、下游没接」，上次是商品页）。
+  //   现在每篇知识有自己的地址，直接推详情页，参数传递这一跳彻底不需要了。
+  if (k?.knowledgeId) router.push(`/knowledge/${k.knowledgeId}`)
 }
 
 /* 专家列表是异步来的，onMounted 那一刻 DOM 里一张卡片都没有，

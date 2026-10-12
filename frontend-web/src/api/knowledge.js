@@ -51,3 +51,25 @@ export function updateKnowledge(id, payload) {
 export function getMyKnowledge() {
   return request.get('/knowledge/my')
 }
+
+/**
+ * 农业知识页：专家删除自己的知识投稿。
+ *
+ * ⚠️ **不可撤销**，调用方必须先二次确认。
+ *
+ * 与商品删除不同，这里后端**一律物理删行**，没有「被引用就改判下架」的例外 ——
+ * 全库没有外键指向 t_knowledge，知识也不参与下单链路。判定依据：
+ *   · t_knowledge 只有 author_id 一条**指出去**的外键（→ t_expert）
+ *   · t_audit.target_id / t_comment.target_id 是多态关联，按设计不建外键
+ *
+ * 副作用（后端已处理，前端提示里要写清）：
+ *   · 该知识的评论会被一并清除（否则会留下再也查不到的孤儿评论行）
+ *   · 审核流水**保留** —— 审核确实发生过，删掉等于篡改管理员的工作量统计。
+ *     代价是后台「知识审核 → 已通过/未通过」列表里那条流水标题会显示成
+ *     「（内容已删除）」，这是预期行为，不是故障。
+ *
+ * 只能删自己发布的，删他人返回 403（body 里的 code，HTTP 恒为 200）；不存在返回 404。
+ */
+export function deleteKnowledge(id) {
+  return request.delete(`/knowledge/${id}`)
+}

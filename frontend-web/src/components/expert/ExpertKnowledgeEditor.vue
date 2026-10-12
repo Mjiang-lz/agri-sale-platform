@@ -25,7 +25,15 @@
             <div class="submission-actions">
               <el-tag :type="statusType(item.auditStatus)">{{ statusText(item.auditStatus) }}</el-tag>
               <el-button link type="primary" @click="openEditor(item)">编辑</el-button>
-              <el-button circle text class="close-button" aria-label="关闭投稿记录" @click="$emit('dismiss', item)">×</el-button>
+              <el-button link type="danger" @click="removeSubmission(item)">删除</el-button>
+              <!--
+                这个 × 是**本地隐藏**（写 localStorage 的 hiddenSubmissionIds），不删数据。
+                用户上次就是把它当成了删除，所以这里必须有可见提示把两件事分开 ——
+                两个按钮挨着、看起来都能让记录消失，不写清楚一定会再误会一次。
+              -->
+              <el-tooltip content="仅从我的列表里隐藏，不删除数据" placement="top">
+                <el-button circle text class="close-button" aria-label="从我的列表隐藏（不删除数据）" @click="$emit('dismiss', item)">×</el-button>
+              </el-tooltip>
             </div>
           </div>
         </div>
@@ -33,7 +41,20 @@
       </div>
     </el-collapse-transition>
 
-    <el-dialog v-model="visible" :title="editingId ? '编辑农业知识' : '发布农业知识'" width="min(760px, 95vw)" destroy-on-close>
+    <!--
+      宽度：用户要求「占页面布局的 70%」⇒ 用视口比例而不是固定像素。
+      1200px 是上限，只在超宽屏生效（视口 ≤1714px 时严格等于 70%，本机 1600px 视口 = 1120px）——
+      不加上限的话 2560px 屏上正文会长到一行放 90 个字，反而更难读。
+      top 配合调小：弹窗变宽后正文行数也加了，15vh 的默认顶部留白会让高度溢出视口。
+    -->
+    <el-dialog
+      v-model="visible"
+      class="knowledge-editor-dialog"
+      :title="editingId ? '编辑农业知识' : '发布农业知识'"
+      width="min(1200px, 70vw)"
+      top="5vh"
+      destroy-on-close
+    >
       <el-alert
         :key="editingId || 'create'"
         type="info"
@@ -53,7 +74,8 @@
           </el-select>
         </el-form-item>
         <el-form-item label="知识正文" prop="content">
-          <el-input v-model="form.content" type="textarea" :rows="10" maxlength="5000" show-word-limit placeholder="请填写完整、可执行的农业技术内容" />
+          <!-- 行数从 10 提到 14：只把弹窗拉宽不加高，编辑区会显得被横向抻长 -->
+          <el-input v-model="form.content" type="textarea" :rows="14" maxlength="5000" show-word-limit placeholder="请填写完整、可执行的农业技术内容" />
         </el-form-item>
         <el-form-item label="知识配图（选填）">
           <el-upload action="#" :show-file-list="false" accept=".jpg,.jpeg,.png" :http-request="handleUpload" :before-upload="beforeUpload">
@@ -74,7 +96,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { uploadKnowledgeImage } from '@/api/common'
-import { createKnowledge, updateKnowledge } from '@/api/knowledge'
+import { createKnowledge, deleteKnowledge, updateKnowledge } from '@/api/knowledge'
 
 defineProps({ submissions: { type: Array, default: () => [] } })
 const emit = defineEmits(['created', 'dismiss'])
@@ -184,6 +206,38 @@ async function submit() {
   }
 }
 
+/**
+ * 删除自己的一条知识投稿（真删除，不可撤销）。
+ *
+ * 与旁边那个 × 的区别（用户上次就是把它当成了删除）：
+ *   · ×  = 本地隐藏，只往 localStorage 的 hiddenSubmissionIds 里记一笔 id，数据一条不动；
+ *   · 本函数 = 调 DELETE /api/knowledge/{id}，后端物理删行。
+ * 两者都会让记录从「我的投稿」里消失，所以提示文案必须把「不可撤销」说在前面。
+ *
+ * 为什么文案里要专门提「评论一并清除、审核记录保留」——这两件事用户看不见，
+ * 但事后去后台翻审核列表时会看到那条流水的标题变成「（内容已删除）」，
+ * 不提前说会被当成 bug 报回来。
+ */
+async function removeSubmission(item) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${item.title}」这条知识吗？此操作不可撤销，删除后无法恢复。\n\n` +
+      '该知识的评论会一并清除；管理员那边的审核记录会保留，' +
+      '标题显示为「（内容已删除）」。',
+      '删除知识投稿',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  await deleteKnowledge(item.knowledgeId)
+  ElMessage.success('知识已删除')
+  // 借父组件已有的刷新入口：handleKnowledgeCreated 会重新拉「我的投稿」+ 公开列表
+  emit('created', { knowledgeId: item.knowledgeId })
+  expanded.value = true
+}
+
 function statusText(status) {
   if (status === '已通过') return '已通过'
   if (status === '未通过') return '未通过'
@@ -215,6 +269,18 @@ function formatDateTime(value) {
 .submission-item strong, .submission-item span { display: block; }
 .submission-item span { margin-top: 3px; color: #75827a; font-size: 12px; }
 .editor-form { margin-top: 18px; }
-.preview { display: block; width: 220px; height: 130px; margin-top: 12px; border-radius: 11px; }
+.preview { display: block; width: 300px; height: 176px; margin-top: 12px; border-radius: 11px; }
 @media (max-width: 680px) { .editor-head { align-items: stretch; flex-direction: column; } }
+</style>
+
+<style>
+/*
+ * 非 scoped 块 —— el-dialog 会 teleport 到 body，scoped 的属性选择器够不到它。
+ * 弹窗加宽加高后（70vw / 正文 14 行），加上配图预览一屏放不下。
+ * 让内容区自己滚，标题栏和底部按钮留在原地，不然滚动时「取消/提交」会跟着滑走。
+ */
+.knowledge-editor-dialog .el-dialog__body {
+  max-height: 66vh;
+  overflow-y: auto;
+}
 </style>

@@ -7,7 +7,24 @@ import java.util.List;
 
 public interface KnowledgeService {
     Page<Knowledge> pageQuery(String category, String keyword, Integer page, Integer size);
-    Knowledge getDetail(Long id);                    // 详情
+
+    /**
+     * 单篇知识详情（对外只返回「已通过」的知识）。
+     *
+     * <p><b>★ 2026-10-12：本方法会真实累加浏览量。</b>在此之前
+     * {@code t_knowledge.view_count} 只是个静态装饰值 —— 种子数据里写死 386/412…，
+     * 新建知识写 0，<b>全项目没有任何一处对它 +1</b>。所以「我浏览过了为什么还是 0」
+     * 不是缓存没刷新，是这个功能根本不存在。</p>
+     *
+     * <p>累计口径：每次调用 +1，<b>不去重</b>。本项目没有 Redis / 会话级计数，
+     * 做去重需要额外引入一套「谁在什么时间看过哪一篇」的存储，收益不抵成本；
+     * 代价是同一人刷新页面也会 +1，因此这个数字应当理解为「阅读次数」而不是
+     * 「读过的人数」。</p>
+     *
+     * @param id 知识主键
+     * @return 知识实体，{@code viewCount} 为<b>累加之后</b>的值
+     */
+    Knowledge getDetail(Long id);
 
     /** 专家新增知识，返回知识主键。 */
     Long createKnowledge(Long userId, KnowledgeCreateDTO dto);
@@ -25,6 +42,24 @@ public interface KnowledgeService {
      * @param dto         新内容，字段约束与新增一致
      */
     void updateKnowledge(Long userId, Long knowledgeId, KnowledgeCreateDTO dto);
+
+    /**
+     * 专家删除自己的知识投稿。
+     *
+     * <p><b>为什么可以物理删，而商品不行</b>：全库没有任何一条外键指向
+     * {@code t_knowledge}（{@code author_id} 那条是它指出去的外键），知识也不参与
+     * 下单链路 —— 所以删行不会留下悬空引用，不需要像商品那样"被引用就改判下架"。</p>
+     *
+     * <p><b>副作用与处置</b>：删前会先清掉该知识的评论（{@code t_comment.target_id}
+     * 是多态关联、没有外键，不清就会留下"评论还在、被评论的知识没了"的孤儿行）；
+     * {@code t_audit} 的审核流水<b>刻意保留</b> —— 审核确实发生过，删掉它等于篡改
+     * 审核工作量统计。代价是审核列表里会出现一条取不到标题的流水，由
+     * {@code AuditServiceImpl.fillTargetInfo} 标成「（内容已删除）」而不是留空。</p>
+     *
+     * @param userId      当前登录用户主键，取自登录态
+     * @param knowledgeId 待删除的知识主键
+     */
+    void deleteKnowledge(Long userId, Long knowledgeId);
 
     /** 当前专家自己的全部知识投稿。 */
     List<Knowledge> myKnowledge(Long userId);

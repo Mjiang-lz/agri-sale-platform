@@ -158,6 +158,15 @@ export function expertBg(id) {
  *      3) 分类渐变封面（data URI SVG）—— 「政策解读 / 绿色食品认证 / 扶持政策」
  *         这类抽象主题本就没有对应实物，硬塞一张农产品照只会更违和。
  *         改用与「知识库列表页」同一套配色的渐变封面：宁可没有图，也不要错图。
+ *
+ *    ★ 2026-10-12：第 3 级**只给卡片用**，不给文章页用。详见 `knowledgePhoto()`
+ *      的注释 —— 渐变封面在文章页是纯噪音，文章页没有真图就不显示配图。
+ *
+ *    ★★ 2026-10-12 同日补：**第 1 级终于有值了** —— `t_knowledge.image_url`
+ *      的 1~18 行已回填真图（12 个 OBS 对象，同一张可被多条知识复用，
+ *      所以 18 行只对应 12 个对象）。上面这些兜底对现网数据基本不再触发，
+ *      **但仍要保留**：① 新发的知识若专家没传图，还得靠它们撑住卡片；
+ *      ② 断网 / 对象被删时，本文件末尾那两个「本地」函数要接住。
  * ================================================================== */
 
 /**
@@ -263,21 +272,71 @@ function knowledgeCover(k) {
 }
 
 /**
- * 取知识封面。
+ * 知识配图的取图函数。**四个函数，按「拿哪几级兜底」分，别混用。**
  *
- * 顺序：接口 imageUrl → 标题关键词实拍图 → 分类渐变封面。恒返回非空。
- * @param {object} k 知识对象（KnowledgeVO）
- * @returns {string} 图片地址（相对路径 或 data URI）
+ * 三个来源，按优先级：
+ *   ① 接口 `imageUrl`（真配图，2026-10-12 起库里已有值，OBS 绝对地址）
+ *   ② 标题关键词命中的**本地实拍图**（`KNOWLEDGE_TITLE_IMG`）
+ *   ③ 分类**渐变封面**（data URI SVG，纯装饰）
+ *
+ * | 函数 | 取哪几级 | 空不空 | 谁用 |
+ * |---|---|---|---|
+ * | `knowledgePhoto(k)`       | ① → ②       | 可能空 | 文章页 `/knowledge/:id` |
+ * | `knowledgeKeywordPhoto(k)` | ②          | 可能空 | 上面两个「失败回退」用 |
+ * | `knowledgeImage(k)`       | ① → ② → ③  | 恒非空 | 卡片（首页 / 知识库列表） |
+ * | `knowledgeLocalImage(k)`  | ② → ③       | 恒非空 | 卡片的「加载失败」回退 |
+ *
+ * **为什么文章页不含第 ③ 级**：渐变封面是「色块 + 分类大字」的装饰图，与正文、
+ * 与标题都不发生信息关系。读者点进来是要看内容，塞一张 900×396 的渐变横幅只是
+ * 噪音；若同时显示「点击图片可放大」更荒谬（放大看什么？）。
+ * **卡片能接受占位装饰，文章页不能** —— 同一条「宁可没有图，也不要错图」。
+ *
+ * **为什么还要「本地」那两个**：2026-10-12 把 image_url 回填成 OBS 绝对地址后，
+ * 图文就依赖公网了（本机 demo / 答辩若断网，全部知识封面会同时失效 —— 改前它们
+ * 是前端静态资源，反而不受影响）。所以 `@error` 时退到本地素材：
+ * 卡片退 `knowledgeLocalImage()`（格子不能空），文章页退 `knowledgeKeywordPhoto()`。
+ * 注意回退**必须跳过第 ① 级**，否则会拿同一个坏 URL 再试一次，陷入死循环。
  */
-export function knowledgeImage(k) {
-  const real = k?.imageUrl || k?.image_url
-  if (real && typeof real === 'string' && real.trim()) return real
 
+/**
+ * 只按标题关键词取本地实拍图。**没有命中时返回空串。**
+ * @param {object} k 知识对象
+ * @returns {string} 本地图片路径（如 `/knowledge/manure-compost.jpg`）或空串
+ */
+export function knowledgeKeywordPhoto(k) {
   const title = String(k?.title || '')
   const hit = KNOWLEDGE_TITLE_IMG.find((item) => item.keys.some((key) => title.includes(key)))
-  if (hit) return hit.img
+  return hit ? hit.img : ''
+}
 
-  return knowledgeCover(k)
+/**
+ * 取知识的**真图**（① 接口地址 → ② 标题命中的实拍图）。文章页用。
+ * @param {object} k 知识对象
+ * @returns {string} 图片地址；**都没有时返回空串**（调用方据此整块不渲染）
+ */
+export function knowledgePhoto(k) {
+  const real = k?.imageUrl || k?.image_url
+  if (real && typeof real === 'string' && real.trim()) return real
+  return knowledgeKeywordPhoto(k)
+}
+
+/**
+ * 取知识封面（**卡片专用**）：① → ② → ③，恒非空。
+ * @param {object} k 知识对象（KnowledgeVO）
+ * @returns {string} 图片地址（相对路径 或 data URI），**恒非空**
+ */
+export function knowledgeImage(k) {
+  return knowledgePhoto(k) || knowledgeCover(k)
+}
+
+/**
+ * 卡片图片**加载失败**时的本地兜底：跳过 ①，只走 ② → ③，恒非空。
+ * 用途见本段开头「为什么还要本地那两个」。
+ * @param {object} k 知识对象
+ * @returns {string} 本地图片路径 或 渐变封面 data URI，**恒非空**
+ */
+export function knowledgeLocalImage(k) {
+  return knowledgeKeywordPhoto(k) || knowledgeCover(k)
 }
 
 /* ------------------------------------------------------------------

@@ -63,4 +63,21 @@ public class KnowledgeController {
         knowledgeService.updateKnowledge(UserContext.currentUserId(), id, dto);
         return Result.success();
     }
+
+    /**
+     * 专家删除自己的农业知识投稿（「我的投稿」列表里的删除）。
+     *
+     * <p>归属由服务端按登录态校验（只能删自己的）。删他人返回 403，不存在返回 404 ——
+     * 两个码刻意分开，理由与编辑接口一致。</p>
+     *
+     * <p>与商品的删除不同，这里**不做软删**：全库没有外键指向 {@code t_knowledge}，
+     * 知识也不参与下单链路，删行不留悬空引用，所以不需要 SRS 那条「被订单引用则改判下架」
+     * 的例外。审核流水会保留（审核确实发生过），详见
+     * {@link com.rxt.service.KnowledgeService#deleteKnowledge}。</p>
+     */
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        knowledgeService.deleteKnowledge(UserContext.currentUserId(), id);
+        return Result.success();
+    }
 }
