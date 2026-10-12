@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import com.rxt.security.PermissionChecker;
 import com.rxt.vo.AppointmentVO;
+import com.rxt.vo.ExpertProfileVO;
 import com.rxt.vo.ExpertVO;
 import jakarta.validation.Valid;
 import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
+import com.rxt.dto.ExpertProfileUpdateDTO;
 
 @RestController
 @RequestMapping("/expert")
@@ -86,5 +88,31 @@ public class ExpertController {
     @GetMapping("/experts")
     public Result<List<ExpertVO>> experts(@RequestParam(required = false) String domain) {
         return Result.success(expertService.listExperts(domain));
+    }
+
+    /**
+     * 专家查看本人档案（《软件需求规格说明书》「个人信息 → 专家信息管理」）。
+     *
+     * <p>档案由登录态定位，<b>不接受 {@code expertId} 入参</b> —— 一旦接受，
+     * 任意专家都能按 id 翻别人的档案。</p>
+     */
+    @GetMapping("/profile")
+    public Result<ExpertProfileVO> profile() {
+        permissionChecker.requireRole(RoleConstant.EXPERT);
+        return Result.success(expertService.getProfile(UserContext.currentUserId()));
+    }
+
+    /**
+     * 专家编辑本人档案（擅长领域、简介与服务范围）。
+     *
+     * <p>入参 {@link ExpertProfileUpdateDTO} 里<b>没有</b> {@code auditStatus} /
+     * {@code workloadStat} / {@code userId}，所以"专家不能改自己的审核状态"是
+     * <b>编译期</b>保证，而不是靠运行时记得过滤某个字段。</p>
+     */
+    @PutMapping("/profile")
+    public Result<Void> updateProfile(@RequestBody @Valid ExpertProfileUpdateDTO dto) {
+        permissionChecker.requireRole(RoleConstant.EXPERT);
+        expertService.updateProfile(UserContext.currentUserId(), dto);
+        return Result.success();
     }
 }

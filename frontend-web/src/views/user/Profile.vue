@@ -212,12 +212,61 @@
         </el-form>
       </el-card>
 
-      <!-- 非农户角色：档案区不渲染编辑表单，与后端 403 的权限边界保持一致 -->
+      <!-- ================= 专家档案 =================
+           对应《SRS》「个人信息 → 专家信息管理：专家维护个人资料与服务范围 → 编辑并保存」。
+           改造前这里只有「农户经营档案」一张卡 + 一句"仅农户可维护"的空态提示，
+           专家进来无处可改 —— 不是权限没开，是接口和入口都不存在。
+           SRS 原文提到的「服务方式」不单独建列，并入「服务简介」（详见
+           docs/接口约定-M5专家资料与资源管理.md §0），所以这里只有两个输入框。 -->
+      <el-card v-else-if="isExpert" shadow="never" class="section-card">
+        <template #header>
+          <div class="card-head">
+            <span>专家档案</span>
+            <el-tag :type="expertAuditTagType" effect="light">
+              审核状态：{{ expertProfile?.auditStatus || '--' }}
+            </el-tag>
+          </div>
+        </template>
+
+        <el-alert
+          class="tip"
+          type="info"
+          :closable="false"
+          show-icon
+          title="这里维护的是对外展示的专家资料，改动后立即生效；审核状态由平台管理员维护，本人不可修改。"
+        />
+
+        <el-form ref="expertFormRef" :model="expertForm" :rules="expertRules" label-width="130px" class="edit-form">
+          <el-form-item label="擅长领域" prop="expertDomain">
+            <el-input v-model="expertForm.expertDomain" maxlength="50" show-word-limit placeholder="如：种植与植保" />
+          </el-form-item>
+          <el-form-item label="服务简介" prop="introduction">
+            <el-input
+              v-model="expertForm.introduction"
+              type="textarea"
+              :rows="5"
+              placeholder="介绍研究方向、服务内容与服务方式（如：线上问答 / 田间指导 / 电话咨询）"
+            />
+          </el-form-item>
+          <el-form-item label="工作量统计">
+            <!-- 只读展示：workload_stat 由系统统计，专家不可改（DTO 里没有这个字段） -->
+            <span class="readonly-value">{{ expertProfile?.workloadStat || '暂无统计' }}</span>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="savingExpert" :disabled="!expertDirty" @click="saveExpert">
+              保存专家档案
+            </el-button>
+            <el-button :disabled="savingExpert || !expertDirty" @click="resetExpertForm">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
+
+      <!-- 其余角色：档案区不渲染编辑表单，与后端 403 的权限边界保持一致 -->
       <el-card v-else shadow="never" class="section-card">
-        <template #header>农户经营档案</template>
+        <template #header>经营档案</template>
         <el-empty
           :image-size="80"
-          :description="`经营档案仅农户角色可维护，当前登录角色为「${profile.roleName || '未知'}」`"
+          :description="`经营档案仅农户角色可维护，专家档案仅专家角色可维护，当前登录角色为「${profile.roleName || '未知'}」`"
         />
       </el-card>
     </template>
@@ -235,6 +284,7 @@ import { useRouter } from 'vue-router'
 import request from '@/api/request'
 import { useUserStore } from '@/store/user'
 import { getProfile, updateProfile, updateFarmerProfile } from '@/api/user'
+import { getExpertProfile, updateExpertProfile } from '@/api/expert'
 import { checkImageFile, uploadAvatar } from '@/api/common'
 import { APPLY_STATUS, isPendingApply } from '@/constants/finance'
 
@@ -382,12 +432,18 @@ const loading = ref(false)
 const profile = ref(null)
 const savingBase = ref(false)
 const savingFarmer = ref(false)
+const savingExpert = ref(false)
 const baseFormRef = ref(null)
 const farmerFormRef = ref(null)
+const expertFormRef = ref(null)
 
 // 编辑态表单
 const baseForm = reactive({ realName: '', avatarUrl: '' })
 const farmerForm = reactive({ mainProduct: '', scaleDesc: '', creditRecord: '' })
+const expertForm = reactive({ expertDomain: '', introduction: '' })
+
+// 专家档案（GET /expert/profile 的完整返回，含审核状态与只读的工作量统计）
+const expertProfile = ref(null)
 
 // 服务端返回值的快照，既是「重置」的目标，也是「是否有改动」的判定基准。
 // ⚠️ 必须用 ref（响应式）：baseDirty / farmerDirty 是 computed，只有依赖变化才会重算。
@@ -395,6 +451,7 @@ const farmerForm = reactive({ mainProduct: '', scaleDesc: '', creditRecord: '' }
 // 不会触发重算 —— 表现为保存成功后按钮仍是可用状态，像是一直有未保存的改动。
 const baseSnapshot = ref({ realName: '', avatarUrl: '' })
 const farmerSnapshot = ref({ mainProduct: '', scaleDesc: '', creditRecord: '' })
+const expertSnapshot = ref({ expertDomain: '', introduction: '' })
 
 // 长度上限与后端 DTO 的 @Size 及建表列宽保持一致（realName/avatarUrl 见 UserProfileUpdateDTO，
 // 其余见 FarmerProfileUpdateDTO：main_product / scale_desc 为 VARCHAR(50)，credit_record 为 TEXT）。
@@ -413,7 +470,28 @@ const farmerRules = {
 }
 
 const isFarmer = computed(() => profile.value?.roleName === '农户')
+const isExpert = computed(() => profile.value?.roleName === '专家')
 const hasFarmerProfile = computed(() => Boolean(profile.value?.farmerProfile))
+
+/** 审核状态标签配色。取值与 t_expert.audit_status 的三态白名单一致。 */
+const expertAuditTagType = computed(() => {
+  const s = expertProfile.value?.auditStatus
+  if (s === '已通过') return 'success'
+  if (s === '未通过') return 'danger'
+  return 'warning'
+})
+
+// 上限与 ExpertProfileUpdateDTO 一致：expertDomain 是 @Size(max=50)，
+// introduction 不设上限（对应列类型是 TEXT）。
+const expertRules = {
+  expertDomain: [{ max: 50, message: '擅长领域不能超过 50 个字符', trigger: 'blur' }]
+}
+
+/** 专家档案是否有改动。两个字段各自比对快照，props 语义差异见 saveExpert() */
+const expertDirty = computed(() => {
+  const snap = expertSnapshot.value
+  return expertForm.expertDomain !== snap.expertDomain || expertForm.introduction !== snap.introduction
+})
 // 头像预览跟随输入实时变化，便于填完地址立刻看到效果
 const avatarPreview = computed(() => baseForm.avatarUrl.trim() || undefined)
 const nameInitial = computed(() => (baseForm.realName.trim() || profile.value?.realName || '用').slice(0, 1))
@@ -509,10 +587,43 @@ async function loadProfile() {
   loading.value = true
   try {
     applyProfile(await getProfile())
+    await loadExpertProfile()
   } catch {
     // 错误提示已由 request 拦截器统一弹出，这里只保证页面停在可重试的状态
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 拉专家本人的档案。
+ *
+ * 仅在当前角色是专家时才请求 —— 非专家调 /expert/profile 后端一律 403，
+ * 每次都白挨一条错误提示。判据用刚拿到的 profile.roleName，而不是
+ * userStore 里那份登录快照（快照可能是旧的）。
+ *
+ * 失败时不弹二次提示：拦截器已经弹过，页面停在「审核状态：--」即可，
+ * 专家档案拉不到不该让人连基本信息都看不了。
+ */
+async function loadExpertProfile() {
+  if (profile.value?.roleName !== '专家') {
+    expertProfile.value = null
+    expertSnapshot.value = { expertDomain: '', introduction: '' }
+    Object.assign(expertForm, expertSnapshot.value)
+    return
+  }
+  try {
+    const data = await getExpertProfile()
+    expertProfile.value = data
+    // Jackson 配了 non_null：为 null 的字段键会整个消失，所以统一用 ?? '' 兜底
+    expertSnapshot.value = {
+      expertDomain: data?.expertDomain ?? '',
+      introduction: data?.introduction ?? ''
+    }
+    Object.assign(expertForm, expertSnapshot.value)
+    expertFormRef.value?.clearValidate()
+  } catch {
+    expertProfile.value = null
   }
 }
 
@@ -572,6 +683,49 @@ function resetBaseForm() {
 function resetFarmerForm() {
   Object.assign(farmerForm, farmerSnapshot.value)
   farmerFormRef.value?.clearValidate()
+}
+
+function resetExpertForm() {
+  Object.assign(expertForm, expertSnapshot.value)
+  expertFormRef.value?.clearValidate()
+}
+
+/**
+ * 保存专家档案。
+ *
+ * ★ 只提交**真正改动过**的字段，原因不止是省一次写入 —— 后端对两个字段的
+ * 「空值」语义是不同的（ExpertServiceImpl.updateProfile）：
+ *   · expertDomain 判的是 StringUtils.hasText ⇒ 传空串 = **跳过**，不会清空已有领域
+ *   · introduction 只判 != null ⇒ 传空串 = **清空简介**
+ * 所以「把领域清空」这件事在当前接口下做不到，只能改不能删。
+ * 如果这里无脑提交两个字段的全量值，用户想清空简介时会被 writing 空的领域一并带过去，
+ * 看着像成功、其实领域没动，与界面表现不一致。
+ *
+ * payload 全空时后端会返回 400「请至少填写一项要修改的内容」，因此先由 expertDirty 挡住。
+ */
+async function saveExpert() {
+  const valid = await expertFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+
+  savingExpert.value = true
+  try {
+    const payload = {}
+    if (expertForm.expertDomain !== expertSnapshot.value.expertDomain) {
+      payload.expertDomain = expertForm.expertDomain.trim()
+    }
+    if (expertForm.introduction !== expertSnapshot.value.introduction) {
+      // 空串是有意义的（清空简介），不能像上面那样顺手 trim 成一个"跳过"
+      payload.introduction = expertForm.introduction.trim()
+    }
+
+    await updateExpertProfile(payload)
+    ElMessage.success('专家档案已保存')
+    await loadExpertProfile()
+  } catch {
+    // 错误提示已由 request 拦截器统一处理
+  } finally {
+    savingExpert.value = false
+  }
 }
 
 onMounted(() => {
@@ -634,6 +788,9 @@ onMounted(() => {
 .identity-desc { flex: 1; min-width: 320px; }
 .tip { margin-bottom: 20px; }
 .edit-form { max-width: 680px; }
+/* 只读展示（工作量统计）：与 el-input 的 disabled 态区分开 —— 它不是"待填的空格"，
+   而是系统算出来的既有值，所以用普通文字色而不是 placeholder 灰。 */
+.readonly-value { color: var(--el-text-color-regular); line-height: 32px; }
 .field-tip { margin-top: 6px; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.6; }
 
 /* 头像上传行：按钮 + 移除 + 预览横向排布。预览固定 56×56 与上方 el-avatar 同尺寸，

@@ -2,8 +2,10 @@ package com.rxt.service.impl;
 
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
+import com.rxt.dto.AdminExpertUpdateDTO;
 import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
+import com.rxt.dto.ExpertProfileUpdateDTO;
 import com.rxt.entity.Appointment;
 import com.rxt.entity.ExpertInfo;
 import com.rxt.mapper.AppointmentMapper;
@@ -12,8 +14,10 @@ import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.mapper.QuestionMapper;
 import com.rxt.mapper.UserMapper;
 import com.rxt.entity.User;
+import com.rxt.security.PermissionChecker;
 import com.rxt.service.ExpertService;
 import com.rxt.vo.AppointmentVO;
+import com.rxt.vo.ExpertProfileVO;
 import com.rxt.vo.ExpertVO;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +45,7 @@ public class ExpertServiceImpl implements ExpertService {
     @Autowired private AppointmentMapper appointmentMapper;
     @Autowired private ExpertInfoMapper expertInfoMapper;
     @Autowired private UserMapper userMapper;
+    @Autowired private PermissionChecker permissionChecker;
 
 
     @Override
@@ -238,14 +243,7 @@ public class ExpertServiceImpl implements ExpertService {
             return new ArrayList<>();
         }
 
-        Set<Long> userIds = experts.stream()
-                .map(ExpertInfo::getUserId)
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toCollection(HashSet::new));
-
-        Map<Long, User> users = userIds.isEmpty() ? Collections.emptyMap()
-                : userMapper.selectBatchIds(userIds).stream()
-                        .collect(Collectors.toMap(User::getUserId, Function.identity(), (a, b) -> a));
+        Map<Long, User> users = loadUsers(experts);
 
         List<ExpertVO> result = new ArrayList<>(experts.size());
         for (ExpertInfo expert : experts) {
@@ -264,5 +262,133 @@ public class ExpertServiceImpl implements ExpertService {
             result.add(vo);
         }
         return result;
+    }
+
+    @Override
+    public ExpertProfileVO getProfile(Long userId) {
+        ExpertInfo expert = requireOwnExpert(userId);
+        return toProfileVO(expert, userMapper.selectById(expert.getUserId()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateProfile(Long userId, ExpertProfileUpdateDTO dto) {
+        ExpertInfo expert = requireOwnExpert(userId);
+        requireSomethingToUpdate(dto.getExpertDomain(), dto.getIntroduction(), null);
+
+        ExpertInfo update = new ExpertInfo();
+        update.setExpertId(expert.getExpertId());
+        // 用 hasText 而不是 != null 判领域：传个空串上来时 hasText 为 false 会跳过，
+        // 而"非 null 就写"会把已有领域清空 —— 那不是"没改"，是"改坏了"。
+        if (StringUtils.hasText(dto.getExpertDomain())) {
+            update.setExpertDomain(dto.getExpertDomain().trim());
+        }
+        // 简介允许传空串（清空简介是合理诉求），所以这里只挡 null。
+        if (dto.getIntroduction() != null) {
+            update.setIntroduction(dto.getIntroduction().trim());
+        }
+        expertInfoMapper.updateById(update);
+    }
+
+    @Override
+    public List<ExpertProfileVO> listProfilesForAdmin(String auditStatus, String domain) {
+        permissionChecker.requireAdmin();
+        List<ExpertInfo> experts = expertInfoMapper.selectList(
+                Wrappers.<ExpertInfo>lambdaQuery()
+                        .eq(StringUtils.hasText(auditStatus), ExpertInfo::getAuditStatus, auditStatus)
+                        .eq(StringUtils.hasText(domain), ExpertInfo::getExpertDomain, domain)
+                        .orderByAsc(ExpertInfo::getCreateTime)
+                        .orderByAsc(ExpertInfo::getExpertId));
+        if (experts.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Map<Long, User> users = loadUsers(experts);
+        List<ExpertProfileVO> result = new ArrayList<>(experts.size());
+        for (ExpertInfo expert : experts) {
+            result.add(toProfileVO(expert, expert.getUserId() == null ? null : users.get(expert.getUserId())));
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateProfileForAdmin(Long expertId, AdminExpertUpdateDTO dto) {
+        permissionChecker.requireAdmin();
+        ExpertInfo exist = expertInfoMapper.selectById(expertId);
+        if (exist == null) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "专家档案不存在");
+        }
+        requireSomethingToUpdate(dto.getExpertDomain(), dto.getIntroduction(), dto.getAuditStatus());
+
+        ExpertInfo update = new ExpertInfo();
+        update.setExpertId(expertId);
+        if (StringUtils.hasText(dto.getExpertDomain())) {
+            update.setExpertDomain(dto.getExpertDomain().trim());
+        }
+        if (dto.getIntroduction() != null) {
+            update.setIntroduction(dto.getIntroduction().trim());
+        }
+        // 审核状态只在管理员侧这条路径上可写（DTO 层已做白名单校验）。
+        // 注意本方法刻意不写 t_audit 留痕，理由见 ExpertService#updateProfileForAdmin。
+        if (StringUtils.hasText(dto.getAuditStatus())) {
+            update.setAuditStatus(dto.getAuditStatus());
+        }
+        expertInfoMapper.updateById(update);
+    }
+
+    /** 取当前登录用户的专家档案；没有则说明不是专家（或尚无档案）。 */
+    private ExpertInfo requireOwnExpert(Long userId) {
+        ExpertInfo expert = expertInfoMapper.selectOne(Wrappers.<ExpertInfo>lambdaQuery()
+                .eq(ExpertInfo::getUserId, userId));
+        if (expert == null) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可维护个人资料");
+        }
+        return expert;
+    }
+
+    /**
+     * 三个可编辑字段全空时直接拒绝。
+     *
+     * <p>不这么做的话，一个空 JSON {@code {}} 也能返回 200「操作成功」，
+     * 而用户看到的是"保存成功但没变化" —— 那是假成功，比报错更难查。</p>
+     */
+    private void requireSomethingToUpdate(String expertDomain, String introduction, String auditStatus) {
+        if (!StringUtils.hasText(expertDomain)
+                && introduction == null
+                && !StringUtils.hasText(auditStatus)) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(), "请至少填写一项要修改的内容");
+        }
+    }
+
+    /** 按 IN 批量取 t_user，避免逐行查库（N+1）。 */
+    private Map<Long, User> loadUsers(List<ExpertInfo> experts) {
+        Set<Long> userIds = experts.stream()
+                .map(ExpertInfo::getUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(HashSet::new));
+        if (userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getUserId, Function.identity(), (a, b) -> a));
+    }
+
+    /**
+     * t_expert + t_user → {@link ExpertProfileVO}。
+     *
+     * <p>{@code realName} 兜底空串而不是 null，理由同 {@link #listExperts} 的注释。</p>
+     */
+    private ExpertProfileVO toProfileVO(ExpertInfo expert, User user) {
+        ExpertProfileVO vo = new ExpertProfileVO();
+        vo.setExpertId(expert.getExpertId());
+        vo.setUserId(expert.getUserId());
+        vo.setExpertDomain(expert.getExpertDomain());
+        vo.setIntroduction(expert.getIntroduction());
+        vo.setWorkloadStat(expert.getWorkloadStat());
+        vo.setAuditStatus(expert.getAuditStatus());
+        vo.setCreateTime(expert.getCreateTime());
+        vo.setRealName(user == null || user.getRealName() == null ? "" : user.getRealName());
+        vo.setAvatarUrl(user == null ? null : user.getAvatarUrl());
+        return vo;
     }
 }
