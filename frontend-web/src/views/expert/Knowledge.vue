@@ -35,7 +35,12 @@
       </template>
 
       <div v-loading="loading" class="knowledge-grid">
-        <article v-for="item in pagedList" :key="item.knowledgeId" class="knowledge-item" @click="openDetail(item)">
+        <!--
+          ★ 2026-10-12：卡片点击从「打开弹窗」改为「跳独立页面 /knowledge/:id」。
+          用户要求「每个帖子知识新起一个页面」—— 弹窗没有自己的地址，
+          读完一篇没法把链接发给别人，浏览器前进后退也管不了它。
+        -->
+        <article v-for="item in pagedList" :key="item.knowledgeId" class="knowledge-item" @click="goDetail(item)">
           <div class="cover" :class="coverClass(item.category)">
             <span>{{ item.category }}</span>
             <strong>{{ (item.title || '农业知识').slice(0, 2) }}</strong>
@@ -59,52 +64,18 @@
         <el-pagination v-model:current-page="page" :page-size="pageSize" :total="filteredList.length" background layout="prev, pager, next" />
       </div>
     </el-card>
-
-    <!-- ★ 2026-10-10：由右侧抽屉改为居中弹窗（用户要求「不要采用抽屉式」）。
-         抽屉的问题是形态本身：700px 宽的竖长条贴在屏幕右边，正文被压进窄栏，
-         长文章要滚很久，读者视线也始终偏在屏幕一侧。
-         弹窗居中后宽度更接近正文的舒适阅读宽度，配合 body 限高滚动，更像在读文章。
-         注意 el-dialog 默认 teleport 到 body，`.el-dialog__body` 的限高规则
-         只能写在文件末尾那个**非 scoped** 的 style 块里 —— scoped 选择器够不着组件内部结构。 -->
-    <el-dialog
-      v-model="detailVisible"
-      title="农业知识详情"
-      width="min(760px, 94%)"
-      top="6vh"
-      class="knowledge-detail-dialog"
-      destroy-on-close
-    >
-      <div v-loading="detailLoading">
-        <template v-if="detail">
-          <el-tag>{{ detail.category }}</el-tag>
-          <h2 class="detail-title">{{ detail.title }}</h2>
-          <div class="detail-meta">
-            <span>发布时间：{{ formatDateTime(detail.createTime) }}</span>
-          </div>
-          <el-image v-if="detail.imageUrl" class="detail-image" :src="detail.imageUrl" fit="cover" />
-          <el-divider />
-          <div class="detail-content">{{ detail.content }}</div>
-          <el-alert
-            class="content-tip"
-            type="info"
-            :closable="false"
-            show-icon
-            title="内容说明"
-            description="农业生产建议仅供参考，请结合当地气候、土壤和作物实际情况执行；涉及用药请遵守安全间隔期。"
-          />
-        </template>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import ExpertKnowledgeEditor from '@/components/expert/ExpertKnowledgeEditor.vue'
-import { getKnowledgeDetail, getKnowledgeList, getMyKnowledge } from '@/api/knowledge'
+import { getKnowledgeList, getMyKnowledge } from '@/api/knowledge'
 import { useUserStore } from '@/store/user'
 
 const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
+const router = useRouter()
 const userStore = useUserStore()
 const isExpert = computed(() => userStore.profile?.roleName === '专家')
 const mySubmissions = ref([])
@@ -113,10 +84,7 @@ const hiddenSubmissionKey = 'rxt_hidden_knowledge_submission_ids'
 let refreshTimer = null
 const demoMode = ref(false)
 const loading = ref(false)
-const detailLoading = ref(false)
-const detailVisible = ref(false)
 const knowledgeList = ref([])
-const detail = ref(null)
 const category = ref('全部')
 const keyword = ref('')
 const totalApproved = ref(0)
@@ -180,18 +148,14 @@ function handleCategoryChange() {
   page.value = 1
 }
 
-async function openDetail(item) {
-  detail.value = item
-  detailVisible.value = true
-  detailLoading.value = true
-  try {
-    const data = await getKnowledgeDetail(item.knowledgeId)
-    if (data) detail.value = data
-  } catch {
-    // 详情接口失败时保留列表行中的标题和摘要，不再切换到假数据。
-  } finally {
-    detailLoading.value = false
-  }
+/**
+ * 打开单篇知识：跳到独立页面 /knowledge/:id。
+ *
+ * 这里原来是「开弹窗 + 调详情接口」，改成整页跳转后两件事都不用做了 ——
+ * 详情页自己会拉数据、自己管加载与错误态。列表页从此只负责列表。
+ */
+function goDetail(item) {
+  if (item?.knowledgeId) router.push(`/knowledge/${item.knowledgeId}`)
 }
 
 function coverClass(categoryName) {
@@ -282,28 +246,6 @@ onUnmounted(() => {
 .item-body p { min-height: 64px; margin: 0; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.65; }
 .item-footer { align-items: center; margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--el-border-color-lighter); }
 .verified { color: var(--el-color-success); }
-.detail-title { margin: 14px 0 10px; line-height: 1.45; }
-.detail-meta { display: flex; gap: 20px; color: var(--el-text-color-secondary); font-size: 13px; }
-.detail-image { width: 100%; max-height: 300px; margin-top: 18px; border-radius: 12px; }
-.detail-content { white-space: pre-wrap; line-height: 2; font-size: 16px; color: #35443b; }
-.content-tip { margin-top: 28px; }
 @media (max-width: 980px) { .knowledge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 680px) { .hero, .toolbar { flex-direction: column; align-items: stretch; } .toolbar .el-input { width: 100% !important; } .knowledge-grid { grid-template-columns: 1fr; } }
-</style>
-
-<!--
-  这个块**故意不加 scoped**。
-  el-dialog 默认 teleport 到 body，弹窗内部的 `.el-dialog__body` 由 Element Plus
-  自己渲染，不带本组件的 data-v 属性，scoped 选择器一律选不中。
-  用 dialog 自己的 class（.knowledge-detail-dialog）做命名空间，避免污染全局版本。
-  限高 + 滚动的理由：知识正文长度不一（实测最长 112 字，还可能更长），
-  不限高的话弹窗会顶出视口，底部的「内容说明」永远看不到。
--->
-<style>
-.knowledge-detail-dialog .el-dialog__body {
-  max-height: 68vh;
-  overflow-y: auto;
-}
-/* 正文行高偏大（2.0），首尾留白在滚动容器里会显得空，收一点 */
-.knowledge-detail-dialog .el-dialog__body > div { padding-bottom: 4px; }
 </style>

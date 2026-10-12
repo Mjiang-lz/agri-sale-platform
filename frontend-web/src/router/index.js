@@ -32,6 +32,11 @@ const routes = [
       // /finance/* 是申请人看自己的，/loan-admin/* 是银行看别人提交的。
       { path: 'finance/bank-review', component: () => import('@/views/finance/BankReview.vue'), meta: { title: '融资审批' } },
       { path: 'expert/knowledge', component: () => import('@/views/expert/Knowledge.vue'), meta: { title: '农业知识' } },
+      // 单篇农业知识的独立阅读页。刻意**不挂在 /expert/ 下**：
+      // 知识是对所有角色都开放的内容，挂在专家模块下会让从首页点进来的读者
+      // 看到顶栏高亮切到「专家助力」，归属感是错的（用户 2026-10-12 的反馈）。
+      // 上一版是列表页里的弹窗，没有自己的地址、前进后退也管不了。
+      { path: 'knowledge/:id', component: () => import('@/views/knowledge/KnowledgeDetail.vue'), meta: { title: '农业知识详情' } },
       { path: 'expert/qa', component: () => import('@/views/expert/Qa.vue'), meta: { title: '专家问答' } },
       { path: 'expert/appointment', component: () => import('@/views/expert/Appointment.vue'), meta: { title: '专家预约' } },
       { path: 'user/profile', component: () => import('@/views/user/Profile.vue'), meta: { title: '个人中心' } },

@@ -39,6 +39,11 @@ request.interceptors.response.use(
     // 页面拿到这个标记后应改为渲染行内错误态（带重试按钮），而不是再弹 toast。
     const err = new Error(message)
     err.notified = true
+    // 把业务码带出去：页面需要区分「404 = 这东西真的没了（重试永远失败）」与
+    // 「其他 = 暂时性故障（值得给重试按钮）」。以前只有 message 可用，只能拿文案做
+    // 字符串匹配 —— 后端改一个字就静默失效。HTTP 状态码也带一份，方便排查。
+    err.code = body.code
+    err.httpStatus = response.status
     return Promise.reject(err)
   },
   (error) => {
