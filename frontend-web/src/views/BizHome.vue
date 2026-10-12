@@ -1060,7 +1060,12 @@ function goProduct(p) {
   if (p?.productId) router.push(`/trade/product/${p.productId}`)
 }
 function goKnowledge(k) {
-  if (k?.knowledgeId) router.push({ path: '/expert/knowledge', query: { knowledgeId: k.knowledgeId } })
+  // ★ 2026-10-12 改：原来推的是 `/expert/knowledge?knowledgeId=xxx`，
+  //   而 Knowledge.vue 里**根本没有 useRoute** —— 那个 query 从来没被读过，
+  //   于是点一张知识卡的效果是「跳到专家助力板块的列表页，什么都没打开」，
+  //   参数被静默丢掉（本仓库第二次踩「上游传参、下游没接」，上次是商品页）。
+  //   现在每篇知识有自己的地址，直接推详情页，参数传递这一跳彻底不需要了。
+  if (k?.knowledgeId) router.push(`/knowledge/${k.knowledgeId}`)
 }
 
 /* 专家列表是异步来的，onMounted 那一刻 DOM 里一张卡片都没有，
