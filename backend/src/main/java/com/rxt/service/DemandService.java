@@ -53,4 +53,17 @@ public interface DemandService {
      * @param demandId    需求主键
      */
     void closeDemand(Long publisherId, Long demandId);
+
+    /**
+     * 删除求购需求（我的发布 · 删除）。
+     *
+     * <p>与商品不同，这里<b>一律物理删除</b>：SRS 的软删例外只针对「已被订单引用的商品」，
+     * 而求购需求不参与下单链路，全库没有任何外键指向 {@code t_demand}
+     * （已核对 schema.sql 的全部 20 条外键），删行不会留下悬空引用。
+     * 「不想被看到」的诉求由 {@link #closeDemand} 承担，两者语义不同。</p>
+     *
+     * @param publisherId 发布人主键（用于权限校验）
+     * @param demandId    需求主键
+     */
+    void deleteDemand(Long publisherId, Long demandId);
 }

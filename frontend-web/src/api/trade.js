@@ -76,6 +76,33 @@ export function getDemandDetail(id) {
   return request.get(`/demand/${id}`)
 }
 
+/**
+ * 关闭求购（我的发布 → 求购需求管理）。
+ *
+ * 语义是「这条需求不收了 / 已达成」，**行保留**、status 由 1 → 0、从公开列表消失。
+ * 与 removeDemand 不是一回事，两个按钮不能合并：
+ *   · 关闭 = 可逆的「撤下」，还能再编辑回来
+ *   · 删除 = 不可逆的「移除记录」
+ * 幂等：重复关闭同一条也返回成功。
+ */
+export function closeDemand(id) {
+  return request.post(`/demand/${id}/close`)
+}
+
+/**
+ * 删除求购（我的发布 → 求购需求管理）。
+ *
+ * ⚠️ **不可逆**，且与商品删除不同 —— 这里一律物理删行。
+ * 理由：SRS 的软删例外只针对「已被订单引用的商品」，求购不参与下单链路，
+ * 全库没有任何外键指向 t_demand，删行不会留下悬空引用。
+ * 调用方必须先二次确认。
+ *
+ * 只能删自己发布的，删他人返回 403（body 里的 code，HTTP 恒为 200）。
+ */
+export function removeDemand(id) {
+  return request.delete(`/demand/${id}`)
+}
+
 /* ====================================================================
  * 购物车
  * ==================================================================== */
@@ -230,6 +257,19 @@ export function updateMyProduct(productId, payload) {
  */
 export function updateMyProductStatus(productId, status) {
   return request.put(`/trade/products/${productId}/status`, null, { params: { status } })
+}
+
+/**
+ * 删除我发布的商品（SRS「我的发布：新增、编辑、上架／下架、删除」的最后一项）。
+ *
+ * ⚠️ **不保证真的删掉了行**，返回值是结果标记（request.js 只透出 Result.data）：
+ *   · 'DELETED'   —— 商品已物理删除
+ *   · 'OFF_SHELF' —— 该商品已被订单引用，按 SRS 例外流程改为下架，行还在
+ * 所以调用方**必须**判返回值再决定提示什么，不能一律报「删除成功」。
+ * 详见 docs/接口约定-我的发布.md §2.1。
+ */
+export function removeMyProduct(productId) {
+  return request.delete(`/trade/products/${productId}`)
 }
 
 /* ====================================================================

@@ -92,6 +92,25 @@ public class TradeController {
     }
 
     /**
+     * 删除商品（我的发布 · 删除）。仅商品归属农户可操作。
+     *
+     * <p><b>返回的 {@code data} 不是可有可无的附属信息</b>：本接口不保证真的删掉了行。
+     * 依据 SRS 例外流程，被订单引用的商品会改判为下架并保持数据完整，
+     * 所以必须把「删掉了」与「只下架了」区分开：
+     * {@code DELETED} = 整行已移除；{@code OFF_SHELF} = 被订单引用，已改为下架。</p>
+     *
+     * <p>前端要读这个值而不是读文案 —— {@code request.js} 只透出 {@code Result.data}，
+     * {@code message} 在成功分支里根本不会到达页面。</p>
+     */
+    @DeleteMapping("/products/{productId}")
+    public Result<String> deleteProduct(@PathVariable Long productId) {
+        String outcome = tradeService.deleteProduct(UserContext.currentUserId(), productId);
+        return TradeService.DELETE_RESULT_OFF_SHELF.equals(outcome)
+                ? Result.success("该商品已被订单引用，不能删除，已改为下架", outcome)
+                : Result.success("商品已删除", outcome);
+    }
+
+    /**
      * 我发布的商品（含待审核 / 未通过 / 已下架），农户管理页用。
      */
     @GetMapping("/my-products")

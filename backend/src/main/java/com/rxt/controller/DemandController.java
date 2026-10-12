@@ -8,6 +8,7 @@ import com.rxt.service.DemandService;
 import com.rxt.vo.DemandVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -78,6 +79,19 @@ public class DemandController {
     @PostMapping("/{id}/close")
     public Result<Void> closeDemand(@PathVariable Long id) {
         demandService.closeDemand(UserContext.currentUserId(), id);
+        return Result.success();
+    }
+
+    /**
+     * 删除求购需求（我的发布 · 删除）。只能删除自己发布的需求，归属校验在 service 层完成。
+     *
+     * <p>与 {@code /{id}/close} 的语义差别：关闭是「这条需求已达成 / 不想再收报价」，
+     * 数据留着、只是从公开列表消失；删除是把记录本身移走。
+     * 求购不参与下单链路，全库没有外键指向 {@code t_demand}，所以这里一律物理删除。</p>
+     */
+    @DeleteMapping("/{id}")
+    public Result<Void> deleteDemand(@PathVariable Long id) {
+        demandService.deleteDemand(UserContext.currentUserId(), id);
         return Result.success();
     }
 }
