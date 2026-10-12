@@ -33,7 +33,7 @@ export function Section3() {
             viewport={{ once: true, margin: "-50px" }}
             transition={{ duration: 0.6, delay: 0.12, ease: "easeOut" }}
           >
-            打通农户、采购方、专家与银行四类角色，把交易、融资、知识与治理四类能力装进同一套系统。
+            打通农户、采购方、专家与银行四类角色，把交易、融资、知识与治理四类能力装进同一套系统
           </motion.p>
         </div>
 

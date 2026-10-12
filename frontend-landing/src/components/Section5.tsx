@@ -166,7 +166,7 @@ export function Section5() {
 
         <motion.p initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.5 }} viewport={{ once: true }}
           className="text-zinc-300 text-base lg:text-lg text-center max-w-[280px] sm:max-w-sm mt-10 lg:mt-14 leading-relaxed px-4">
-          从农户发布的每一条货源，到采购方签下的每一份订单，平台上的每一次撮合，都真实发生在田间地头。
+          从农户发布的每一条货源，到采购方签下的每一份订单，平台上的每一次撮合，都真实发生在田间地头
         </motion.p>
 
         <motion.a

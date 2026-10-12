@@ -139,7 +139,7 @@ export function Section4() {
               viewport={{ once: true, margin: "-50px" }}
               className="text-sm text-white/50 mb-6"
             >
-              覆盖主要农产品产区，支持按品类、产地、价格区间与上市时间组合筛选，全流程走担保交易。
+              覆盖主要农产品产区，支持按品类、产地、价格区间与上市时间组合筛选，全流程走担保交易
             </motion.div>
             {(tab.items as string[]).map((item, i) => (
               <div key={`${active}-${item}`} className="relative py-4">
@@ -282,7 +282,7 @@ export function Section4() {
                       {state === "error" ? "平台接口暂不可用" : "平台当前暂无在售货源"}
                     </div>
                     <div className="text-white/40 text-[12px] leading-[1.6]">
-                      本卡片展示的是平台真实在售货源，没有数据时保持为空。
+                      本卡片展示的是平台真实在售货源，没有数据时保持为空
                     </div>
                   </div>
                 )}
