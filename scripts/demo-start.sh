@@ -296,6 +296,26 @@ start_frontend "落地页"   "frontend-landing" "${LANDING_PORT}" "LANDING_PORT"
   "${API_ENV} VITE_PLATFORM_BASE_URL=http://localhost:${WEB_PORT}"
 
 # ---------------------------------------------------------------------------
+# 文件存储模式（只提示，不阻塞启动）
+#
+# OBS 开关是「每人本机一份」的：backend/src/main/resources/application-local.yml
+# 不在版本库里（.gitignore 已覆盖），队友 clone 下来默认没有它 —— 文件于是写本地磁盘。
+#
+# 难查就难查在**它没有任何报错**：上传照样成功，只是「你传的头像队友看不到」，
+# 最容易被当成功能坏了。所以在每次启动的信息里把当前模式写明，并附上配置命令。
+#
+# 判据与后端保持一致：环境变量 RXT_OBS_ENABLED 优先，其次读 local.yml 的 enabled。
+# 这里刻意不校验密钥是否为空 —— 那是启动期的事，后端会直接报错并说明该 export 什么。
+# ---------------------------------------------------------------------------
+OBS_LOCAL_CFG="${ROOT}/backend/src/main/resources/application-local.yml"
+STORAGE_MODE="local"
+if [ "${RXT_OBS_ENABLED:-}" = "true" ]; then
+  STORAGE_MODE="obs"
+elif [ -f "${OBS_LOCAL_CFG}" ] && grep -qE '^[[:space:]]*enabled:[[:space:]]*true' "${OBS_LOCAL_CFG}"; then
+  STORAGE_MODE="obs"
+fi
+
+# ---------------------------------------------------------------------------
 # 就绪
 # ---------------------------------------------------------------------------
 printf '\n'
@@ -314,6 +334,12 @@ info "    专家     13800000007     银行用户 13800000009"
 info "    管理员   13800000001"
 info ""
 info "  日志目录    ${LOG_DIR}"
+if [ "${STORAGE_MODE}" = "obs" ]; then
+  info "  文件存储    ${C_OK}OBS${C_OFF}（上传的图片全员可见）"
+else
+  info "  文件存储    ${C_WARN}本地磁盘${C_OFF}（上传的图片只在本机，队友看不到）"
+  info "              ${C_DIM}要共享：bash scripts/setup-obs-local.sh，然后重启后端${C_OFF}"
+fi
 info "  ${C_WARN}Ctrl-C 退出会一并关闭本次拉起的进程${C_OFF}"
 info "${C_OK}═══════════════════════════════${C_OFF}"
 printf '\n'
