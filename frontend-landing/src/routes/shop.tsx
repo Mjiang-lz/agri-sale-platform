@@ -82,10 +82,10 @@ function ShopPage() {
 
   const emptyText =
     state === 'error'
-      ? '平台接口暂不可用，货源未加载。本页不展示任何演示数据，请确认后端服务已启动后刷新。'
+      ? '平台接口暂不可用，货源未加载。本页不展示任何演示数据，请确认后端服务已启动后刷新'
       : state === 'loading'
         ? '正在同步平台货源…'
-        : '平台当前暂无在售货源。'
+        : '平台当前暂无在售货源'
 
   return (
     <div className={`min-h-screen bg-[#1b1b1b] text-white ${FONT}`}>

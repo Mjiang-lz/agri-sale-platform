@@ -12,7 +12,7 @@
       <div>
         <span class="eyebrow">M6 · 平台治理</span>
         <h2>用户管理</h2>
-        <p>管理全平台账号的启用状态与角色。账号只做停用不做删除，业务数据（商品、订单、融资）都关联到用户。</p>
+        <p>管理全平台账号的启用状态与角色。账号只做停用不做删除，业务数据（商品、订单、融资）都关联到用户</p>
       </div>
       <div class="hero-side">
         <div class="hero-stat">
@@ -29,7 +29,7 @@
       show-icon
       :closable="false"
       title="治理红线"
-      description="不能停用当前登录的管理员自己；系统至少保留一名启用状态的管理员。这两条由后端强制校验，前端已同步置灰按钮。"
+      description="不能停用当前登录的管理员自己；系统至少保留一名启用状态的管理员。这两条由后端强制校验，前端已同步置灰按钮"
     />
 
     <el-card shadow="never" class="table-card">
@@ -146,7 +146,7 @@
           show-icon
           :closable="false"
           title="不能调整自己的角色"
-          description="把自己改成非管理员会让治理入口自锁，后端会拒绝该操作。"
+          description="把自己改成非管理员会让治理入口自锁，后端会拒绝该操作"
         />
         <el-alert
           v-else-if="roleTarget.roleName === '管理员'"
@@ -154,7 +154,7 @@
           show-icon
           :closable="false"
           title="该用户当前是管理员"
-          description="改成其他角色前，系统必须还有其他启用状态的管理员，否则后端会拒绝。"
+          description="改成其他角色前，系统必须还有其他启用状态的管理员，否则后端会拒绝"
         />
       </template>
       <template #footer>
@@ -303,8 +303,8 @@ async function toggleStatus(row) {
   try {
     await ElMessageBox.confirm(
       next === 1
-        ? `确认启用「${row.realName}」的账号吗？启用后该用户可以重新登录。`
-        : `确认停用「${row.realName}」的账号吗？停用后该用户将无法登录，但历史数据保留。`,
+        ? `确认启用「${row.realName}」的账号吗？启用后该用户可以重新登录`
+        : `确认停用「${row.realName}」的账号吗？停用后该用户将无法登录，但历史数据保留`,
       `${verb}确认`,
       { type: next === 1 ? 'info' : 'warning', confirmButtonText: `确认${verb}`, cancelButtonText: '取消' }
     )

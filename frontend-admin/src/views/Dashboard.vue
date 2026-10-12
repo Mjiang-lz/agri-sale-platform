@@ -9,7 +9,7 @@
       <div>
         <span class="eyebrow">M6 · 平台治理</span>
         <h2>运营数据看板</h2>
-        <p>用户、商品、订单与融资的全平台汇总。所有数字由后端实时统计得出，管理员在其他页面新增数据后刷新本页即可看到变化。</p>
+        <p>用户、商品、订单与融资的全平台汇总。所有数字由后端实时统计得出，管理员在其他页面新增数据后刷新本页即可看到变化</p>
       </div>
       <div class="hero-side">
         <div class="hero-time">
@@ -29,7 +29,7 @@
       show-icon
       :closable="false"
       :title="errorMessage"
-      description="请确认后端服务已启动，且当前登录账号具备管理员权限。"
+      description="请确认后端服务已启动，且当前登录账号具备管理员权限"
     />
 
     <template v-else>

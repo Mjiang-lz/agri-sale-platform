@@ -35,11 +35,13 @@
         show-icon
         :closable="false"
         title="融资申请加载失败"
-        description="无法连接后端服务，或当前账号不是银行用户角色（本接口仅银行用户可用）。"
         class="error-alert"
       >
         <template #default>
-          <el-button type="danger" size="small" @click="loadList">重新加载</el-button>
+          <div class="error-desc">无法连接后端服务，或当前账号不是银行用户角色（本接口仅银行用户可用）</div>
+          <div class="error-actions">
+            <el-button type="danger" size="small" @click="loadList">重新加载</el-button>
+          </div>
         </template>
       </el-alert>
 
@@ -214,7 +216,7 @@
       </el-form>
 
       <p class="approve-warn">
-        结论提交后不可修改 —— 同一笔申请只能审批一次，农户侧「我的融资」会立即更新为最终状态。
+        结论提交后不可修改 —— 同一笔申请只能审批一次，农户侧「我的融资」会立即更新为最终状态
       </p>
 
       <template #footer>
@@ -402,8 +404,8 @@ async function submitApprove() {
   try {
     await ElMessageBox.confirm(
       pass
-        ? `确认核准放款 ¥${formatAmount(approveForm.loanAmount)}？提交后不可修改。`
-        : '确认给出「不通过」结论？申请人会看到你填写的审批意见，提交后不可修改。',
+        ? `确认核准放款 ¥${formatAmount(approveForm.loanAmount)}？提交后不可修改`
+        : '确认给出「不通过」结论？申请人会看到你填写的审批意见，提交后不可修改',
       pass ? '确认审批通过' : '确认审批不通过',
       { type: 'warning', confirmButtonText: '确认提交', cancelButtonText: '再想想' }
     )
