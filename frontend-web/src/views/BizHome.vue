@@ -656,7 +656,7 @@ const categories = [
   { name: '蔬菜', img: '/products/p26.jpg' },
   { name: '水产', img: '/products/p19.jpg' },
   { name: '畜禽产品', img: '/products/p27.jpg' },
-  { name: '粮油', img: '/products/g02.png' },
+  { name: '粮油', img: '/products/g02.jpg' },
   { name: '干货', img: '/products/p22.jpg' }
 ]
 function goCategory(name) {
