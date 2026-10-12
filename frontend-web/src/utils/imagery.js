@@ -158,6 +158,9 @@ export function expertBg(id) {
  *      3) 分类渐变封面（data URI SVG）—— 「政策解读 / 绿色食品认证 / 扶持政策」
  *         这类抽象主题本就没有对应实物，硬塞一张农产品照只会更违和。
  *         改用与「知识库列表页」同一套配色的渐变封面：宁可没有图，也不要错图。
+ *
+ *    ★ 2026-10-12：第 3 级**只给卡片用**，不给文章页用。详见 `knowledgePhoto()`
+ *      的注释 —— 渐变封面在文章页是纯噪音，文章页没有真图就不显示配图。
  * ================================================================== */
 
 /**
@@ -263,21 +266,45 @@ function knowledgeCover(k) {
 }
 
 /**
- * 取知识封面。
+ * 取知识的**真图**（作者上传的，或标题命中的实拍主题图）。
  *
- * 顺序：接口 imageUrl → 标题关键词实拍图 → 分类渐变封面。恒返回非空。
- * @param {object} k 知识对象（KnowledgeVO）
- * @returns {string} 图片地址（相对路径 或 data URI）
+ * ★ 2026-10-12 从 `knowledgeImage()` 里拆出来。拆的理由不是重构癖，是
+ * 详情页和卡片对「没有真图」的处置**必须不同**：
+ *
+ *   · 卡片（首页 / 列表）：没有真图时给一张**分类渐变封面**撑着，格子不能是空的；
+ *   · 文章页（`/knowledge/:id`）：渐变封面在那里没有意义 —— 它是一个纯装饰的
+ *     色块加水印字，跟正文、跟标题都不发生信息关系，读者点进来是想看内容，
+ *     塞一张 900×396 的渐变横幅只是噪音；而且配上「点击图片可放大」更荒谬
+ *     （放大看什么？）。所以文章页没有真图就**干脆不显示配图**。
+ *
+ * 这也是「宁可没有图，也不要错图」这条规则在文章页的延伸。
+ *
+ * @param {object} k 知识对象
+ * @returns {string} 图片地址；**没有真图时返回空串**（调用方自行决定兜底）
  */
-export function knowledgeImage(k) {
+export function knowledgePhoto(k) {
   const real = k?.imageUrl || k?.image_url
   if (real && typeof real === 'string' && real.trim()) return real
 
   const title = String(k?.title || '')
   const hit = KNOWLEDGE_TITLE_IMG.find((item) => item.keys.some((key) => title.includes(key)))
-  if (hit) return hit.img
+  return hit ? hit.img : ''
+}
 
-  return knowledgeCover(k)
+/**
+ * 取知识封面（**卡片专用**）。
+ *
+ * 顺序：接口 imageUrl → 标题关键词实拍图 → 分类渐变封面。恒返回非空。
+ *
+ * ⚠️ 库里 `t_knowledge.image_url` 19 行里有 18 行是 NULL（只有用户实测时
+ * 传过的那条有值），所以绝大多数卡片实际吃的是后两级兜底。等这些行回填了
+ * 真图，第一级会自动接管，本函数不用改。
+ *
+ * @param {object} k 知识对象（KnowledgeVO）
+ * @returns {string} 图片地址（相对路径 或 data URI），**恒非空**
+ */
+export function knowledgeImage(k) {
+  return knowledgePhoto(k) || knowledgeCover(k)
 }
 
 /* ------------------------------------------------------------------
