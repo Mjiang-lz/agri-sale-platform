@@ -73,9 +73,15 @@
           <h3>{{ heroTitle }}</h3>
           <p class="hero-desc">{{ heroDesc }}</p>
           <div class="hero-search">
+            <!-- ★ placeholder 只承诺 doSearch 真能兑现的范围：商品名 / 品类 / 产地。
+                 2026-10-12：原文案末尾还有一个「专家」，但 doSearch 一律跳
+                 /trade/products（商品页），后端 keyword 也只 LIKE 商品名/品类/产地
+                 （TradeServiceImpl#pageProducts），搜「王教授」只会得到空结果。
+                 专家搜索其实已经有了，入口在 /expert/appointment 页（按姓名/领域/简介
+                 前端过滤），不该由这个框冒充。 -->
             <el-input
               v-model="keyword"
-              placeholder="搜农产品、产地、专家"
+              placeholder="搜农产品、产地"
               clearable
               @keyup.enter="doSearch"
             >
