@@ -76,6 +76,7 @@
           :preview-src-list="[photo]"
           preview-teleported
           fit="contain"
+          @error="coverFailed = true"
         />
         <span class="cover-tip">点击图片可放大查看</span>
       </div>
@@ -105,18 +106,32 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getKnowledgeDetail } from '@/api/knowledge'
-import { knowledgePhoto } from '@/utils/imagery'
+import { knowledgeKeywordPhoto, knowledgePhoto } from '@/utils/imagery'
 
 const route = useRoute()
 const router = useRouter()
 
 const loading = ref(true)
 const knowledge = ref(null)
+
+/** 配图是否加载失败（OBS 取不到：断网 / 对象被删） */
+const coverFailed = ref(false)
+
 /**
  * 配图（作者上传的 或 标题命中的实拍主题图）。
  * 没有真图时为空串 ⇒ 模板整个配图块不渲染，而不是退化成一张渐变横幅。
+ *
+ * 加载失败时退到 `knowledgeKeywordPhoto()`（本地实拍图），**不再退到渐变封面** ——
+ * 渐变块在文章里只是噪音，退到它等于把上面那条规则绕开了；
+ * 本地图也没有（抽象主题）就干脆隐藏配图块，与「本来就没真图」表现一致。
+ *
+ * ⚠️ 回退必须跳过第 ① 级，否则 `knowledgePhoto()` 又会返回那个坏掉的 OBS 地址。
  */
-const photo = computed(() => knowledgePhoto(knowledge.value))
+const photo = computed(() => {
+  const k = knowledge.value
+  if (!k) return ''
+  return coverFailed.value ? knowledgeKeywordPhoto(k) : knowledgePhoto(k)
+})
 const errorMessage = ref('')
 /** 'ok' | 'missing'（404，重试无意义）| 'error'（可重试） */
 const status = ref('ok')
@@ -126,6 +141,7 @@ async function load() {
   knowledge.value = null
   errorMessage.value = ''
   status.value = 'ok'
+  coverFailed.value = false
 
   if (!id) {
     loading.value = false

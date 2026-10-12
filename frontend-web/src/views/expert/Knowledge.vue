@@ -41,9 +41,25 @@
           读完一篇没法把链接发给别人，浏览器前进后退也管不了它。
         -->
         <article v-for="item in pagedList" :key="item.knowledgeId" class="knowledge-item" @click="goDetail(item)">
+          <!--
+            ★ 2026-10-12：封面从「只有分类渐变块」改为「有真配图就显示拍图」。
+            起因是当天的另一个修复 —— 1~18 号知识的 image_url 已回填为真实 OBS 地址，
+            首页与详情页都会显示它；这一页若还只画渐变块，同一份数据就有了两副面孔。
+            没有真图（含加载失败、以及演示数据）时，仍然退回原来的渐变块 + 分类水印，
+            所以格子不会开天窗。
+          -->
           <div class="cover" :class="coverClass(item.category)">
+            <img
+              v-if="coverOf(item)"
+              class="cover-img"
+              :src="coverOf(item)"
+              alt=""
+              loading="lazy"
+              @error="onCoverError(item)"
+            />
+            <div v-if="coverOf(item)" class="cover-scrim"></div>
             <span>{{ item.category }}</span>
-            <strong>{{ (item.title || '农业知识').slice(0, 2) }}</strong>
+            <strong v-if="!coverOf(item)">{{ (item.title || '农业知识').slice(0, 2) }}</strong>
           </div>
           <div class="item-body">
             <div class="meta">
@@ -72,6 +88,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ExpertKnowledgeEditor from '@/components/expert/ExpertKnowledgeEditor.vue'
 import { getKnowledgeList, getMyKnowledge } from '@/api/knowledge'
+import { knowledgeImage, knowledgeLocalImage } from '@/utils/imagery'
 import { useUserStore } from '@/store/user'
 
 const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
@@ -126,6 +143,8 @@ const visibleSubmissions = computed(() => mySubmissions.value.filter((item) => !
 async function loadList() {
   loading.value = true
   demoMode.value = false
+  // 重新拉列表时清掉失败记录：上一轮可能是网络抖动，给 OBS 真图一次重试的机会
+  coverFailedIds.value = []
   try {
     const data = await getKnowledgeList()
     const list = Array.isArray(data) ? data : data?.records || []
@@ -156,6 +175,37 @@ function handleCategoryChange() {
  */
 function goDetail(item) {
   if (item?.knowledgeId) router.push(`/knowledge/${item.knowledgeId}`)
+}
+
+/**
+ * 封面加载失败的 knowledgeId 集合。
+ *
+ * 2026-10-12：1~18 号知识的 image_url 回填成了 OBS 绝对地址，但 OBS 对象可能
+ * 断网取不到、也可能被后来清理掉 —— 那时 `<img>` 会裂图（比没图更难看）。
+ * 所以失败一次就记下来，改用本地实拍图；再失败也不重试，避免无限循环。
+ */
+const coverFailedIds = ref([])
+
+/**
+ * 当前应该给这张卡渲染哪个封面。
+ *
+ * - 正常：knowledgeImage(item) —— ① 接口 imageUrl（真 OBS 图）→ ② 标题关键词本地图 → ③ 分类渐变封面，恒非空
+ * - 加载失败过：knowledgeLocalImage(item) —— **跳过第 ① 级**，只走 ② → ③
+ *
+ * ⚠️ 失败后必须跳过 ①：knowledgeImage() 第一步就是那个坏掉的 OBS 地址，
+ * 再走一遍只会「失败 → 换成同一个 URL → 再失败」。这与 BizHome 里用
+ * dataset.localFallback 打标记是同一个用意。
+ */
+function coverOf(item) {
+  if (coverFailedIds.value.includes(Number(item?.knowledgeId))) return knowledgeLocalImage(item)
+  return knowledgeImage(item)
+}
+
+function onCoverError(item) {
+  const id = Number(item?.knowledgeId)
+  // 只记一次：本地兜底图若也失败，不再重复 push 同一个 id（否则每次 error 都触发重渲染）
+  if (!Number.isFinite(id) || coverFailedIds.value.includes(id)) return
+  coverFailedIds.value = [...coverFailedIds.value, id]
 }
 
 function coverClass(categoryName) {
@@ -233,7 +283,13 @@ onUnmounted(() => {
 .knowledge-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; min-height: 280px; }
 .knowledge-item { overflow: hidden; border: 1px solid var(--el-border-color-light); border-radius: 14px; background: #fff; cursor: pointer; transition: .2s; }
 .knowledge-item:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(29, 70, 46, .1); }
-.cover { height: 112px; padding: 16px; display: flex; justify-content: space-between; align-items: flex-start; color: #fff; background: linear-gradient(135deg, #2d7a4c, #73b586); }
+.cover { position: relative; overflow: hidden; height: 112px; padding: 16px; display: flex; justify-content: space-between; align-items: flex-start; color: #fff; background: linear-gradient(135deg, #2d7a4c, #73b586); }
+/* 真配图铺满封面；分类角标与水印靠 z-index 浮在图上 */
+.cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* 顶部/底部压一层很薄的暗角：分类角标是「半透明白底 + 白字」，
+   直接压在浅色照片（如沙地、水面）上会看不清 —— 与轮播指示点踩过的是同一个坑 */
+.cover-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, .36) 0%, rgba(0, 0, 0, 0) 48%, rgba(0, 0, 0, .24) 100%); }
+.cover > span, .cover > strong { position: relative; z-index: 1; }
 .cover-1 { background: linear-gradient(135deg, #91602a, #d4a164); }
 .cover-2 { background: linear-gradient(135deg, #2c6679, #78adba); }
 .cover-3 { background: linear-gradient(135deg, #674b7d, #a991ba); }
