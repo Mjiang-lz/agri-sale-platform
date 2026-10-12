@@ -67,7 +67,7 @@
             show-icon
             :closable="false"
             title="还没有收货地址"
-            description="订单提交后要进入农户发货环节，没有收货人的订单农户处理不了，所以请先新增一条收货地址。"
+            description="订单提交后要进入农户发货环节，没有收货人的订单农户处理不了，所以请先新增一条收货地址"
           />
         </el-card>
 
@@ -129,7 +129,7 @@
             placeholder="如「工作日送达，请提前电话联系」「按 20 斤一箱装」"
           />
           <p class="remark-tip">
-            这批 {{ settleable.length }} 种商品会<b>各自生成一笔订单</b>，备注会写到每一笔上。
+            这批 {{ settleable.length }} 种商品会<b>各自生成一笔订单</b>，备注会写到每一笔上
           </p>
         </el-card>
       </div>

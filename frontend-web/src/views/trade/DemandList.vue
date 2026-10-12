@@ -32,10 +32,10 @@
       show-icon
       :closable="false"
       title="求购需求加载失败"
-      description="无法连接后端服务，请确认后端已启动（默认 8080 端口）后重试。"
       class="error-alert"
     >
       <template #default>
+        <div class="error-desc">无法连接后端服务，请确认后端已启动（默认 8080 端口）后重试</div>
         <div class="error-actions">
           <el-button type="danger" size="small" @click="loadDemands">重新加载</el-button>
         </div>
@@ -288,7 +288,7 @@ function handleSizeChange() {
 async function handleClose(row) {
   try {
     await ElMessageBox.confirm(
-      `确定要关闭「${categoryLabel(row)}」这条求购需求吗？关闭后不再展示给供应商，可以重新编辑再开。`,
+      `确定要关闭「${categoryLabel(row)}」这条求购需求吗？关闭后不再展示给供应商，可以重新编辑再开`,
       '关闭求购需求',
       { type: 'warning', confirmButtonText: '确定关闭', cancelButtonText: '取消' }
     )
@@ -316,7 +316,7 @@ async function handleClose(row) {
 async function handleRemove(row) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除「${categoryLabel(row)}」这条求购需求吗？删除后无法恢复，需要重新发布。`,
+      `确定要删除「${categoryLabel(row)}」这条求购需求吗？删除后无法恢复，需要重新发布`,
       '删除求购需求',
       {
         type: 'error',

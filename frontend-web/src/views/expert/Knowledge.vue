@@ -18,7 +18,7 @@
       v-if="demoMode"
       class="demo-alert"
       title="当前页面显示的是演示数据"
-      description="真实接口失败或返回空列表，且 VITE_USE_DEMO=true。请先检查后端和 rxt.t_knowledge 数据。"
+      description="真实接口失败或返回空列表，且 VITE_USE_DEMO=true。请先检查后端和 rxt.t_knowledge 数据"
       type="warning"
       :closable="false"
       show-icon

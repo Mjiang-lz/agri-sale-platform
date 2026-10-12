@@ -22,7 +22,7 @@
       class="article-result"
       icon="warning"
       title="这条知识不存在或未通过审核"
-      sub-title="它可能已被作者删除，或仍在审核队列中。"
+      sub-title="它可能已被作者删除，或仍在审核队列中"
     >
       <template #extra>
         <el-button type="primary" @click="goList">去看看其他农技知识</el-button>
@@ -35,10 +35,10 @@
       show-icon
       :closable="false"
       title="知识内容加载失败"
-      :description="errorMessage"
       class="error-alert"
     >
       <template #default>
+        <div class="error-desc">{{ errorMessage }}</div>
         <div class="error-actions">
           <el-button type="danger" size="small" @click="load">重新加载</el-button>
           <el-button size="small" @click="goList">返回列表</el-button>
@@ -103,7 +103,7 @@
         :closable="false"
         show-icon
         title="内容说明"
-        description="农业生产建议仅供参考，请结合当地气候、土壤和作物实际情况执行；涉及用药请遵守安全间隔期。"
+        description="农业生产建议仅供参考，请结合当地气候、土壤和作物实际情况执行；涉及用药请遵守安全间隔期"
       />
 
       <footer class="article-foot">

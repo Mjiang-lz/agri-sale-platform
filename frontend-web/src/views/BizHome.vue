@@ -602,10 +602,10 @@ const HERO_IMAGES = [
 ]
 const HERO_ALT = ['水稻田里的稻谷长势', '田间蔬菜批发市场的货架', '养殖基地的鱼塘', '农场的散养鸡蛋']
 const HERO_TEXT = [
-  { kicker: '产地直供', title: '田间到餐桌，少中间一环', desc: '24 个在售货源全部来自产地直发，看得到产地、看得到库存。' },
-  { kicker: '今日采摘', title: '蔬菜类当日采摘当日发', desc: '叶菜按筐起发，冷链优先派送，江浙沪次日可达。' },
-  { kicker: '水产直供', title: '活鱼现捞，水库到餐桌', desc: '水产类按斤计价，下单后由基地现捞现发。' },
-  { kicker: '散养蛋品', title: '林下散养，枚枚可溯', desc: '畜禽产品标注产期与养殖方式，按盒装发货。' }
+  { kicker: '产地直供', title: '田间到餐桌，少中间一环', desc: '24 个在售货源全部来自产地直发，看得到产地、看得到库存' },
+  { kicker: '今日采摘', title: '蔬菜类当日采摘当日发', desc: '叶菜按筐起发，冷链优先派送，江浙沪次日可达' },
+  { kicker: '水产直供', title: '活鱼现捞，水库到餐桌', desc: '水产类按斤计价，下单后由基地现捞现发' },
+  { kicker: '散养蛋品', title: '林下散养，枚枚可溯', desc: '畜禽产品标注产期与养殖方式，按盒装发货' }
 ]
 const heroIdx = ref(0)
 let heroTimer = null
@@ -656,7 +656,7 @@ const categories = [
   { name: '蔬菜', img: '/products/p26.jpg' },
   { name: '水产', img: '/products/p19.jpg' },
   { name: '畜禽产品', img: '/products/p27.jpg' },
-  { name: '粮油', img: '/products/g02.png' },
+  { name: '粮油', img: '/products/g02.jpg' },
   { name: '干货', img: '/products/p22.jpg' }
 ]
 function goCategory(name) {
@@ -897,10 +897,10 @@ const emptyTitle = computed(() => {
   return '暂无业务记录'
 })
 const emptyDesc = computed(() => {
-  if (actualRole.value === '农户') return '先看看下面的在售行情与田间求购，定下价再发布你的货源；需要周转可以提交融资意向。'
-  if (actualRole.value === '采购方') return '挑中上面的商品加入购物车即可下单，订单会出现在这里。'
-  if (actualRole.value === '银行用户') return '农户提交融资申请后，清单会出现在这里。'
-  return '当前没有待处理事项。'
+  if (actualRole.value === '农户') return '先看看下面的在售行情与田间求购，定下价再发布你的货源；需要周转可以提交融资意向'
+  if (actualRole.value === '采购方') return '挑中上面的商品加入购物车即可下单，订单会出现在这里'
+  if (actualRole.value === '银行用户') return '农户提交融资申请后，清单会出现在这里'
+  return '当前没有待处理事项'
 })
 const emptyAction = computed(() => {
   if (actualRole.value === '采购方') return { label: '去挑货', path: '/trade/products' }

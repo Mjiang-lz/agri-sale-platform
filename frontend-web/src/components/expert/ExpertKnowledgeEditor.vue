@@ -61,8 +61,8 @@
         :closable="false"
         show-icon
         :title="editingId
-          ? '保存后该条知识将回到「待审核」状态，需管理员重新审核通过后才会再次公开。'
-          : '投稿后会进入待审核状态，审核通过后在农业知识列表公开。'"
+          ? '保存后该条知识将回到「待审核」状态，需管理员重新审核通过后才会再次公开'
+          : '投稿后会进入待审核状态，审核通过后在农业知识列表公开'"
       />
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="editor-form">
         <el-form-item label="知识标题" prop="title">
@@ -223,7 +223,7 @@ async function removeSubmission(item) {
     await ElMessageBox.confirm(
       `确定删除「${item.title}」这条知识吗？此操作不可撤销，删除后无法恢复。\n\n` +
       '该知识的评论会一并清除；管理员那边的审核记录会保留，' +
-      '标题显示为「（内容已删除）」。',
+      '标题显示为「（内容已删除）」',
       '删除知识投稿',
       { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
     )
