@@ -47,42 +47,43 @@
     </el-alert>
 
     <article v-else-if="knowledge" class="article">
+      <!--
+        ★ 2026-10-12 第三轮调整（用户：「图片不用占据这么多空间，正文才是主导位置」）
+        标题区从「居中 + 三行」压成「左对齐 + 两行」：
+        分类标签与时间/浏览并到同一行，标题跟在下面。原来光标题区就吃掉约 130px，
+        加上配图，正文被挤到首屏之外 —— 阅读页的标题本来就该左对齐（居中会读成海报）。
+      -->
       <header class="article-head">
-        <el-tag effect="plain" round>{{ knowledge.category }}</el-tag>
-        <h1>{{ knowledge.title }}</h1>
-        <div class="article-meta">
+        <div class="head-meta">
+          <el-tag effect="plain" round size="small">{{ knowledge.category }}</el-tag>
           <span>发布时间：{{ formatDateTime(knowledge.createTime) }}</span>
           <span>浏览 {{ knowledge.viewCount ?? 0 }}</span>
         </div>
+        <h1>{{ knowledge.title }}</h1>
       </header>
 
       <!--
-        配图用 contain 不用 cover：知识配图可能是竖图（实测有一张 810×1440），
-        cover 会把竖图裁成中间一条，读者看不到全貌。
-        点图可放大看细节。
-
-        ★ 2026-10-12 修：原来 v-if 只看 `knowledge.imageUrl`，于是出现
-        「首页卡片有图、点进来却没有」的割裂 —— 首页卡片走的是 `knowledgeImage()`
-        三级兜底，而详情页只认第一级（数据库字段），可库里 19 条有 18 条该字段是 NULL。
-        现在两边同源：都用 `knowledgePhoto()`，作者传了图就用作者的，
-        没有则退到标题命中的实拍主题图。
-        但**不含**分类渐变封面那一级 —— 渐变块在文章页没有信息量，
-        配「点击图片可放大」更荒谬，所以没有真图就干脆不显示配图块。
-
-        ★★ 2026-10-12 第二轮修（用户：「图片怎么能占据这么大的地方」）：
-        改前是 `max-width: 640px; height: 340px` 的**固定盒子** + `fit="contain"`。
-        但 Element Plus 的 `.el-image__inner` 被写成 `width:100%;height:100%`，
-        于是**盒子尺寸完全决定观感**：一张 810×1440 的竖照片在 640 宽的盒子里
-        只占中间 190px，两侧各 225px 全是底色（一张"假空盒"），而整个盒子
-        仍稳稳吃掉 340px 高 —— 照片没多大，留白却比正文还抢眼。
-
-        现在改成**盒子贴着图**：加载完读一次 `naturalWidth/naturalHeight`，
-        把真实比例写到盒子的 `aspect-ratio` 上，再配 `max-height: 260px`。
-        竖图 → 146×260，横图 → 590×260，盒子边缘就是图片边缘，没有假留白。
-        为什么不改成 `cover` 裁成横幅：文章配图常是流程图/示意图，裁中间一条
-        损失的是信息 —— 与审核详情页同一条判据。
+        正文优先：紧接标题，不再被配图挡在后面（农技文章里「1. 2. 3.」这类分行有信息量，
+        所以用 pre-wrap 按原文渲染）。
       -->
-      <div v-if="photo" class="cover-box">
+      <div class="article-content">{{ knowledge.content }}</div>
+
+      <!--
+        配图下沉为「附图」，放在正文之后。三条理由：
+          ① 正文优先 —— 读者进页面第一眼就是内容，而不是先划过一张图；
+          ② 列表卡片上已经有同一张封面了，详情页再顶一张大图属于重复；
+          ③ 「点开大图」本来就是按需动作，想看细节的人点一下即可，不想看的人不被打断。
+        尺寸仍由 onCoverLoad 算出的 aspect-ratio 决定，这里只封顶（见下 CSS）。
+
+        ★ 前一版的两处修正（同日）：
+          · 原 `v-if` 只看 `knowledge.imageUrl`，导致「首页卡片有图、点进来却没有」的割裂
+            → 改用 `knowledgePhoto()`，与卡片同源；但**不含**分类渐变封面那一级，
+              渐变块在文章里没有信息量，没有真图就干脆不显示配图。
+          · 原 `max-width: 640px; height: 340px` 的**固定盒子**（EP 把内部 img 强制成
+            `width:100%;height:100%`，盒子尺寸决定观感）会把 810×1440 的竖图做成
+            「图小盒大」的假留白 → 改成盒子贴图。
+      -->
+      <figure v-if="photo" class="cover-box">
         <el-image
           class="cover-image"
           :style="coverStyle"
@@ -93,13 +94,8 @@
           @load="onCoverLoad"
           @error="coverFailed = true"
         />
-        <span class="cover-tip">点击图片可放大查看</span>
-      </div>
-
-      <el-divider />
-
-      <!-- 正文按原文换行渲染：农技文章里「1. 2. 3.」这种分行是有信息量的 -->
-      <div class="article-content">{{ knowledge.content }}</div>
+        <figcaption class="cover-tip">附图 · 点击可放大查看</figcaption>
+      </figure>
 
       <el-alert
         class="content-tip"
@@ -227,28 +223,34 @@ watch(
 
 <style scoped>
 /* 阅读型页面：限宽居中。正文行长超过 900px 之后眼睛要来回扫，反而难读 */
-.article { max-width: 900px; margin: 0 auto; padding: 28px 32px 34px; border: 1px solid #e1eae4; border-radius: 16px; background: #fff; }
+.article { max-width: 900px; margin: 0 auto; padding: 26px 32px 30px; border: 1px solid #e1eae4; border-radius: 16px; background: #fff; }
 .article-skeleton, .article-result { max-width: 900px; margin: 0 auto; }
 .page-head { max-width: 900px; margin: 0 auto 14px; }
-.article-head { text-align: center; }
-.article-head h1 { margin: 12px 0 10px; font-size: 26px; line-height: 1.45; color: #1f3b2c; }
-.article-meta { display: flex; justify-content: center; gap: 18px; color: #75827a; font-size: 13px; }
-.cover-box { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 18px; }
 /*
- * 封面盒子的尺寸由 style 里动态算出的 `aspect-ratio` 决定（见 onCoverLoad），
- * 这里只封顶：高度不超过 260px，宽度不超过正文列宽。
- * 两轴都封顶后，`contain` 的元素恰好等于图片本身大小 —— 盒子边缘即图片边缘，
- * 不会出现「图很小、盒子很大」的假留白。
+ * 标题区：左对齐 + 分类与时间同排。
+ * 改前是「居中 + 分类/标题/时间三行」，光这块就约 130px；正文被挤到首屏之外，
+ * 观感变成「标题 + 配图」在撑场。阅读页标题左对齐也更符合习惯（居中会读成海报）。
  */
-.cover-image { max-width: 100%; max-height: 260px; border: 1px solid #e1eae4; border-radius: 12px; overflow: hidden; background: #f7faf8; cursor: zoom-in; }
+.article-head { text-align: left; }
+.head-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: #75827a; font-size: 13px; }
+.article-head h1 { margin: 10px 0 0; font-size: 24px; line-height: 1.45; color: #1f3b2c; }
+/* 正文：紧跟标题，是这一页的主体 */
+.article-content { margin-top: 18px; white-space: pre-wrap; line-height: 1.95; font-size: 15.5px; color: #2b3a32; }
+/*
+ * 附图（正文之后）：尺寸由 style 里动态算出的 `aspect-ratio` 决定（见 onCoverLoad），
+ * 这里只封顶 —— 高度不超过 200px、宽度不超过正文列宽。
+ * 两轴都封顶后 `contain` 恰好等于图片本身，盒子边缘即图片边缘，没有假留白。
+ * 用一条极细的分隔线代替 el-divider：后者上下各 24px，纯浪费纵向空间。
+ */
+.cover-box { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 26px 0 0; padding-top: 20px; border-top: 1px solid #eef3ef; }
+.cover-image { max-width: 100%; max-height: 200px; border: 1px solid #e1eae4; border-radius: 12px; overflow: hidden; background: #f7faf8; cursor: zoom-in; }
 .cover-tip { color: #98a49c; font-size: 12px; }
-.article-content { white-space: pre-wrap; line-height: 1.95; font-size: 15.5px; color: #2b3a32; }
-.content-tip { margin-top: 26px; }
+.content-tip { margin-top: 24px; }
 .article-foot { display: flex; justify-content: center; margin-top: 22px; }
 .error-actions { display: flex; gap: 10px; margin-top: 10px; }
 @media (max-width: 760px) {
   .article { padding: 20px 18px 26px; }
-  .cover-image { max-height: 200px; }
-  .article-meta { flex-direction: column; gap: 4px; }
+  .cover-image { max-height: 170px; }
+  .head-meta { gap: 8px; }
 }
 </style>
