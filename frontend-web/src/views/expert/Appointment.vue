@@ -137,7 +137,10 @@ import { useUserStore } from '@/store/user'
  * 换浏览器/清缓存就没了，也拿不到专家的处理意见。现已改为读取服务端数据。
  */
 const userStore = useUserStore()
-const canBookAppointment = computed(() => userStore.profile?.roleName === '农户')
+// 管理员与农户同口径（与 MainLayout 的 isFarmerLike 一致）：
+// 农户是平台主体、预约是通用能力，管理员也应当能看到预约入口。
+// ⚠️ 这只管「能否看到/预约」，真正写入仍由后端 requireRole 拦截。
+const canBookAppointment = computed(() => ['农户', '管理员'].includes(userStore.profile?.roleName))
 const isExpert = computed(() => userStore.profile?.roleName === '专家')
 const experts = expertOptions
 const appointments = ref([])

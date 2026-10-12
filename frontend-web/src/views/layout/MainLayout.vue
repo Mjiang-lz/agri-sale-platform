@@ -22,41 +22,48 @@
               <RxtIcon name="ico-source" />
               <span>商品货源</span>
             </el-menu-item>
-            <!-- 下面三项都属于「我的数据」，未登录时进去只会被接口打回 401，
-                 与其让人白点一次，不如先不显示 -->
+            <!-- 求购需求：**所有人都可见**，包括管理员。
+                 管理员的职责包含「商品货源与求购需求审核」，需要看到这些数据；
+                 该页对管理员是纯只读（不显示发布按钮与右侧「我发布的」）。
+                 未登录时隐藏：进去要 401，不如不显示。 -->
             <el-menu-item v-if="isLoggedIn" index="/trade/demand">
               <RxtIcon name="ico-demand" />
               <span>求购需求</span>
             </el-menu-item>
-            <el-menu-item v-if="isLoggedIn" index="/trade/cart">
+            <!-- 购物车与我的订单属于买家侧动作，管理员一律隐藏：
+                 加购与下单会写入真实订单数据，平台管理员账号不该产生这种记录。 -->
+            <el-menu-item v-if="isLoggedIn && !isAdmin" index="/trade/cart">
               <RxtIcon name="ico-cart" />
               <span>购物车</span>
             </el-menu-item>
-            <el-menu-item v-if="isLoggedIn" index="/trade/orders">
+            <el-menu-item v-if="isLoggedIn && !isAdmin" index="/trade/orders">
               <RxtIcon name="ico-order" />
               <span>我的订单</span>
             </el-menu-item>
-            <!-- 我的商品：只有农户看得到。
-                 按 actualRole 而不是 activeRole 判断 —— 后端这两个接口是
-                 requireRole(FARMER)，采购方点进去只会拿到 403；
-                 而 activeRole 是前端可切的状态，用它判断会出现
-                 「切成采购方后发布入口消失、但接口其实还能调」的错位。 -->
+            <!-- 我的商品：仅农户可见。
+                 ⚠️ 管理员**不显示**这一栏：他不参与发布商品，「我的商品」对自己是空的
+                 （管理员名下没有任何商品），点进去只会看到一个红色报错 ——
+                 后端 pageMyProducts 是 requireRole(FARMER)，管理员调它直接 403。
+                 治理要看全平台在售货源，那是「商品货源」那一项，不在这里。 -->
             <el-menu-item v-if="isFarmer" index="/trade/my-products">
               <RxtIcon name="ico-source" />
               <span>我的商品</span>
             </el-menu-item>
           </el-sub-menu>
-          <!-- 融资服务：这个菜单名下其实是两个不同的模块，按角色分流。
+          <!-- 融资服务：这个菜单名下其实是三个不同的模块，按角色分流。
                · 农户    → 提交申请、看自己的进度（/finance/apply、/finance/my）
                · 银行用户 → 审批别人提交的申请（/finance/bank-review）
-               两者不能共用页面：银行用户调 /finance/apply/my 永远是空列表
-               ——那是「申请人看自己的申请」的口径。 -->
+               · 管理员  → 与农户相同的展示页，但**只读**：后端 submitApply / getMyApply
+               都是 requireRole(FARMER)，管理员真去提交会 403。所以这里给的是同一批页面，
+               提交按钮由 FinanceApply.vue 里的 isReadOnly 置灰，另加一个看全部的融资台账。
+               ⚠️ 三个分支必须覆盖全部角色：原先只有 v-if / v-else-if，
+               管理员两个都不匹配，展开就是一个空下拉框（点得开但什么都没有）。 -->
           <el-sub-menu v-if="canSeeFinance" index="finance">
             <template #title>
               <RxtIcon name="ico-finance" />
               <span>融资服务</span>
             </template>
-            <template v-if="isFarmer">
+            <template v-if="isFarmerLike">
               <el-menu-item index="/finance/apply">
                 <RxtIcon name="ico-apply" />
                 <span>融资申请</span>
@@ -64,6 +71,11 @@
               <el-menu-item index="/finance/my">
                 <RxtIcon name="ico-ledger" />
                 <span>我的融资</span>
+              </el-menu-item>
+              <!-- 管理员专属：全平台台账。农户看不到别人的申请，这个入口只给管理员。 -->
+              <el-menu-item v-if="isAdmin" index="/finance/ledger">
+                <RxtIcon name="ico-ledger" />
+                <span>融资台账</span>
               </el-menu-item>
             </template>
             <el-menu-item v-else-if="isBank" index="/finance/bank-review">
@@ -185,20 +197,44 @@ const nameInitial = computed(() => displayName.value.slice(0, 1))
 const avatarUrl = computed(() => userStore.profile?.avatarUrl || undefined)
 const menuPerms = computed(() => String(userStore.menuPerms || '').split(',').filter(Boolean))
 const isLoggedIn = computed(() => Boolean(userStore.token))
-// 未登录时也展示「农产品交易」入口：商品货源是公开页面，
-// 若沿用后端菜单权限（游客为空）判断，访客在详情页会看到一个空导航
-const canSeeTrade = computed(() => isLoggedIn.value ? menuPerms.value.includes('trade') : true)
-const canSeeFinance = computed(() => menuPerms.value.includes('finance'))
-const canSeeExpert = computed(() => menuPerms.value.includes('expert'))
-const canSeeUser = computed(() => menuPerms.value.includes('user'))
-const canSwitchRole = computed(() => ['农户', '采购方'].includes(actualRole.value))
-const canAccessAppointment = computed(() => ['农户', '专家'].includes(actualRole.value))
 
 // 按「登录账号的真实角色」分流菜单：真实角色决定接口能不能调通，
 // activeRole 只是前端的展示态（农户可切成采购方预览），拿它做权限分流会出现
 // 「菜单没了但接口还能调」这种两边对不上的状态。
 const isFarmer = computed(() => actualRole.value === '农户')
 const isBank = computed(() => actualRole.value === '银行用户')
+
+/**
+ * 管理员与农户同权限的展示口径。
+ *
+ * 为什么管理员要和农户看到同一批页面：
+ * 农户是这个平台的主体（供给侧 + 融资需求侧都归他），功能最多。
+ * 管理员登录后若菜单比农户还少，既不符合实际使用场景，
+ * 也会露出「按角色 v-if 没覆盖全」的空子菜单（见融资服务那段注释）。
+ *
+ * ⚠️ 这里是**展示**口径，不是接口权限口径。submitApply / getMyApply
+ * 后端仍是 requireRole(FARMER)，所以管理员进入这些页面后提交按钮必须置灰，
+ * 由 FinanceApply.vue 的 isReadOnly 负责 —— 前端放开显示 + 后端拦住写入，
+ * 这样既不会空菜单，也不会让管理员真的提交出数据。
+ */
+const isAdmin = computed(() => actualRole.value === '管理员')
+const isFarmerLike = computed(() => isFarmer.value || isAdmin.value)
+
+// 未登录时也展示「农产品交易」入口：商品货源是公开页面，
+// 若沿用后端菜单权限（游客为空）判断，访客在详情页会看到一个空导航。
+//
+// 管理员同样为 true：t_role 里管理员的 menu_perms 是
+// `dashboard,audit,user,finance`，**不含 trade**，靠 includes 判断会把整个
+// 农产品交易菜单藏起来 —— 而管理员恰恰需要看全平台在售货源来核对治理数据。
+// 这里刻意不改数据库，前端放宽一个角色。
+// 代价是这与后端 menu_perms 口径不一致（管理员的权限串里并没有 trade），
+// 属于「展示口径」而非「权限口径」：写操作仍由各页面的只读态与后端拦截把关。
+const canSeeTrade = computed(() => isLoggedIn.value ? (menuPerms.value.includes('trade') || isAdmin.value) : true)
+const canSeeFinance = computed(() => menuPerms.value.includes('finance'))
+const canSeeExpert = computed(() => menuPerms.value.includes('expert'))
+const canSeeUser = computed(() => menuPerms.value.includes('user'))
+const canSwitchRole = computed(() => ['农户', '采购方'].includes(actualRole.value))
+const canAccessAppointment = computed(() => ['农户', '专家'].includes(actualRole.value))
 
 const activeMenu = computed(() => {
   if (route.path.startsWith('/trade/product')) return '/trade/products'

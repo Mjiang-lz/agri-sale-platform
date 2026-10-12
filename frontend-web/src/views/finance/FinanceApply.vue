@@ -21,7 +21,10 @@
             </div>
           </template>
 
-          <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+          <!-- isReadOnly：管理员以只读方式查看本页（后端 write 接口不放行 ADMIN），
+               置灰表单而不是隐藏 —— 让页面结构、字段与校验规则都仍然可看，
+               只是不能真的提交 -->
+          <el-form ref="formRef" :model="form" :rules="rules" label-position="top" :disabled="isReadOnly">
             <el-form-item label="贷款产品" prop="loanProductId">
               <div class="product-list">
                 <button
@@ -97,11 +100,19 @@
             </el-form-item>
 
             <div class="form-actions">
-              <el-button type="primary" size="large" :loading="submitting" @click="handleSubmit">
-                提交融资申请
+              <el-button type="primary" size="large" :loading="submitting" :disabled="isReadOnly" @click="handleSubmit">
+                {{ isReadOnly ? '提交融资申请（管理员只读）' : '提交融资申请' }}
               </el-button>
-              <el-button size="large" @click="resetForm">重置</el-button>
+              <el-button size="large" :disabled="isReadOnly" @click="resetForm">重置</el-button>
             </div>
+            <el-alert
+              v-if="isReadOnly"
+              type="info"
+              :closable="false"
+              show-icon
+              title="管理员为只读查看"
+              description="本页面向农户提交融资申请，后端写接口仅放行农户角色，因此管理员可查看页面与字段，但不能提交。平台代农户提交请在管理后台处理。"
+            />
           </el-form>
         </el-card>
       </el-col>
@@ -204,6 +215,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/store/user'
 import {
   createLoanGroup,
   getLoanProducts,
@@ -220,6 +232,7 @@ import {
  * - createLoanGroup 创建联合贷款小组。
  */
 const router = useRouter()
+const userStore = useUserStore()
 const useDemo = import.meta.env.VITE_USE_DEMO === 'true'
 const demoMode = ref(false)
 const formRef = ref()
@@ -232,6 +245,19 @@ const candidates = ref([])
 const selectedFarmerIds = ref([])
 /** 推荐接口的失败原因。非空时弹窗内展示错误态，而不是展示一份空名单 */
 const recommendError = ref('')
+
+/**
+ * 管理员只读态。
+ *
+ * 背景：菜单口径上管理员与农户看到同一批页面（农户是平台主体，功能最多），
+ * 但后端 submitApply / getMyApply / recommendGuarantors 三处都是
+ * requireRole(FARMER)，管理员真去提交会拿到 403。
+ *
+ * 所以这里在前端把写操作关掉：按钮置灰 + 表单不可编辑，
+ * 页面照常展示产品、额度校验规则这些内容供查看。
+ * 前端放开显示 + 后端拦住写入 —— 菜单不空，也不会产生越权数据。
+ */
+const isReadOnly = computed(() => userStore.profile?.roleName === '管理员')
 
 const form = reactive({
   loanProductId: null,
@@ -336,6 +362,11 @@ async function loadProducts() {
 }
 
 async function handleSubmit() {
+  // 按钮已置灰，这里再挡一道：置灰只挡点击，挡不住控制台直接调函数
+  if (isReadOnly.value) {
+    ElMessage.warning('管理员为只读查看，不能提交融资申请')
+    return
+  }
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
   submitting.value = true

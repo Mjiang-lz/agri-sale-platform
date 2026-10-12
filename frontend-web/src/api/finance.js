@@ -46,6 +46,32 @@ export function getMyFinanceApplies(pageNum = 1, pageSize = 100) {
 }
 
 /* ====================================================================
+ * 融资台账（管理员只读）
+ *
+ * 与上面 /finance/* 的区别有两处，都要看清：
+ *   1) **数据范围**：/finance/apply/my 只返回本人提交，且后端 requireRole(FARMER)；
+ *      台账返回全平台全部申请，后端是 requireAdmin() 放行的只读查询。
+ *   2) **基础路径不同**：这里在 /admin/finance 下，不是 /finance 的子路径。
+ *
+ * 审批动作不在这条链路上（那属于 /loan-admin，只对银行用户开放）。
+ * 管理员在这里能看见全部申请与银行结论，但出不了结论 —— 与平台治理的定位一致。
+ * ==================================================================== */
+
+/**
+ * 融资申请分页台账。
+ *
+ * @param {object} [params]
+ * @param {string} [params.applyStatus] 按申请状态筛选
+ * @param {string} [params.keyword]     按申请编号或农户姓名模糊匹配
+ * @returns 分页对象 { records, total, current, size }
+ */
+export function getFinanceLedger({ applyStatus, keyword, pageNum = 1, pageSize = 10 } = {}) {
+  return request.get('/admin/finance/applies', {
+    params: { applyStatus, keyword, pageNum, pageSize }
+  })
+}
+
+/* ====================================================================
  * 融资管理（银行侧）
  *
  * 后端是独立的 LoanAdminController，基础路径 /api/loan-admin ——
