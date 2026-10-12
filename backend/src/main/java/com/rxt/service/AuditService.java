@@ -56,10 +56,14 @@ public interface AuditService {
     AuditTaskVO auditDetail(Long auditId);
 
     /**
-     * 待审内容详情：返回内容全文（商品描述、知识正文、评论原文）供审核员判断。
+     * 待审内容详情：返回内容全文（商品描述、知识正文、评论原文）与配图供审核员判断。
      *
      * <p>与 {@link #auditDetail(Long)} 的区别：待审内容在 t_audit 中尚无记录、没有 auditId，
      * 只能按 targetType + targetId 定位；若该内容已有历史审核记录，则附带最近一次的结论。</p>
+     *
+     * <p><b>配图（imageUrl）与全文同口径：只在详情返回、列表不带。</b>
+     * 配图是审核判断的一部分（正文合规不代表配图合规），所以详情必须带上；
+     * 但列表一页 10 条、每条一个 OBS 绝对地址（约 100 字符）没有任何用处，白撑响应体。</p>
      *
      * @param targetType 内容类型：PRODUCT / KNOWLEDGE / COMMENT
      * @param targetId   内容主键

@@ -112,6 +112,27 @@
             <el-descriptions-item label="知识正文">
               <div class="full-content">{{ detail.content || '暂无知识正文' }}</div>
             </el-descriptions-item>
+            <!--
+              配图必须给审核员看到：一条知识正文写得再合规，配图也可能是违规内容。
+              imageUrl 由后端详情接口返回（列表接口不带，所以打开抽屉时会有极短的空白期）。
+
+              fit 用 contain 而不是 cover：专家上传的可能是竖图（实测这张是 810x1440），
+              cover 会把竖图裁成中间一条 —— 审核场景下"看不到的部分"恰恰可能是有问题的部分。
+              contain 会留白，但保证整张图都在视野里；细节靠点击放大看。
+            -->
+            <el-descriptions-item label="知识配图">
+              <div v-if="detail.imageUrl" class="image-cell">
+                <el-image
+                  class="content-image"
+                  :src="detail.imageUrl"
+                  :preview-src-list="[detail.imageUrl]"
+                  preview-teleported
+                  fit="contain"
+                />
+                <span class="image-tip">点击图片可放大查看</span>
+              </div>
+              <span v-else class="no-image">该知识未上传配图</span>
+            </el-descriptions-item>
             <el-descriptions-item v-if="detail.auditResult" label="审核结论">{{ detail.auditResult }}</el-descriptions-item>
             <el-descriptions-item v-if="detail.auditRemark" label="审核意见">{{ detail.auditRemark }}</el-descriptions-item>
             <el-descriptions-item v-if="detail.auditorName" label="审核人">{{ detail.auditorName }}</el-descriptions-item>
@@ -323,6 +344,11 @@ onMounted(refreshAll)
 .detail-head span { color: #75827a; font-size: 12px; }
 .detail-head h3 { margin: 5px 0 0; }
 .full-content { white-space: pre-wrap; line-height: 1.8; }
+.image-cell { display: flex; flex-direction: column; gap: 6px; }
+/* 260x220 + contain：竖图/横图都能整张看到，浅底让留白看着是有意为之 */
+.content-image { width: 260px; height: 220px; border: 1px solid #e1eae4; border-radius: 10px; background: #f7faf8; cursor: zoom-in; }
+.image-tip { color: #98a49c; font-size: 12px; }
+.no-image { color: #98a49c; }
 .reject-tip { margin: 0 0 12px; color: #75827a; line-height: 1.7; font-size: 13px; }
 @media (max-width: 1000px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 680px) { .audit-hero, .toolbar, .section-head { align-items: stretch; flex-direction: column; } .hero-status { width: 100%; } .stat-grid { grid-template-columns: 1fr; } .trend-list { gap: 5px; } .toolbar-actions { justify-content: space-between; } }

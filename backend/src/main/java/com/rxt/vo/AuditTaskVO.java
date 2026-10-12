@@ -49,6 +49,18 @@ public class AuditTaskVO implements Serializable {
      */
     private String content;
 
+    /**
+     * 内容配图地址，仅供详情接口返回（商品取 image_url、知识取 image_url）。
+     *
+     * <p><b>为什么必须有这个字段</b>：配图是审核判断的一部分 —— 一条知识正文写得再合规，
+     * 配图也可能是违规内容。此前 VO 里没有它，导致专家上传了配图、审核端却「看不见图」，
+     * 审核员只能对着正文判。</p>
+     *
+     * <p>与 {@link #content} 同口径只填详情：列表用不上，且 OBS 绝对地址每条 100 字符左右，
+     * 一页 10 条白带 1KB。评论没有配图，该字段为 null。</p>
+     */
+    private String imageUrl;
+
     /** 提交人 ID（商品取 seller_id、知识取 author_id、评论取 user_id） */
     private Long submitterId;
 
