@@ -67,8 +67,12 @@ public class ObsFileStorageServiceImpl implements FileStorageService {
             throw new IllegalStateException("rxt.obs.enabled=true，但未配置 rxt.obs.bucket");
         }
         if (!StringUtils.hasText(properties.getAccessKey()) || !StringUtils.hasText(properties.getSecretKey())) {
+            // 提示语必须点名**具体的变量名**：只说「用环境变量注入」等于给了方法没给钥匙孔，
+            // 拿到报错的人还得回去翻 application.yml 才知道该 export 什么。
             throw new IllegalStateException("rxt.obs.enabled=true，但 access-key / secret-key 为空。"
-                    + "密钥不得写入 application.yml，请通过环境变量或 application-local.yml 注入");
+                    + "密钥不得写入 application.yml。请在启动前注入："
+                    + "export RXT_OBS_ACCESS_KEY=你的AK; export RXT_OBS_SECRET_KEY=你的SK"
+                    + "（或写进 backend/src/main/resources/application-local.yml，该文件已在 .gitignore 中）");
         }
         ObsConfiguration configuration = new ObsConfiguration();
         configuration.setEndPoint(properties.getEndpoint());
