@@ -120,8 +120,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRoute } from 'vue-router'
 import ExpertAppointmentPanel from '@/components/expert/ExpertAppointmentPanel.vue'
 import { getMyAppointments, submitAppointment } from '@/api/expert'
 import { expertOptions } from '@/constants/experts'
@@ -147,7 +148,15 @@ const appointmentError = ref('')
 const dialogVisible = ref(false)
 const submitting = ref(false)
 const selectedExpert = ref(null)
-const keyword = ref('')
+/**
+ * ★ 2026-10-12：支持从商品列表页的空态引导带关键词跳进来
+ * （商品搜不到 → 「在专家里搜「xxx」」，见 trade/ProductList.vue）。
+ * 地址栏参数用户能手改，`?keyword=a&keyword=b` 会被解析成数组，
+ * 直接塞进 el-input 会渲染成 "a,b"，所以只认字符串。
+ */
+const pickQuery = (v) => (typeof v === 'string' ? v : '')
+const route = useRoute()
+const keyword = ref(pickQuery(route.query.keyword))
 const domain = ref('全部')
 const formRef = ref()
 const domains = ['全部', '种植与植保', '畜牧与水产']
@@ -176,6 +185,13 @@ const filteredExperts = computed(() => experts.filter((item) => {
   const keywordMatch = !key || `${item.realName}${item.expertDomain}${item.introduction}`.includes(key)
   return domainMatch && keywordMatch
 }))
+
+// 本页可能已在另一个 tab / 上一次跳转中打开过，此时再带新关键词跳进来，
+// 组件不会重新挂载（onMounted 不再跑），所以必须监听一次路由参数。
+watch(
+  () => route.query.keyword,
+  (v) => { keyword.value = pickQuery(v) }
+)
 
 function disabledDate(date) { return date.getTime() < new Date().setHours(0, 0, 0, 0) }
 
