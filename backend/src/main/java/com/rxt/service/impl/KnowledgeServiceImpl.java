@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
 import com.rxt.common.ResultCode;
 import com.rxt.dto.KnowledgeCreateDTO;
+import com.rxt.entity.Comment;
 import com.rxt.entity.ExpertInfo;
 import com.rxt.entity.Knowledge;
+import com.rxt.mapper.CommentMapper;
 import com.rxt.mapper.ExpertInfoMapper;
 import com.rxt.mapper.KnowledgeMapper;
 import com.rxt.service.KnowledgeService;
@@ -21,11 +23,17 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private static final String AUDIT_PENDING = "待审核";
     private static final String AUDIT_APPROVED = "已通过";
 
+    /** t_comment.target_type 的知识取值。与 AuditServiceImpl.TYPE_KNOWLEDGE 同一个词表 */
+    private static final String COMMENT_TARGET_KNOWLEDGE = "KNOWLEDGE";
+
     @Autowired
     private KnowledgeMapper knowledgeMapper;
 
     @Autowired
     private ExpertInfoMapper expertInfoMapper;
+
+    @Autowired
+    private CommentMapper commentMapper;
 
     @Override
     public Page<Knowledge> pageQuery(String category, String keyword, Integer page, Integer size) {
@@ -107,6 +115,38 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         update.setAuditStatus(AUDIT_PENDING);
 
         knowledgeMapper.updateById(update);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteKnowledge(Long userId, Long knowledgeId) {
+        ExpertInfo expert = expertInfoMapper.selectOne(new LambdaQueryWrapper<ExpertInfo>()
+                .eq(ExpertInfo::getUserId, userId));
+        if (expert == null) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "仅专家可删除农业知识");
+        }
+
+        Knowledge exist = knowledgeMapper.selectById(knowledgeId);
+        if (exist == null) {
+            // 与 updateKnowledge 同一口径：404 与 403 分开报。
+            // 报「不存在」会让作者以为自己那条丢了，报 403 才是"它在，但不是你的"。
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "知识不存在");
+        }
+        if (!exist.getAuthorId().equals(expert.getExpertId())) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "只能删除自己发布的知识");
+        }
+
+        // 先清评论再删正文。t_comment.target_id 是多态关联、没有外键，所以不清也不会
+        // 撞约束 —— 但会留下「评论还在、被评论的知识没了」的孤儿行：从此查不到、
+        // 也没人再能删掉它。评论模块目前只写 PRODUCT 评论，这条清理覆盖的是历史/种子数据。
+        commentMapper.delete(new LambdaQueryWrapper<Comment>()
+                .eq(Comment::getTargetType, COMMENT_TARGET_KNOWLEDGE)
+                .eq(Comment::getTargetId, knowledgeId));
+
+        knowledgeMapper.deleteById(knowledgeId);
+
+        // t_audit 流水刻意不删（理由见 KnowledgeService#deleteKnowledge）：
+        // 审核确实发生过，删掉它等于篡改管理员的工作量统计。
     }
 
     @Override
