@@ -10,7 +10,7 @@
       :closable="false"
       show-icon
       title="当前账号不能提交专家预约"
-      description="只有农户账号可以提交预约；采购方仍可查看专家资料。若需要切换演示身份，请使用右上角身份切换。"
+      description="只有农户账号可以提交预约；采购方仍可查看专家资料。若需要切换演示身份，请使用右上角身份切换"
     />
 
     <section class="appointment-hero">
@@ -49,7 +49,7 @@
         <div class="recent-head">
           <div>
             <strong>我的预约</strong>
-            <span>来自服务端的完整预约记录，含专家的处理意见；刷新不会丢失。</span>
+            <span>来自服务端的完整预约记录，含专家的处理意见；刷新不会丢失</span>
           </div>
           <el-button :loading="loadingAppointments" @click="loadAppointments">刷新</el-button>
         </div>
@@ -199,7 +199,7 @@ async function loadAppointments() {
     appointments.value = Array.isArray(data) ? data : []
   } catch (err) {
     appointments.value = []
-    appointmentError.value = err?.message || '无法连接后端服务，请确认后端已启动后重试。'
+    appointmentError.value = err?.message || '无法连接后端服务，请确认后端已启动后重试'
   } finally {
     loadingAppointments.value = false
   }

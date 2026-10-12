@@ -91,7 +91,7 @@
               >
                 <el-button>选择资料</el-button>
                 <template #tip>
-                  <div class="el-upload__tip">支持 PDF/JPG/PNG，最多 5 个。当前后端未提供文件上传接口，因此只在前端展示文件名。</div>
+                  <div class="el-upload__tip">支持 PDF/JPG/PNG，最多 5 个。当前后端未提供文件上传接口，因此只在前端展示文件名</div>
                 </template>
               </el-upload>
             </el-form-item>
@@ -128,7 +128,7 @@
           :closable="false"
           show-icon
           title="申请规则"
-          description="同一农户同时最多参与一个进行中的联合贷款小组；额度和期限必须在所选产品允许范围内。"
+          description="同一农户同时最多参与一个进行中的联合贷款小组；额度和期限必须在所选产品允许范围内"
         />
       </el-col>
     </el-row>
@@ -136,7 +136,7 @@
     <el-dialog v-model="recommendVisible" title="推荐联保人" width="min(760px, 94vw)" :close-on-click-modal="false">
       <p class="dialog-tip">
         按经营特征匹配度排序。已经在小队里的农户不会出现在这里；
-        若某位候选人本次未能入组，创建小组时会告诉你具体原因。
+        若某位候选人本次未能入组，创建小组时会告诉你具体原因
       </p>
 
       <!-- 推荐接口失败时如实呈现，不再用演示数据顶替：
@@ -188,8 +188,8 @@
         show-icon
         :title="`${selectedProduct.productName} 起贷需 ${selectedProduct.minGroupSize} 户，当前 ${selectedFarmerIds.length + 1} 户（含你）`"
         :description="groupSizeEnough
-          ? '人数已达标，可以直接创建小组。'
-          : '人数不足也可以先创建：小组会停留在「组建中」，其他农户提交同产品申请后即可加入。'"
+          ? '人数已达标，可以直接创建小组'
+          : '人数不足也可以先创建：小组会停留在「组建中」，其他农户提交同产品申请后即可加入'"
       />
 
       <template #footer>
@@ -418,15 +418,15 @@ async function showCreateResult(result) {
     .join('、')
   const skipped = result?.skipped || []
 
-  let text = `小组「${result?.groupName || '联合贷款小组'}」已创建：当前 ${count} 户，起贷需 ${required} 户。`
+  let text = `小组「${result?.groupName || '联合贷款小组'}」已创建：当前 ${count} 户，起贷需 ${required} 户`
   if (joined) {
-    text += ` 已入组：${joined}。`
+    text += ` 已入组：${joined}`
   }
   if (skipped.length) {
     const details = skipped
       .map((item) => `${item.realName || `用户 ${item.userId}`}：${item.reason}`)
       .join('；')
-    text += ` 未入组 ${skipped.length} 人 —— ${details}。`
+    text += ` 未入组 ${skipped.length} 人 —— ${details}`
   }
 
   await ElMessageBox.alert(text, skipped.length ? '小组已创建，部分候选人未入组' : '小组创建成功', {

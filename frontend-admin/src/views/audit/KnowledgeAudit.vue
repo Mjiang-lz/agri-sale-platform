@@ -8,7 +8,7 @@
       <div>
         <span class="eyebrow">M6 · 农技内容治理</span>
         <h2>知识审核</h2>
-        <p>检查农技文章的内容合规性与专业性，通过后公开展示，驳回时向专家反馈修改原因。</p>
+        <p>检查农技文章的内容合规性与专业性，通过后公开展示，驳回时向专家反馈修改原因</p>
       </div>
       <div class="hero-status">
         <span>当前待办</span>
@@ -150,8 +150,8 @@
     </el-drawer>
 
     <el-dialog v-model="rejectVisible" title="填写知识驳回理由" width="min(540px, 92vw)">
-      <p class="reject-tip">理由会写入 t_audit.audit_remark，并反馈给知识发布专家。</p>
-      <el-input v-model="rejectRemark" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="例如：文中防治方法缺少科学依据，请补充来源和适用条件。" />
+      <p class="reject-tip">理由会写入 t_audit.audit_remark，并反馈给知识发布专家</p>
+      <el-input v-model="rejectRemark" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="例如：文中防治方法缺少科学依据，请补充来源和适用条件" />
       <template #footer>
         <el-button @click="rejectVisible = false">取消</el-button>
         <el-button type="danger" :loading="submitting" @click="confirmReject">确认驳回</el-button>
@@ -273,7 +273,7 @@ async function openDetail(row) {
 }
 
 async function approve(row) {
-  await ElMessageBox.confirm(`确认通过知识“${row.targetTitle}”吗？通过后将在前台农业知识页展示。`, '审核确认', {
+  await ElMessageBox.confirm(`确认通过知识“${row.targetTitle}”吗？通过后将在前台农业知识页展示`, '审核确认', {
     type: 'warning',
     confirmButtonText: '确认通过',
     cancelButtonText: '取消'

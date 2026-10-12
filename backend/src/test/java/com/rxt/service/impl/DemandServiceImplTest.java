@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.entity.Demand;
 import com.rxt.mapper.DemandMapper;
+import com.rxt.service.DemandExpireService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,11 +21,12 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * M3 求购列表的可见性过滤条件防回归。
+ * M3 求购列表的可见性过滤条件 + 读路径的到期收口防回归。
  *
  * <p><b>为什么需要这个测试</b>：列表的可见性完全由一个 SQL 条件决定：
  * {@code status = 1 AND valid_until >= NOW()}。这条条件有两个失效方式，
@@ -43,10 +45,15 @@ import static org.mockito.Mockito.when;
  * **过滤条件本身存在**：只要有人把 {@code valid_until >= ?} 从查询里去掉，
  * 本测试立即变红。</p>
  *
+ * <p><b>2026-10-12 补充（W2 到期失效）</b>：新增的 {@code expireOverdue()} 调用
+ * 也纳入本类覆盖 —— 它同样属于「不报错、只能靠比对发现」的那一类：
+ * 一旦有人把读路径里的这行调用删掉，过期需求的状态就会永远停在 1，
+ * 而接口照常返回 200。故补三条断言：列表触发、详情触发、写路径不触发。</p>
+ *
  * <p>纯 Mockito，不启动 Spring、不依赖本地 MySQL。</p>
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("M3 求购列表：可见性过滤条件防回归")
+@DisplayName("M3 求购列表：可见性过滤条件与到期收口防回归")
 class DemandServiceImplTest {
 
     /**
@@ -60,6 +67,10 @@ class DemandServiceImplTest {
 
     @Mock
     private DemandMapper demandMapper;
+
+    /** W2 新增依赖：读路径的到期收口服务。不 mock 它会注入 null 并让下面用例全红。 */
+    @Mock
+    private DemandExpireService demandExpireService;
 
     @InjectMocks
     private DemandServiceImpl demandService;
@@ -78,6 +89,13 @@ class DemandServiceImplTest {
         // paramNameValuePairs 的，不渲染就拿不到任何参数（空 Map）。
         wrapper.getTargetSql();
         return wrapper;
+    }
+
+    private static Demand demandOf(Long id, Long publisherId) {
+        Demand d = new Demand();
+        d.setDemandId(id);
+        d.setPublisherId(publisherId);
+        return d;
     }
 
     @Test
@@ -117,5 +135,36 @@ class DemandServiceImplTest {
         assertTrue(params.containsValue(1),
                 "status 的过滤值应为 1（有效）。若被改成 0 或其他值，列表语义就反了。"
                         + "实际参数：" + params);
+    }
+
+    @Test
+    @DisplayName("W2：列表读取前先收口过期状态（否则过期需求永远停在 status=1）")
+    void pageDemands_triggersExpireOverdue() {
+        when(demandMapper.selectPage(any(), any())).thenReturn(new Page<Demand>());
+
+        demandService.pageDemands(1, 10, null, null);
+
+        verify(demandExpireService).expireOverdue();
+    }
+
+    @Test
+    @DisplayName("W2：详情读取前同样先收口过期状态")
+    void detail_triggersExpireOverdue() {
+        when(demandMapper.selectById(1L)).thenReturn(demandOf(1L, 7L));
+
+        demandService.detail(1L);
+
+        verify(demandExpireService).expireOverdue();
+    }
+
+    @Test
+    @DisplayName("W2 反向对照：写路径（关闭）不触发收口，只做自己那一件事")
+    void closeDemand_doesNotTriggerExpire() {
+        when(demandMapper.selectById(1L)).thenReturn(demandOf(1L, 7L));
+
+        demandService.closeDemand(7L, 1L);
+
+        verify(demandExpireService, never()).expireOverdue();
+        verify(demandMapper).updateById(any(Demand.class));
     }
 }

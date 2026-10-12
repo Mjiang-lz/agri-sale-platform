@@ -7,7 +7,9 @@
  *
  * 图的来源：
  *   - `frontend-web/public/products/` 原有 27 张真实田间/市场照片
- *   - 新增 `g01.png` ~ `g10.png`：为 10 个无法被现有素材精确匹配的商品生成的实拍风格图
+ *   - `g01.jpg` ~ `g10.jpg`：为 10 个无法被现有素材精确匹配的商品配的实拍图。
+ *     2026-10-12 第九轮：换掉原来的 AI 生成图（右下角带「AI生成 / WorkBuddy」水印），
+ *     改为 Pexels 实拍图（免费商用、无需署名），并从 PNG 转 JPEG ⇒ 16.5MB → 1.2MB。
  *   - 新增 `experts/zhao-guoqiang.png`、`experts/sun-lihua.png`：两位专家的 AI 生成写实头像
  *   - 新增 `public/knowledge/` 6 张**知识专题实拍图**（2026-10-10）：取自 Pexels，
  *     许可为免费商用、无需署名。用途见 `KNOWLEDGE_TITLE_IMG` 顶部注释。
@@ -26,24 +28,24 @@ const NAME_IMG = [
   { keys: ['蜜柚', '柚子'], img: '/products/p12.jpg' },
   { keys: ['猕猴桃', '奇异果'], img: '/products/p11.jpg' },
   { keys: ['小番茄', '西红柿', '番茄'], img: '/products/p02.jpg' },
-  { keys: ['干香菇', '香菇'], img: '/products/g04.png' },
+  { keys: ['干香菇', '香菇'], img: '/products/g04.jpg' },
   { keys: ['红薯', '地瓜'], img: '/products/p15.jpg' },
-  { keys: ['五常大米', '大米'], img: '/products/g02.png' },
-  { keys: ['玉米面', '玉米粉'], img: '/products/g07.png' },
-  { keys: ['小米'], img: '/products/g03.png' },
+  { keys: ['五常大米', '大米'], img: '/products/g02.jpg' },
+  { keys: ['玉米面', '玉米粉'], img: '/products/g07.jpg' },
+  { keys: ['小米'], img: '/products/g03.jpg' },
   { keys: ['黄瓜'], img: '/products/p26.jpg' },
   { keys: ['大白菜', '白菜'], img: '/products/p25.jpg' },
   { keys: ['土豆', '马铃薯'], img: '/products/p04.jpg' },
   { keys: ['干辣椒', '辣椒'], img: '/products/p21.jpg' },
   { keys: ['鸡蛋'], img: '/products/p17.jpg' },
   { keys: ['土鸡', '老母鸡', '母鸡'], img: '/products/p27.jpg' },
-  { keys: ['腊肉'], img: '/products/g05.png' },
-  { keys: ['草鱼'], img: '/products/g06.png' },
+  { keys: ['腊肉'], img: '/products/g05.jpg' },
+  { keys: ['草鱼'], img: '/products/g06.jpg' },
   { keys: ['小龙虾'], img: '/products/p19.jpg' },
-  { keys: ['莲藕'], img: '/products/g10.png' },
-  { keys: ['菜籽油', '菜油'], img: '/products/g01.png' },
-  { keys: ['大闸蟹', '螃蟹'], img: '/products/g08.png' },
-  { keys: ['松茸'], img: '/products/g09.png' },
+  { keys: ['莲藕'], img: '/products/g10.jpg' },
+  { keys: ['菜籽油', '菜油'], img: '/products/g01.jpg' },
+  { keys: ['大闸蟹', '螃蟹'], img: '/products/g08.jpg' },
+  { keys: ['松茸'], img: '/products/g09.jpg' },
   // 兜底：当关键词没命中时，用更宽泛的品类池
   { keys: ['水果'], img: '/products/p09.jpg' },
   { keys: ['蔬菜'], img: '/products/p05.jpg' },
@@ -57,10 +59,10 @@ const NAME_IMG = [
 const CATEGORY_IMG = {
   水果: ['/products/p03.jpg', '/products/p13.jpg', '/products/p01.jpg', '/products/p11.jpg', '/products/p12.jpg', '/products/p09.jpg'],
   蔬菜: ['/products/p04.jpg', '/products/p26.jpg', '/products/p25.jpg', '/products/p02.jpg', '/products/p06.jpg', '/products/p05.jpg'],
-  干货: ['/products/g04.png', '/products/p22.jpg', '/products/p21.jpg'],
-  粮油: ['/products/g02.png', '/products/g01.png', '/products/g03.png', '/products/g07.png', '/products/p14.jpg', '/products/p08.jpg'],
-  畜禽产品: ['/products/p27.jpg', '/products/p16.jpg', '/products/p17.jpg', '/products/g05.png'],
-  水产: ['/products/g06.png', '/products/p19.jpg', '/products/g08.png', '/products/p20.jpg'],
+  干货: ['/products/g04.jpg', '/products/p22.jpg', '/products/p21.jpg'],
+  粮油: ['/products/g02.jpg', '/products/g01.jpg', '/products/g03.jpg', '/products/g07.jpg', '/products/p14.jpg', '/products/p08.jpg'],
+  畜禽产品: ['/products/p27.jpg', '/products/p16.jpg', '/products/p17.jpg', '/products/g05.jpg'],
+  水产: ['/products/g06.jpg', '/products/p19.jpg', '/products/g08.jpg', '/products/p20.jpg'],
   // data.sql 里出现过的其他品类，兜到最通用的田间图
   默认: ['/products/p08.jpg']
 }
@@ -72,9 +74,9 @@ const ALL = [
   '/products/p15.jpg', '/products/p16.jpg', '/products/p17.jpg', '/products/p19.jpg',
   '/products/p20.jpg', '/products/p21.jpg', '/products/p22.jpg', '/products/p25.jpg',
   '/products/p26.jpg', '/products/p27.jpg',
-  '/products/g01.png', '/products/g02.png', '/products/g03.png', '/products/g04.png',
-  '/products/g05.png', '/products/g06.png', '/products/g07.png', '/products/g08.png',
-  '/products/g09.png', '/products/g10.png'
+  '/products/g01.jpg', '/products/g02.jpg', '/products/g03.jpg', '/products/g04.jpg',
+  '/products/g05.jpg', '/products/g06.jpg', '/products/g07.jpg', '/products/g08.jpg',
+  '/products/g09.jpg', '/products/g10.jpg'
 ]
 
 /** 文字兜底：图挂了就显示商品名首字，而不是碎图 */
@@ -192,9 +194,24 @@ const KNOWLEDGE_TITLE_IMG = [
   { keys: ['酸化', '土壤改良', '土壤健康'], img: '/knowledge/soil-health.jpg' },                               // pexels 3696170
   { keys: ['稻瘟', '水稻', '稻田', '育秧'], img: '/knowledge/rice-paddy.jpg' },                                // pexels 9272061
 
+  // —— 2026-10-12 第八轮补的 8 张 ——
+  // 动因：这 8 个主题原先只能落到**农产品商品照**上，而且多组共用同一张
+  //   （1/3/5 全是 p03 柑橘树、11/15/17 全是 p20 鲤鱼、12/18 全是 p19 螃蟹），
+  //   卡片列表上「同一张图出现三次」，且 #12/#18 配螃蟹是**物种就不对**。
+  // 现在每个主题有自己的图；关键词从下面的商品照分组里**移走**，不要两处都留。
+  // 全部 Pexels License（免费商用、无需署名），已裁成 900×396。
+  { keys: ['修剪', '剪枝', '整形', '嫁接'], img: '/knowledge/orchard-pruning.jpg' },          // pexels 11257617
+  { keys: ['基肥', '秋施', '施肥'], img: '/knowledge/orchard-base-fertilizer.jpg' },          // pexels 33995853
+  { keys: ['家禽', '鸡群', '禽舍', '呼吸道'], img: '/knowledge/poultry-flock.jpg' },           // pexels 34795500
+  { keys: ['饲料', '日粮', '育肥', '蛋白能量'], img: '/knowledge/animal-feed.jpg' },           // pexels 7781984
+  { keys: ['尾水', '生态化处理', '人工湿地', '养殖废水'], img: '/knowledge/aquaculture-tailwater.jpg' }, // pexels 36345997
+  { keys: ['越冬', '冬管'], img: '/knowledge/fish-pond.jpg' },                                 // pexels 5774415
+  { keys: ['水草', '浮萍'], img: '/knowledge/duckweed-pond.jpg' },                             // pexels 38289921
+  { keys: ['小龙虾', '龙虾'], img: '/knowledge/crayfish.jpg' },                                // pexels 34486954
+
   // ================= 农产品实拍图（按标题里的具象词匹配）=================
-  // —— 果园 / 果树 ——
-  { keys: ['柑橘', '脐橙', '柚子', '蜜柚', '裂果', '果园', '果树', '修剪', '嫁接'], img: '/products/p03.jpg' },
+  // —— 果园 / 果树 ——（修剪/嫁接 已上移到专题组）
+  { keys: ['柑橘', '脐橙', '柚子', '蜜柚', '裂果', '果园', '果树'], img: '/products/p03.jpg' },
   { keys: ['猕猴桃', '奇异果'], img: '/products/p11.jpg' },
   // —— 蔬菜 ——
   { keys: ['大白菜', '白菜'], img: '/products/p25.jpg' },
@@ -205,26 +222,24 @@ const KNOWLEDGE_TITLE_IMG = [
   { keys: ['采收', '预冷', '保鲜', '分级', '贮运', '冷链'], img: '/products/p06.jpg' },
   // —— 大田 / 粮油 ——（水稻/稻田/稻瘟 已上移到专题组）
   { keys: ['麦田', '大田'], img: '/products/p08.jpg' },
-  { keys: ['大米', '稻米'], img: '/products/g02.png' },
-  { keys: ['小米', '谷子'], img: '/products/g03.png' },
-  { keys: ['玉米'], img: '/products/g07.png' },
-  { keys: ['菜籽油', '榨油', '油菜'], img: '/products/g01.png' },
-  // —— 水产 ——
-  { keys: ['小龙虾', '龙虾'], img: '/products/p19.jpg' },
-  { keys: ['大闸蟹', '螃蟹'], img: '/products/g08.png' },
-  { keys: ['鱼塘', '淡水鱼', '缺氧', '尾水', '越冬', '水质'], img: '/products/p20.jpg' },
-  // —— 畜禽 ——
-  { keys: ['土鸡', '散养', '家禽', '鸡'], img: '/products/p27.jpg' },
+  { keys: ['大米', '稻米'], img: '/products/g02.jpg' },
+  { keys: ['小米', '谷子'], img: '/products/g03.jpg' },
+  { keys: ['玉米'], img: '/products/g07.jpg' },
+  { keys: ['菜籽油', '榨油', '油菜'], img: '/products/g01.jpg' },
+  // —— 水产 ——（小龙虾 已上移到专题组；原先这里指向的是「螃蟹」，物种就不对）
+  { keys: ['大闸蟹', '螃蟹'], img: '/products/g08.jpg' },
+  { keys: ['鱼塘', '淡水鱼', '缺氧', '水质'], img: '/products/p20.jpg' },
+  // —— 畜禽 ——（家禽 已上移到专题组）
+  { keys: ['土鸡', '散养', '鸡'], img: '/products/p27.jpg' },
   { keys: ['蛋鸡', '鸡蛋'], img: '/products/p17.jpg' },
-  { keys: ['饲料', '育肥'], img: '/products/g07.png' },
   // —— 食用菌 ——
-  { keys: ['香菇', '食用菌', '菌菇'], img: '/products/g04.png' },
-  { keys: ['松茸', '牛肝菌'], img: '/products/g09.png' },
+  { keys: ['香菇', '食用菌', '菌菇'], img: '/products/g04.jpg' },
+  { keys: ['松茸', '牛肝菌'], img: '/products/g09.jpg' },
   // —— 通用农事（宽泛词，必须垫底）——
   // 注意：`大棚`/`连作` 已上移到专题组，`酸化`/`盐碱` 同理，这里不再重复定义，
   // 避免「同一关键词出现在两组、靠数组顺序决定结果」这种隐式依赖。
   { keys: ['蔬菜'], img: '/products/p05.jpg' },
-  { keys: ['土壤', '整地', '基肥', '施肥'], img: '/products/p15.jpg' },
+  { keys: ['土壤', '整地'], img: '/products/p15.jpg' },
   { keys: ['田间', '农事', '栽培', '管理'], img: '/products/p07.jpg' }
 ]
 

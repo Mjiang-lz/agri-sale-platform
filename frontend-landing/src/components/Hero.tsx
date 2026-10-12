@@ -136,7 +136,7 @@ export function Hero() {
             className="w-full text-sm font-normal text-white/75 lg:w-96 lg:text-base"
             initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.8, ease: "easeOut" }}>
-            融销通打通农户、采购方、专家与金融机构之间的信息壁垒，把农产品交易、融资撮合与专家助力装进同一套系统。
+            融销通打通农户、采购方、专家与金融机构之间的信息壁垒，把农产品交易、融资撮合与专家助力装进同一套系统
           </motion.p>
         </div>
 
