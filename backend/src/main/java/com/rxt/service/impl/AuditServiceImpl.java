@@ -367,6 +367,7 @@ public class AuditServiceImpl implements AuditService {
                 AuditTaskVO item = newPendingVO(TYPE_PRODUCT, product.getProductId(),
                         product.getProductName(), product.getSellerId(), product.getCreateTime());
                 item.setContent(product.getDescription());
+                item.setImageUrl(product.getImageUrl());
                 item.setAuditStatus(product.getAuditStatus());
                 yield item;
             }
@@ -379,6 +380,7 @@ public class AuditServiceImpl implements AuditService {
                         knowledge.getTitle(), toUserIdByExpertId(knowledge.getAuthorId()),
                         knowledge.getCreateTime());
                 item.setContent(knowledge.getContent());
+                item.setImageUrl(knowledge.getImageUrl());
                 item.setAuditStatus(knowledge.getAuditStatus());
                 yield item;
             }
