@@ -19,6 +19,8 @@ import com.rxt.vo.CommentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,14 +52,19 @@ public class CommentServiceImpl implements CommentService {
     private static final String AUDIT_APPROVED = "已通过";
 
     /**
-     * 「已购」口径：付过款之后的订单状态。
+     * 「已购」口径：允许发表评论的订单状态。
      *
-     * <p>t_order 没有独立的支付标记，但「待发货」本身就是支付成功后的状态
-     * （待支付 → 待发货），所以这三个状态等同于「钱已经付了」。
-     * 要收紧成「确认收货后才能评价」，把这里改成只留 {@code 已完成} 即可，
-     * 业务口径集中在这一个常量上，改一处就够。</p>
+     * <p><b>2026-10-12 起定为「确认收货后」</b>，因此只认 {@code 已完成}。
+     * 订单状态机是「待支付 → 待发货 → 待收货 → 已完成」，买家点「确认收货」
+     * 才会走到 {@code 已完成}（见 TradeServiceImpl#receiveOrder）。</p>
+     *
+     * <p>为什么不做成「付款后就能评」（待发货 / 待收货）：货还没到手就写评价，
+     * 内容只能是对商品的先验印象，与「评价」这个动作的语义不符。</p>
+     *
+     * <p>业务口径集中在这一个常量上 —— 将来要放宽（比如允许「待收货」评）
+     * 或收紧，都只改这一行。</p>
      */
-    private static final List<String> PURCHASED_ORDER_STATUSES = List.of("待发货", "待收货", "已完成");
+    private static final List<String> PURCHASED_ORDER_STATUSES = List.of("已完成");
 
     private final CommentMapper commentMapper;
     private final ProductMapper productMapper;
@@ -130,6 +137,31 @@ public class CommentServiceImpl implements CommentService {
         // 这一页的评论人一次性补齐，避免在循环里逐条查用户（N+1）
         fillUserInfo(result.getRecords());
         return result;
+    }
+
+    @Override
+    public Map<Long, String> commentStatusOf(Long userId, Collection<Long> productIds) {
+        if (userId == null || productIds == null || productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        // 只取两列：正文、评论人都不需要，调用方只关心「评没评过、什么状态」。
+        // 查询条件与 pageProductComments 同前缀，命中 idx_comment_target。
+        List<Comment> comments = commentMapper.selectList(new LambdaQueryWrapper<Comment>()
+                .select(Comment::getTargetId, Comment::getAuditStatus)
+                .eq(Comment::getUserId, userId)
+                .eq(Comment::getTargetType, TYPE_PRODUCT)
+                .in(Comment::getTargetId, productIds)
+                .in(Comment::getAuditStatus, AUDIT_PENDING, AUDIT_APPROVED));
+
+        // publishProductComment 的防重复规则保证「同一用户 + 同一商品」最多只有
+        // 一条有效评论，所以这里直接 put 不会互相覆盖。被驳回（未通过）的不在结果里
+        // —— 那种情况用户可以重新提交，对调用方而言与「没评过」等价。
+        Map<Long, String> statusMap = new HashMap<>();
+        for (Comment comment : comments) {
+            statusMap.put(comment.getTargetId(), comment.getAuditStatus());
+        }
+        return statusMap;
     }
 
     /**

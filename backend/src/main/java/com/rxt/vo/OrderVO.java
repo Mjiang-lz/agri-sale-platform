@@ -78,4 +78,13 @@ public class OrderVO implements Serializable {
 
     /** 下单时间 */
     private LocalDateTime createTime;
+
+    /**
+     * 买家对该商品的评论状态：{@code 待审核} / {@code 已通过}；
+     * {@code null} 表示还没评价过（含评论被驳回的情况，可以重新提交）。
+     *
+     * <p>只在「我买的」列表与订单详情里回填 —— 发表评论是买家的动作。
+     * 「我卖的」列表不填，恒为 null。</p>
+     */
+    private String commentStatus;
 }
