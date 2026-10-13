@@ -83,7 +83,19 @@
               <span>融资审批</span>
             </el-menu-item>
           </el-sub-menu>
-          <template v-if="canSeeExpert && actualRole === '专家'">
+          <!--
+            专家角色且**尚未通过资格认证**：不给专家工作台，只留一条去认证的入口。
+            未过审的专家看不到待处理提问/预约，是因为「能处理别人的提问」本身就是
+            一种执业资格，认证通过才该给（后端 /expert/qa/pending 等接口也会 403，
+            这里只是不让人看见一个点了就报错的入口）。
+          -->
+          <template v-if="isPendingExpert">
+            <el-menu-item index="/user/profile">
+              <RxtIcon name="ico-expert" />
+              <span>专家资格认证</span>
+            </el-menu-item>
+          </template>
+          <template v-else-if="canSeeExpert && actualRole === '专家'">
             <el-menu-item index="/expert/knowledge">
               <RxtIcon name="ico-knowledge" />
               <span>农业知识</span>
@@ -213,6 +225,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { useMessages } from '@/composables/useMessages'
+import { getExpertProfile } from '@/api/expert'
 import RxtIcon from '@/components/RxtIcon.vue'
 import RxtLogo from '@/components/RxtLogo.vue'
 
@@ -281,6 +294,35 @@ const canSeeFinance = computed(() => menuPerms.value.includes('finance'))
 const canSeeExpert = computed(() => menuPerms.value.includes('expert'))
 const canSeeUser = computed(() => menuPerms.value.includes('user'))
 const canAccessAppointment = computed(() => ['农户', '专家'].includes(actualRole.value))
+
+/* ---------- 专家资格认证闸门（需求 10） ---------- */
+const expertAuditStatus = ref('')
+/**
+ * 是否是「还没通过资格认证的专家」。
+ *
+ * ★ 只有真实角色是专家、且档案状态不是「已通过」时才为 true。
+ *   三种情形分别为 false：
+ *     · 非专家 —— 与认证无关；
+ *     · 档案拉取失败（游客、非专家、网络抖动）—— 不能因为一次拉取失败
+ *       就把专家的整个工作台藏起来，那比多显示一个入口糟糕得多；
+ *     · 已通过 —— 正常显示工作台。
+ *
+ * 初值为空串而不是 true/false：认证状态是**登录后异步拉**的，
+ * 初值若写成 false，用户刷新瞬间会看到完整菜单闪一下再消失。
+ * 空串在模板里与 false 同义，但语义是「还不知道」，不会误判。
+ */
+const isPendingExpert = computed(() => {
+  if (actualRole.value !== '专家') return false
+  if (!expertAuditStatus.value) return false
+  return expertAuditStatus.value !== '已通过'
+})
+
+if (actualRole.value === '专家') {
+  // 只有专家角色才拉：非专家调这个接口后端一律 403，没必要发一次注定失败的请求
+  getExpertProfile()
+    .then((p) => { expertAuditStatus.value = p?.auditStatus || '' })
+    .catch(() => { expertAuditStatus.value = '' })
+}
 
 /* ---------- 消息提醒（顶栏铃铛） ---------- */
 const msgOpen = ref(false)

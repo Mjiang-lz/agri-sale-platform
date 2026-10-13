@@ -6,6 +6,7 @@ import com.rxt.dto.AdminExpertUpdateDTO;
 import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
 import com.rxt.dto.ExpertProfileUpdateDTO;
+import com.rxt.dto.ExpertCertifyDTO;
 import com.rxt.entity.Appointment;
 import com.rxt.entity.ExpertInfo;
 import com.rxt.entity.Question;
@@ -42,6 +43,9 @@ public class ExpertServiceImpl implements ExpertService {
 
     /** 审核结论词表里的「通过」。全仓没有共享常量类，各服务各自持有（同 HomeServiceImpl:49）。 */
     private static final String AUDIT_APPROVED = "已通过";
+
+    /** 审核结论词表里的「待审核」：自助注册后、资质材料待管理员核对 */
+    private static final String AUDIT_PENDING = "待审核";
 
     /** 提问状态：已回复（专家详情页的「答复过的问题」只认这个状态） */
     private static final String QUESTION_ANSWERED = "已回复";
@@ -373,6 +377,40 @@ public class ExpertServiceImpl implements ExpertService {
     /** selectCount 回 Long，VO 里声明的是 Integer；null 一律归 0，别把 null 抛给前端。 */
     private Integer countToInt(Long count) {
         return count == null ? 0 : count.intValue();
+    }
+
+    /**
+     * 提交专家资格认证材料（需求 10）。
+     *
+     * <p>自助注册选「专家」时已经建好一份 {@code auditStatus='待审核'} 的空档案，
+     * 本方法负责把领域与简介填进去。<b>不改审核状态</b> —— 能否执业由管理员决定，
+     * 本人只能提交材料。</p>
+     *
+     * <p>已通过的专家再调一次会走到「已认证过」的分支：允许补资料但不再重置状态。
+     * 若这里把状态打回「待审核」，等于让任何已通过的专家点一下就把自己从
+     * 公开专家列表里摘掉。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void certify(Long userId, ExpertCertifyDTO dto) {
+        ExpertInfo expert = requireOwnExpert(userId);
+        if (AUDIT_APPROVED.equals(expert.getAuditStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "你的专家资格已通过认证，如需修改资料请在「个人中心 → 专家信息」里编辑");
+        }
+
+        ExpertInfo update = new ExpertInfo();
+        update.setExpertId(expert.getExpertId());
+        update.setExpertDomain(dto.getExpertDomain().trim());
+        update.setIntroduction(dto.getIntroduction().trim());
+        // 资料有实质变化才重新送审。重复点提交会把管理员的待办列表刷一遍，
+        // 让人以为又多了一份新申请。
+        boolean changed = !dto.getExpertDomain().trim().equals(expert.getExpertDomain())
+                || !dto.getIntroduction().trim().equals(expert.getIntroduction());
+        if (changed) {
+            update.setAuditStatus(AUDIT_PENDING);
+        }
+        expertInfoMapper.updateById(update);
     }
 
     @Override

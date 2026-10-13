@@ -6,6 +6,8 @@ import com.rxt.dto.LoginDTO;
 import com.rxt.dto.RegisterDTO;
 import com.rxt.entity.Role;
 import com.rxt.entity.User;
+import com.rxt.entity.ExpertInfo;
+import com.rxt.mapper.ExpertInfoMapper;
 import com.rxt.mapper.RoleMapper;
 import com.rxt.mapper.UserMapper;
 import com.rxt.security.CaptchaService;
@@ -47,11 +49,15 @@ public class AuthServiceImpl implements AuthService {
     /** 账号状态：正常 */
     private static final int STATUS_ENABLED = 1;
 
+    /** 专家档案审核状态：待审核（刚自助注册、资质材料还没交/还没审） */
+    private static final String AUDIT_PENDING = "待审核";
+
     /** BCrypt 加盐哈希，线程安全，可当单例复用 */
     private static final PasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
 
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
+    private final ExpertInfoMapper expertInfoMapper;
     private final JwtUtils jwtUtils;
     private final CaptchaService captchaService;
 
@@ -142,6 +148,24 @@ public class AuthServiceImpl implements AuthService {
         user.setRoleId(role.getRoleId());
         user.setStatus(STATUS_ENABLED);
         userMapper.insert(user);
+
+        // ★ 选「专家」必须同时建一份待审核的专家档案（需求 10）。
+        //   改前只 insert t_user，于是这个账号：不在任何专家列表里
+        //   （listExperts 按 audit_status='已通过' 过滤），
+        //   requireRole(EXPERT) 也查不到档案 —— 「注册成了专家，却什么都不是」。
+        //   档案状态给「待审核」，管理员在「专家资源管理」里审批通过后才对外可见。
+        if (RoleConstant.EXPERT.equals(role.getRoleName())) {
+            ExpertInfo expert = new ExpertInfo();
+            expert.setUserId(user.getUserId());
+            // 领域与简介留给本人登录后通过 POST /expert/certify 补交，
+            // 注册页只收手机号/密码/姓名，问专业资质要再填一整套表单才能提交
+            expert.setExpertDomain(null);
+            expert.setIntroduction(null);
+            expert.setAuditStatus(AUDIT_PENDING);
+            expertInfoMapper.insert(expert);
+            log.info("已创建待审核专家档案 expertId={} userId={}",
+                    expert.getExpertId(), user.getUserId());
+        }
 
         log.info("注册成功 userId={} phone={} role={}", user.getUserId(), user.getPhone(), role.getRoleName());
     }

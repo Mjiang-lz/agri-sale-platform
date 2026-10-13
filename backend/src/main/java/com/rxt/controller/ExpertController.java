@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
 import com.rxt.dto.ExpertProfileUpdateDTO;
+import com.rxt.dto.ExpertCertifyDTO;
 
 @RestController
 @RequestMapping("/expert")
@@ -104,6 +105,24 @@ public class ExpertController {
     @GetMapping("/experts/{expertId}")
     public Result<ExpertDetailVO> expertDetail(@PathVariable Long expertId) {
         return Result.success(expertService.getExpertDetail(expertId));
+    }
+
+    /**
+     * 提交专家资格认证材料（需求 10）。
+     *
+     * <p>与 {@link #profile()} 的区别：那个用于「已通过的专家维护自己那一份」，
+     * 本接口用于「刚注册、还没通过认证」的人首次提交资质。
+     * 二者的关键差别是<b>能不能改审核状态</b>：本接口只写材料，
+     * {@code audit_status} 一律由管理员侧接口决定。</p>
+     *
+     * <p>需要专家角色 —— 非专家账号进来直接 403，这是「专家才能申请成为专家」
+     * 的第一道闸；真正的准入判断在 Service 层（是否已有档案/是否已通过）。</p>
+     */
+    @PostMapping("/certify")
+    public Result<Void> certify(@RequestBody @Valid ExpertCertifyDTO dto) {
+        permissionChecker.requireRole(RoleConstant.EXPERT);
+        expertService.certify(UserContext.currentUserId(), dto);
+        return Result.success();
     }
 
     /**

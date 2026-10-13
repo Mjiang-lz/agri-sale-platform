@@ -230,6 +230,16 @@
         </template>
 
         <el-alert
+          v-if="!expertApproved"
+          class="tip"
+          type="warning"
+          :closable="false"
+          show-icon
+          :title="expertAuditTitle"
+          :description="expertAuditDesc"
+        />
+        <el-alert
+          v-else
           class="tip"
           type="info"
           :closable="false"
@@ -255,7 +265,7 @@
           </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading="savingExpert" :disabled="!expertDirty" @click="saveExpert">
-              保存专家档案
+              {{ expertApproved ? '保存专家档案' : '提交认证材料' }}
             </el-button>
             <el-button :disabled="savingExpert || !expertDirty" @click="resetExpertForm">重置</el-button>
           </el-form-item>
@@ -285,7 +295,7 @@ import { useRouter } from 'vue-router'
 import request from '@/api/request'
 import { useUserStore } from '@/store/user'
 import { getProfile, updateProfile, updateFarmerProfile } from '@/api/user'
-import { getExpertProfile, updateExpertProfile } from '@/api/expert'
+import { getExpertProfile, updateExpertProfile, submitExpertCertify } from '@/api/expert'
 import { checkImageFile, uploadAvatar } from '@/api/common'
 import { APPLY_STATUS, isPendingApply } from '@/constants/finance'
 
@@ -493,6 +503,22 @@ const expertDirty = computed(() => {
   const snap = expertSnapshot.value
   return expertForm.expertDomain !== snap.expertDomain || expertForm.introduction !== snap.introduction
 })
+
+/* ---- 专家资格认证（需求 10） ----
+ * 未通过认证时保存要走 POST /expert/certify（专供认证申请），
+ * 已通过才走 PUT /expert/profile（资料维护）。两条路径的差别是
+ * 前者会把 audit_status 置回「待审核」等管理员再审，后者不动状态。 */
+const expertApproved = computed(() => expertProfile.value?.auditStatus === '已通过')
+const expertRejected = computed(() => expertProfile.value?.auditStatus === '未通过')
+const expertAuditTitle = computed(() => {
+  if (expertRejected.value) return '你的专家资格认证未通过，请补充材料后重新提交'
+  return '专家资格认证尚未通过，暂不能开展专家服务'
+})
+const expertAuditDesc = computed(() =>
+  expertRejected.value
+    ? '请根据审批意见修改擅长领域与服务简介后重新提交，管理员会再次核对'
+    : '填好下面的擅长领域与服务简介后点「提交认证材料」，管理员核对通过后你就能接单答疑与预约'
+)
 // 头像预览跟随输入实时变化，便于填完地址立刻看到效果
 const avatarPreview = computed(() => baseForm.avatarUrl.trim() || undefined)
 const nameInitial = computed(() => (baseForm.realName.trim() || profile.value?.realName || '用').slice(0, 1))
@@ -719,8 +745,20 @@ async function saveExpert() {
       payload.introduction = expertForm.introduction.trim()
     }
 
-    await updateExpertProfile(payload)
-    ElMessage.success('专家档案已保存')
+    // ★ 两条路径的差别不只是接口地址：certify 会把档案置回「待审核」
+    //   等管理员再审（材料有实质变化时），update 只改资料不动状态。
+    //   未过审的专家调 update 也能存，但那样管理员那边看不到任何变化，
+    //   用户会以为「保存了怎么还没动静」。
+    if (expertApproved.value) {
+      await updateExpertProfile(payload)
+      ElMessage.success('专家档案已保存')
+    } else {
+      await submitExpertCertify({
+        expertDomain: expertForm.expertDomain.trim(),
+        introduction: expertForm.introduction.trim()
+      })
+      ElMessage.success('认证材料已提交，请等待管理员审核')
+    }
     await loadExpertProfile()
   } catch {
     // 错误提示已由 request 拦截器统一处理

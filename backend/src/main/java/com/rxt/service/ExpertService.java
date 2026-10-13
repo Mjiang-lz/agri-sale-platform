@@ -4,6 +4,7 @@ import com.rxt.dto.AdminExpertUpdateDTO;
 import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
 import com.rxt.dto.ExpertProfileUpdateDTO;
+import com.rxt.dto.ExpertCertifyDTO;
 import com.rxt.vo.AppointmentVO;
 import com.rxt.vo.ExpertDetailVO;
 import com.rxt.vo.ExpertProfileVO;
@@ -63,6 +64,16 @@ public interface ExpertService {
      * @param expertId 专家主键
      */
     ExpertDetailVO getExpertDetail(Long expertId);
+
+    /**
+     * 提交专家资格认证材料（领域 + 简介）。
+     *
+     * <p>档案由自助注册时创建，本方法只填材料；<b>不自行改变审核状态</b> ——
+     * 通过与否由管理员在「专家资源管理」里审批。</p>
+     *
+     * @param userId 当前登录用户（取自登录态）
+     */
+    void certify(Long userId, ExpertCertifyDTO dto);
 
     ExpertProfileVO getProfile(Long userId);
 
