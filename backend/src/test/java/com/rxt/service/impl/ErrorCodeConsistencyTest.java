@@ -16,8 +16,13 @@ import com.rxt.mapper.OrderMapper;
 import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
 import com.rxt.security.PermissionChecker;
+import com.rxt.service.AddressService;
 import com.rxt.service.CommentService;
+import com.rxt.service.DemandExpireService;
+import com.rxt.service.NotificationService;
+import com.rxt.vo.AddressVO;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -89,11 +95,45 @@ class ErrorCodeConsistencyTest {
     private PermissionChecker permissionChecker;
     @Mock
     private DemandMapper demandMapper;
+    /**
+     * 求购到期自动失效（W2）。10-12 给 DemandServiceImpl 加了这一步之后，
+     * 本类有三个用例（详情 / 编辑 / 关闭）开始以 NPE 失败 —— 当时只跑了
+     * DemandServiceImplTest，没跑本类，所以一直没被发现。
+     */
+    @Mock
+    private DemandExpireService demandExpireService;
+    /** 收货地址校验（10-10 组长加入 createOrder） */
+    @Mock
+    private AddressService addressService;
+    /** 站内通知（订单状态流转写入） */
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private TradeServiceImpl tradeService;
     @InjectMocks
     private DemandServiceImpl demandService;
+
+    /**
+     * 下单用例需要一笔合法地址。放 {@code @BeforeEach} + lenient：
+     * 本类的用例大多不下单，严格模式会把它们全判成「多余 stub」。
+     */
+    @BeforeEach
+    void stubPickableAddress() {
+        lenient().when(addressService.loadOwned(anyLong(), any())).thenReturn(addressFixture());
+    }
+
+    private static AddressVO addressFixture() {
+        AddressVO vo = new AddressVO();
+        vo.setConsignee("刘美玲");
+        vo.setPhone("13800000006");
+        vo.setProvince("江西省");
+        vo.setCity("赣州市");
+        vo.setDistrict("信丰县");
+        vo.setDetail("嘉定镇 1 号");
+        vo.setFullAddress("江西省赣州市信丰县嘉定镇 1 号");
+        return vo;
+    }
 
     // ==================== 测试夹具 ====================
 
