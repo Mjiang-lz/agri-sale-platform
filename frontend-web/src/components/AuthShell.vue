@@ -19,7 +19,7 @@
     页脚沉底，从上到下铺满整屏。左侧只留纯底图。
 
     ★ 页脚返回项按当前页分流（见脚本里的 footBack）：
-    登录页回首页、注册页回登录页且带 ?redirect=。
+    登录页回首页；注册页不放链接（表单下方已有「去登录」，重复了）。
 
     ★ 半透明带来的代价：油菜花田是高饱和黄绿，40% 透明度下
     表单文字会糊在花纹上。所以**输入框自己补了一层近不透明底**，
@@ -46,7 +46,10 @@
       </main>
 
       <footer class="auth-foot">
-        <router-link class="auth-link" :to="footBack.to">{{ footBack.text }}</router-link>
+        <!-- ★ 注册页这里不放链接（返回 null）：
+             表单下方已经有「已有账号？去登录」，页脚再放一个「返回登录页」
+             是同一个动作出现两次。详见脚本里 footBack 的注释。 -->
+        <router-link v-if="footBack" class="auth-link" :to="footBack.to">{{ footBack.text }}</router-link>
         <span>基于数字经济的农产品融销一体平台</span>
       </footer>
     </aside>
@@ -67,31 +70,23 @@ import RxtLogo from '@/components/RxtLogo.vue'
 //   长写法 background-image/size/attachment 同样丢，别以为换长写法能绕开。
 const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field.jpg")`)
 
-/* ★ 页脚的「返回」在两页指向不同的地方：
- *   登录页 → 回首页（还没登录，没别的地方可去）
- *   注册页 → 回登录页（注册是登录的前一步，回首页等于把用户甩到
- *              一个还要再点一次「登录」的地方，白绕一圈）
+/* ★ 页脚的返回项按当前页分流：
+ *   登录页 → 「返回首页」/home。还没登录，没有别的地方可去。
+ *   注册页 → **不显示链接**（返回 null）。注册页表单下方已经有
+ *              「已有账号？去登录」，页脚再放一个「返回登录页」是
+ *              同一个动作出现两次；两个一模一样的入口反而让用户
+ *              以为是两个不同的东西。中间那一段标语留着，
+ *              免得页脚只剩一行字显得太空。
+ *
+ * 演绎过程（别当成最终方案）：最初两页都「返回首页」→ 用户要求注册页
+ * 改「返回登录页」→ 用户又指出与「去登录」重复。**同一处位置反复被否，
+ * 说明真正该问的是「这里到底需不需要一个链接」，而不是换一个目标。**
  *
  * 刻意在这里读路由自己判断，而不是让 Login/Register 各传一个 prop：
- * 两页共用同一个外壳，页脚位置与样式也完全相同，多一个 prop 就多一处
- * 「以后新增第三页忘了传」的坑。
- *
- * ★ 注册页回登录必须带上 ?redirect= —— 用户多半是「被守卫从某个受保护页
- * 踢到 /login → 点立即注册过来」的，不带 redirect 的话从页脚退回登录页
- * 就丢了原本要去的地方，登录完被扔到首页。loginLink 的同款过滤：
- * 只认站内绝对路径，挡掉 ?redirect=//evil.com。 */
+ * 两页共用同一个外壳、页脚位置与样式也完全相同，多一个 prop 就多一处
+ * 「以后新增第三页忘了传」的坑。 */
 const route = useRoute()
-const footBack = computed(() => {
-  if (route.path === '/register') {
-    const r = route.query.redirect
-    const dest = typeof r === 'string' && r.startsWith('/') && !r.startsWith('//') ? r : ''
-    return {
-      text: '返回登录页',
-      to: dest ? { path: '/login', query: { redirect: dest } } : '/login'
-    }
-  }
-  return { text: '返回首页', to: '/home' }
-})
+const footBack = computed(() => (route.path === '/register' ? null : { text: '返回首页', to: '/home' }))
 </script>
 
 <style scoped>
