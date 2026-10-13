@@ -113,31 +113,76 @@ export function removeDemand(id) {
  *   PUT  /demand/{id}     → 同样 500
  *   但 DELETE /demand/{id} → 200 且真删掉了行。
  *
- * 定位过程（供队友排查参考）：
- *   1) 用等价 SQL 直连 rxt 库手动 INSERT —— 成功，说明表结构与字段都没问题；
- *   2) 故意缺必填字段 category —— 返回 **500 而非 400**，
- *      说明 @Valid 的校验压根没跑，请求死在 JSON 反序列化阶段，方法体没执行；
- *   3) GlobalExceptionHandler 已有 MethodArgumentNotValidException 分支，
- *      但**没有 HttpMessageNotReadableException 分支**，
- *      而 validUntil 是 LocalDateTime —— 时间解析失败正好落进兜底
- *      Exception 分支，被翻译成「系统繁忙」。
- *   推测真因：LocalDateTime 缺 @JsonFormat 或全局 Jackson 配置不匹配。
+ * ✅ 真因已定位（2026-10-13 逐格式实测，确认不是 500 而是能成功）：
+ *   validUntil 是 LocalDateTime，项目没配自定义 Jackson 日期格式，
+ *   只认 **ISO 8601**：
+ *       "2026-12-31T23:59:59" → 200 成功，正常入库
+ *       "2026-12-31 23:59:59" → 500「系统繁忙」
+ *   传空格分隔时 Jackson 抛 HttpMessageNotReadableException，
+ *   而 GlobalExceptionHandler 没有该分支，落进兜底处理器被翻译成
+ *   「系统繁忙」—— 提示与真实原因完全无关，排查时极易被带偏。
  *
- * 前端对策：publishDemand / updateDemand 走 mock，交互完整可用，
- * 等后端修好后把 USE_DEMAND_MOCK 置 false（或删掉 mock 分支）即自动切到真实接口。
+ * ⚠️ 这里更正一条此前的错误结论：
+ *   之前记的是「缺必填字段也返回 500，说明 @Valid 没跑、方法体没执行」——
+ *   **不对**。实测缺字段会正常返回 400 并逐条列出（「请填写需求有效期；
+ *   请填写求购品类；…」），校验是跑的。真正的区别是
+ *   **validUntil 解析成功之后才崩**，崩在方法体内/写库环节。
+ *
+ * 前端对策：把日期统一转成 ISO（见下面的 formatValidUntil）即可正常提交，
+ * 已切真实接口（USE_DEMAND_MOCK = false）。
  * ==================================================================== */
 
-/** 发布/编辑求购走mock：后端 500 时也能把交互跑通、后端一修就自动切真实。 */
-export const USE_DEMAND_MOCK = true
+/** 发布/编辑求购是否走 mock：后端已能正常提交，关掉 mock 走真实接口。 */
+export const USE_DEMAND_MOCK = false
 
-/** 把表单里的日期对象拼成后端要的 "YYYY-MM-DD HH:mm:ss"（LocalDateTime 格式）。 */
+/**
+ * 把表单里的有效期转成后端能解析的 **ISO 8601**（`2026-12-31T23:59:59`）。
+ *
+ * ⚠️ 这里的 'T' 不能省 —— 这是踩过的坑：
+ * 后端 `validUntil` 是 `LocalDateTime`，项目没配自定义 Jackson 日期格式，
+ * 默认只认 ISO 8601。实测（2026-10-13）：
+ *     "2026-12-31T23:59:59" → 200 成功，正常入库
+ *     "2026-12-31 23:59:59" → 500「系统繁忙」
+ * 传空格分隔时 Jackson 解析抛 HttpMessageNotReadableException，
+ * 而 GlobalExceptionHandler 没有该分支，落进兜底处理器被翻译成「系统繁忙」——
+ * 提示与真实原因完全无关，排查时极易被带偏。
+ *
+ * ⚠️ 原先这里写成 `if (typeof value === 'string') return value`直接原样返回，
+ * 而 el-date-picker 传的恰好就是 `YYYY-MM-DD HH:mm:ss` 字符串，
+ * 于是这个早退让下面的格式化**根本没机会执行**，等于一直没生效。
+ * 现在字符串也走同一套转换：先归一成 Date 再统一输出 ISO。
+ */
 function formatValidUntil(value) {
   if (!value) return undefined
-  if (typeof value === 'string') return value
-  const d = new Date(value)
+
+  let d
+  if (value instanceof Date) {
+    d = value
+  } else if (typeof value === 'string') {
+    // 用 '-' 替换分隔符再 new Date：Safari/iOS 不认 '2026-12-31 23:59:59' 这种
+    // 空格分隔格式，直接 parse 会得到 Invalid Date。
+    d = new Date(value.replace(/-/g, '/'))
+  } else {
+    d = new Date(value)
+  }
   if (Number.isNaN(d.getTime())) return undefined
+
   const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  // 注意 'T' 分隔 —— 少了它后端会 500
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+/**
+ * 转成「本地可读格式」（空格分隔），与后端 list 接口返回的样式保持一致。
+ *
+ * 只给 mock 库用：mock 数据要能原样喂回 el-date-picker（它的 value-format 是
+ * 'YYYY-MM-DD HH:mm:ss'），而提交给后端时另走上面的 ISO 转换。
+ * 两条路径分开，避免 mock 数据带着 'T' 回填进 date-picker 显示成带 T 的怪格式。
+ */
+function toLocalDateTimeString(value) {
+  const iso = formatValidUntil(value)
+  return iso ? iso.replace('T', ' ') : undefined
 }
 
 /** mock 需求库：让右栏与列表在同一页面内自洽（发布后立刻能看到自己那条）。 */
@@ -170,7 +215,7 @@ export async function publishDemand(payload) {
     expectPrice: payload.expectPrice ?? null,
     description: payload.description || '',
     region: payload.region,
-    validUntil: formatValidUntil(payload.validUntil),
+    validUntil: toLocalDateTimeString(payload.validUntil),
     contact: payload.contact,
     status: 1,
     createTime: new Date().toISOString().slice(0, 19).replace('T', ' ')
@@ -199,7 +244,8 @@ export async function updateDemand(id, payload) {
       ...mockMine[idx],
       ...payload,
       unit: payload.unit || mockMine[idx].unit,
-      validUntil: formatValidUntil(payload.validUntil)
+      // mock 库统一存空格格式（理由见 toLocalDateTimeString 的注释）
+      validUntil: toLocalDateTimeString(payload.validUntil)
     }
   }
   return id
