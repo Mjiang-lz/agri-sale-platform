@@ -41,7 +41,7 @@
       </main>
 
       <footer class="auth-foot">
-        <router-link class="auth-link" to="/home">← 返回首页</router-link>
+        <router-link class="auth-link" to="/home">返回首页</router-link>
         <span>基于数字经济的农产品融销一体平台</span>
       </footer>
     </aside>
@@ -92,9 +92,12 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
 .auth-drawer {
   position: relative;
   z-index: 1;
-  width: 40%;
+  width: 45%;
   min-width: 420px;
-  max-width: 640px;
+  /* ★ 45% 在 1440px 视口下是 648px，比 45% 小屏多出来的部分全靠
+     max-width 收口。旧值 640px 会把 45% 压回 44.4% —— 数字看着改了、
+     实测比值对不上，所以两者要一起调 */
+  max-width: 760px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -124,14 +127,16 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
   display: block;
 }
 .auth-brand-text strong {
-  font-size: 21px;
+  font-size: 23px;
   letter-spacing: 1px;
-  color: var(--rxt-ink);
+  /* ★ 半透明底上的深色字要够「黑」才够清晰。--rxt-ink 是带绿调的
+     灰墨（#14302b），在半透明白 + 花田背景上偏灰；这里压到接近纯墨色 */
+  color: #0d201b;
 }
 .auth-brand-text small {
   margin-top: 3px;
-  font-size: 11px;
-  color: var(--rxt-ink-weak);
+  font-size: 12px;
+  color: #33544a;
 }
 
 /* 中间：表单。flex:1 撑开剩余高度并把内容居中 */
@@ -156,8 +161,9 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
   padding: 20px 32px 28px;
   /* ★ 页脚与表单共用同一块半透明底，不再自己垫白牌：
      之前它单独垫一块牌子，底色跟盒子一深一浅，反而把盒子切成了三段 */
-  font-size: 12px;
-  color: #2c4038;
+  font-size: 13px;
+  /* ★ 半透明底上的灰字偏淡偏小，压深一档才够清晰 */
+  color: #16302a;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
 }
 .auth-foot .auth-link {
@@ -210,15 +216,17 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
 <style>
 .auth-title {
   margin: 26px 0 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--rxt-ink);
+  /* ★ 字号与字重一起提：半透明底 + 背景模糊会把字边缘吃掉，
+     20px/600 在这套底上偏「飘」。24px/700 才压得住 */
+  font-size: 24px;
+  font-weight: 700;
+  color: #0d201b;
 }
 .auth-sub {
   margin: 8px 0 22px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.7;
-  color: var(--el-text-color-secondary);
+  color: #33544a;
 }
 
 /*
@@ -237,15 +245,19 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
 }
 .auth-submit .el-button {
   width: 100%;
-  font-weight: 600;
-  letter-spacing: 2px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  /* 按钮在花田背景上，中间偏右有一片高饱和黄绿；
+     给白字压一层同色深影，白字才不会「陷进背景里」 */
+  text-shadow: 0 1px 2px rgba(6, 62, 48, 0.45);
 }
 
 .auth-switch {
   margin-top: 4px;
   text-align: center;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
+  font-size: 15px;
+  color: #26453c;
 }
 .auth-link {
   color: var(--el-color-primary);
@@ -271,22 +283,73 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
    比逐个类名更稳（el-select 在 2.8 里已换成 .el-select__wrapper，
    逐个类名要写两套，少写一套就漏）。 */
 .auth-card {
-  --el-fill-color-blank: rgba(255, 255, 255, 0.93);
-  /* 表单 label 与报错也在半透明底上，描一道淡影把字从花纹里拎出来 */
-  --el-text-color-regular: #22332c;
+  --el-fill-color-blank: rgba(255, 255, 255, 0.96);
+  /* 表单正文色压深一档：EP 默认 #606266 在花田背景上偏灰 */
+  --el-text-color-regular: #1b2f28;
+  /* ★ 别指望这里改 --el-font-size-base 能放大输入框的字：
+     EP 的 el-input[size=large] 会在组件自己的作用域里把这个变量
+     重新设成 14px，把这里的值盖掉（实测设 16px 无效、computed 仍是 14px）。
+     所以字号必须写在 .el-input__inner 上，见下方规则。 */
+}
+/* 输入框内的文字：EP size="large" 是 14px，在 45% 宽的大盒子里偏小，
+   半透明底还会再吃掉一点笔画。直接写在这两个元素上，不走变量。 */
+.auth-card .el-input__inner,
+.auth-card .el-select__selected-item {
+  font-size: 16px;
+  /* 16px 字配 40px 高的框会上下顶边。抬到 46px 才透气 ——
+     EP 的 --el-component-size-large 是 40px，是给 14px 字准备的 */
+  line-height: 1.5;
+}
+.auth-card .el-input__wrapper,
+.auth-card .el-select__wrapper {
+  min-height: 46px;
+  align-items: center;
+}
+
+/* ★ label 与输入框贴得太近：label-position="top" 时 EP 的 label
+   margin-bottom 很小，字号一放大就挤成「手机号」紧贴框上沿。
+   label 15px 需要 6px 下间距才读得开 */
+.auth-card .el-form-item__label {
+  padding-bottom: 6px;
+  line-height: 1.3;
+}
+/* 表单项之间也要放：16px 字 + 46px 框，18px 默认间距偏挤 */
+.auth-card .el-form-item {
+  margin-bottom: 20px;
+}
+/* 提交项的额外下间距由 .auth-switch 接手，这里去掉避免两段间距叠加 */
+.auth-card .auth-submit {
+  margin-bottom: 0;
 }
 .auth-card .el-input__wrapper,
 .auth-card .el-select__wrapper,
 .auth-card .el-textarea__inner {
-  box-shadow: 0 0 0 1px rgba(20, 52, 42, 0.14) inset;
+  /* ★ 边框加粗到 2px：原来的 1px rgba(...0.14) 在半透明底上
+     基本看不见，输入框像「浮在背景里」而不是一个框 */
+  box-shadow: 0 0 0 2px rgba(24, 61, 49, 0.26) inset;
 }
 .auth-card .el-input__wrapper.is-focus,
 .auth-card .el-select__wrapper.is-focused {
-  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+  box-shadow: 0 0 0 2px var(--el-color-primary) inset;
 }
 .auth-card .el-form-item__label {
-  color: #22332c;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  /* ★ label 15px + 加重：EP 默认 14px/常规，在这套底上偏小偏淡 */
+  font-size: 15px;
+  font-weight: 600;
+  color: #1b2f28;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
+}
+/* ★ 去掉必填的红色星号（用户要求）。
+   ★ 用 :before 的 content 覆盖**而不是**删 `.el-form-item.is-required`
+   —— 那个 class 带着校验语义，删它可能连带影响 EP 的必填判定样式。
+   content 置空是最小侵入的做法。 */
+.auth-card .el-form-item.is-required:not(.is-no-asterisk) > .el-form-item__label::before {
+  content: '' !important;
+}
+/* placeholder 在花田背景上最容易糊，压深一档 */
+.auth-card .el-input__inner::placeholder,
+.auth-card .el-select__placeholder.is-transparent {
+  color: #7d918a;
 }
 /* 校验失败的报错是红字，叠花纹最容易糊，加一层白底衬 */
 .auth-card .el-form-item__error {
