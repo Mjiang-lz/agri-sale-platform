@@ -34,7 +34,8 @@ const NAME_PHOTO: Record<string, string> = {
   '大棚黄瓜': '/products/p26.jpg',
   '农家自种小番茄': '/products/p05.jpg',
   // 粮油
-  '菜籽油5L': '/products/p24.jpg',
+  // p24 是橄榄油静物（画面里有橄榄果与橄榄枝），与菜籽油语义不符，改用 p29（散装黄色食用油实拍）
+  '菜籽油5L': '/products/p29.jpg',
   '有机小米5斤': '/products/p08.jpg',
   // p07 是「田间/农事」场景图（frontend-web imagery.js 也在用），玉米面另配 p28
   '现磨玉米面5斤': '/products/p28.jpg',
@@ -63,7 +64,7 @@ const KEYWORD_PHOTO: Array<[RegExp, string]> = [
   [/鱼|鳝|泥鳅/, '/products/p20.jpg'],
   [/香菇|木耳|银耳|菌|笋干|腐竹/, '/products/p22.jpg'],
   [/辣椒|花椒|胡椒|八角/, '/products/p21.jpg'],
-  [/菜油|花生油|香油|食用油|调和油|油/, '/products/p24.jpg'],
+  [/菜油|花生油|香油|食用油|调和油|油/, '/products/p29.jpg'],
   [/莲藕|藕/, '/products/p23.jpg'],
   [/红薯|地瓜|紫薯|山药/, '/products/p15.jpg'],
   [/土豆|马铃薯|芋/, '/products/p04.jpg'],
@@ -82,7 +83,7 @@ const KEYWORD_PHOTO: Array<[RegExp, string]> = [
 const CATEGORY_PHOTOS: Record<string, string[]> = {
   水果: ['/products/p03.jpg', '/products/p13.jpg', '/products/p12.jpg', '/products/p11.jpg', '/products/p09.jpg'],
   蔬菜: ['/products/p02.jpg', '/products/p04.jpg', '/products/p25.jpg', '/products/p26.jpg', '/products/p05.jpg'],
-  粮油: ['/products/p14.jpg', '/products/p08.jpg', '/products/p24.jpg', '/products/p15.jpg'],
+  粮油: ['/products/p14.jpg', '/products/p08.jpg', '/products/p29.jpg', '/products/p15.jpg'],
   畜禽产品: ['/products/p16.jpg', '/products/p27.jpg', '/products/p17.jpg', '/products/p18.jpg'],
   水产: ['/products/p19.jpg', '/products/p20.jpg'],
   干货: ['/products/p21.jpg', '/products/p22.jpg'],
