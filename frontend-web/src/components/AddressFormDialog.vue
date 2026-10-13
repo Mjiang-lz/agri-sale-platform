@@ -64,6 +64,20 @@
       </el-form-item>
     </el-form>
 
+    <!--
+      保存失败的行内提示。
+      必须放在弹窗里而不是只靠 toast：toast 两三秒就没了，
+      而弹窗还开着、用户正准备改输入 —— 这时候他需要知道**到底哪里错了**。
+    -->
+    <el-alert
+      v-if="saveError"
+      type="error"
+      show-icon
+      :closable="false"
+      :title="saveError"
+      class="save-error"
+    />
+
     <template #footer>
       <el-button @click="$emit('update:modelValue', false)">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="submit">保存</el-button>
@@ -85,6 +99,14 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 
 const formRef = ref(null)
 const submitting = ref(false)
+/**
+ * 保存失败时的行内错误文案。
+ *
+ * 与 request.js 的全局 toast 是互补关系，不是重复：
+ * toast 会消失，而这个弹窗还开着、用户正要改输入 —— 他需要一句话告诉他哪儿错了，
+ * 而不是凭记忆回想三秒前飘过的那行字。
+ */
+const saveError = ref('')
 
 const isEdit = computed(() => Boolean(props.address?.addressId))
 
@@ -134,6 +156,9 @@ watch(
     form.detail = a?.detail || ''
     form.isDefault = a?.isDefault ?? 0
     formRef.value?.clearValidate()
+    // 每次打开都清掉上一次的保存失败提示，
+    // 否则「上次失败的原因」会挂在这次新建的表单上方，完全对不上。
+    saveError.value = ''
   },
   { immediate: true }
 )
@@ -156,6 +181,7 @@ async function submit() {
   }
 
   submitting.value = true
+  saveError.value = ''
   try {
     const addressId = isEdit.value
       ? (await updateAddress(props.address.addressId, payload), props.address.addressId)
@@ -164,7 +190,11 @@ async function submit() {
     emit('saved', addressId)
     emit('update:modelValue', false)
   } catch (err) {
-    // 失败时保持弹窗打开，用户的输入不丢；错误提示已由拦截器给出
+    // 失败时保持弹窗打开，用户的输入不丢；
+    // 但**必须在弹窗内留一句话** —— toast 一闪而过，用户没看清就得重填一遍。
+    // 用rawMessage（后端原文）而不是 err.message（翻译后的长句），
+    // 前者更紧凑，弹窗里放得下。
+    saveError.value = err?.rawMessage || err?.message || '保存失败，请稍后重试'
     console.error('保存收货地址失败：', err)
   } finally {
     submitting.value = false
@@ -173,6 +203,11 @@ async function submit() {
 </script>
 
 <style scoped>
+/* 保存失败的行内提示：贴住表单底部，视觉上属于表单的一部分 */
+.save-error {
+  margin-top: 4px;
+}
+
 .region-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
