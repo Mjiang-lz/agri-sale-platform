@@ -19,7 +19,43 @@
  * 优先级（商品）：接口返回的 imageUrl > 按商品名精确匹配 > 按品类兜底 > 通用田间图
  * 优先级（专家）：接口返回的 avatarUrl（若可用）> 按 expertId 的生成头像 > 姓名首字
  * 优先级（知识）：接口返回的 imageUrl > 标题关键词匹配 > 分类渐变封面
+ *
+ * ★★ 2026-10-13：本文件所有素材路径**统一过 `assetUrl()` 再返回**。
+ *    起因是一次真实事故 —— 路径写的是「站点根绝对路径」（`/products/g01.jpg`），
+ *    而业务端构建后的 base 是 `/app/`，浏览器于是去**站点根**找图：那里只有落地页
+ *    自带的 27 张，缺 `g01~g10`、缺整个 `experts/` 与 `knowledge/`。结果 nginx 的
+ *    SPA 回退把「文件不存在」返回成 `200 + index.html`，`<img>` 解码失败，
+ *    前端静默退化成「商品名首字色块」—— 状态码全绿，看不出任何异常。
+ *
+ *    ★ 关键认知：Vite 的 `base` 只作用于**它自己能看到的引用**（`import` 进来的资源、
+ *      CSS 里的相对 url、index.html）。**JS 里手写的字符串它一概不管**，
+ *      浏览器一律按站点根解析。所以这类字符串必须手动拼 `import.meta.env.BASE_URL`。
+ *    ★ 判据：字符串开头是不是 `/`。是 ⇒ 必须过 `assetUrl()`；不是（`data:`、`http(s):`、
+ *      相对地址）⇒ 原样放行。
+ *
+ *    下面这些常量表**刻意保留带前导 `/` 的写法** —— 可读，而且它们本身就是一份素材清单。
+ *    转换只发生在**返回给调用方之前**，转换点集中，不容易漏。
  */
+
+/** 构建 base：开发态 `/`，`RXT_BASE=/app/` 构建时为 `/app/`（与 `createWebHistory` 读同一个值）。 */
+const ASSET_BASE = import.meta.env.BASE_URL || '/'
+
+/**
+ * 给「站点根绝对路径」拼上构建 base，得到浏览器能正确解析的地址。
+ *
+ * **本文件所有素材路径的出口都必须过这里**；其他文件（如 `BizHome.vue` 的轮播图、
+ * 品类圆入口）也请复用它，不要再手写裸路径。
+ *
+ * @param {string} path 素材路径
+ * @returns {string} 可安全放进 `<img src>` 的地址
+ */
+export function assetUrl(path) {
+  if (!path) return path
+  // data URI（渐变封面）与外链已是完整地址，不再拼前缀
+  if (!path.startsWith('/')) return path
+  // base 为 '/' 时去尾斜杠得空串；为 '/app/' 时得 '/app'
+  return ASSET_BASE.replace(/\/$/, '') + path
+}
 
 /** 商品名关键词 → 精确图片。这是让「文案 / 搜索结果 / 图片」三者匹配的核心表。 */
 const NAME_IMG = [
@@ -94,13 +130,13 @@ export function productImage(p) {
   const name = String(p?.productName || '')
   // 1) 按商品名关键词精确匹配：让搜索结果和商品文案与图片对应
   const exact = NAME_IMG.find((item) => item.keys.some((k) => name.includes(k)))
-  if (exact) return exact.img
+  if (exact) return assetUrl(exact.img)
 
   // 2) 按品类兜底：用 productId 取模，保证同一商品永远拿到同一张图
   const cat = p?.category
   const pool = CATEGORY_IMG[cat] || CATEGORY_IMG['默认']
   const id = Number(p?.productId || p?.id || 0)
-  return pool[(id || 1) % pool.length]
+  return assetUrl(pool[(id || 1) % pool.length])
 }
 
 /** 图片加载失败时的占位底色（按 id 稳定取色，避免整页一个颜色） */
@@ -125,7 +161,7 @@ const EXPERT_IMG = {
 
 export function expertAvatar(e) {
   const id = Number(e?.expertId || 0)
-  return EXPERT_IMG[id] || ''
+  return assetUrl(EXPERT_IMG[id]) || ''
 }
 
 export function expertInitial(name) {
@@ -321,7 +357,7 @@ function knowledgeCover(k) {
 export function knowledgeKeywordPhoto(k) {
   const title = String(k?.title || '')
   const hit = KNOWLEDGE_TITLE_IMG.find((item) => item.keys.some((key) => title.includes(key)))
-  return hit ? hit.img : ''
+  return hit ? assetUrl(hit.img) : ''
 }
 
 /**
@@ -362,7 +398,7 @@ export function demandImage(d) {
   const cat = d?.category
   const pool = CATEGORY_IMG[cat] || ALL
   const id = Number(d?.demandId || 0)
-  return pool[(id || 1) % pool.length]
+  return assetUrl(pool[(id || 1) % pool.length])
 }
 
 export function demandFallbackBg(d) {
@@ -390,9 +426,11 @@ const DOMAIN_IMG = {
 
 export function expertBanner(e) {
   const d = String(e?.expertDomain || '')
-  if (!d) return '/products/p08.jpg'
+  if (!d) return assetUrl('/products/p08.jpg')
   const hit = Object.keys(DOMAIN_IMG).find((k) => d.includes(k))
-  return hit ? DOMAIN_IMG[hit] : '/products/p08.jpg'
+  return assetUrl(hit ? DOMAIN_IMG[hit] : '/products/p08.jpg')
 }
 
-export { ALL as ALL_PRODUCT_IMAGES }
+// 导出时也过 assetUrl：调用方拿到就能直接塞进 `src`，不必再关心构建 base。
+// （当前仓库内无引用，保留是为了不破坏原有对外 API。）
+export const ALL_PRODUCT_IMAGES = ALL.map((p) => assetUrl(p))
