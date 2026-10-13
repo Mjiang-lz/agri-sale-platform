@@ -23,7 +23,8 @@ const NAME_PHOTO: Record<string, string> = {
   // 水果
   '赣南脐橙5kg装': '/products/p03.jpg',
   '砂糖橘10斤装': '/products/p13.jpg',
-  '蜜柚单果约2.5kg': '/products/p12.jpg',
+  // p12 是挂在树上的青皮柚（偏暗绿），不像蜜柚；改用 p30（半个红心蜜柚实拍）
+  '蜜柚单果约2.5kg': '/products/p30.jpg',
   '猕猴桃5斤装': '/products/p11.jpg',
   '脐橙次果特惠': '/products/p09.jpg',
   // 蔬菜
@@ -73,7 +74,7 @@ const KEYWORD_PHOTO: Array<[RegExp, string]> = [
   [/西红柿|番茄/, '/products/p02.jpg'],
   [/玉米/, '/products/p28.jpg'],
   [/猕猴桃|奇异果/, '/products/p11.jpg'],
-  [/柚/, '/products/p12.jpg'],
+  [/柚/, '/products/p30.jpg'],
   [/砂糖橘|砂糖桔|蜜橘|橘|桔|柑|橙/, '/products/p03.jpg'],
   [/桃|李|杏|梨|枣|莓|葡萄|樱桃|荔枝|龙眼|苹果/, '/products/p09.jpg'],
   [/米|谷|麦|豆|面/, '/products/p14.jpg'],
