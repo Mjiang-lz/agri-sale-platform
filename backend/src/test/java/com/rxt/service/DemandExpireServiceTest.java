@@ -1,6 +1,7 @@
 package com.rxt.service;
 
 import com.rxt.mapper.DemandMapper;
+import com.rxt.service.impl.DemandExpireServiceImpl;
 import org.apache.ibatis.annotations.Update;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,9 @@ import static org.mockito.Mockito.when;
  *
  * <p>断言全部落在**语义片段**上而非整段文本相等，这样格式化或加注释不会误报，
  * 而上面四种改动一定会红。</p>
+ *
+ * <p>被注入的是实现类：{@code DemandExpireService} 在拆出接口后是接口类型，
+ * Mockito 无法实例化接口，故这里（也只有这里）指向 Impl。</p>
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("M3 求购到期失效：状态变更语义防回归")
@@ -42,7 +46,7 @@ class DemandExpireServiceTest {
     private DemandMapper demandMapper;
 
     @InjectMocks
-    private DemandExpireService demandExpireService;
+    private DemandExpireServiceImpl demandExpireService;
 
     @Test
     @DisplayName("expireOverdue 只委托给 Mapper 上那一条 UPDATE（不在服务层再写一套判断）")
