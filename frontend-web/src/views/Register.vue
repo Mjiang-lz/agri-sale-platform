@@ -43,6 +43,8 @@
           <el-option v-for="r in ROLES" :key="r" :label="r" :value="r" />
         </el-select>
       </el-form-item>
+      <!-- ★ v-model 用 captchaKey 而非 key —— key 是 Vue 保留属性，用它双向绑定会静默失效 -->
+      <CaptchaField ref="captchaRef" v-model:captcha-key="form.captchaKey" v-model:captcha-code="form.captchaCode" @submit="onSubmit" />
       <el-form-item class="auth-submit">
         <el-button type="primary" :loading="loading" @click="onSubmit">注 册</el-button>
       </el-form-item>
@@ -61,6 +63,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/request'
 import AuthShell from '@/components/AuthShell.vue'
+import CaptchaField from '@/components/CaptchaField.vue'
 
 // 取值必须与后端 t_role 一致（注册接口按 roleName 反查角色），别自己造词
 const ROLES = ['农户', '采购方', '专家', '银行用户']
@@ -68,8 +71,10 @@ const ROLES = ['农户', '采购方', '专家', '银行用户']
 const route = useRoute()
 const router = useRouter()
 const formRef = ref()
+const captchaRef = ref()
 const loading = ref(false)
-const form = reactive({ phone: '', password: '', realName: '', roleName: '' })
+// captchaKey / captchaCode 由 CaptchaField 双向绑定写进来，字段名与后端 RegisterDTO 一致
+const form = reactive({ phone: '', password: '', realName: '', roleName: '', captchaKey: '', captchaCode: '' })
 
 const rules = {
   phone: [
@@ -97,14 +102,18 @@ const loginLink = computed(() => {
 async function onSubmit() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
+  if (!captchaRef.value.validate()) return
 
   loading.value = true
   try {
     await request.post('/auth/register', form)
     ElMessage.success('注册成功，请登录')
     router.push(loginLink.value)
+    // key 已被一次性消费，换一张新的（此时往往紧接着就要填登录表单）
+    captchaRef.value.refresh()
   } catch {
     // 失败提示由 request 拦截器统一弹出（如「该手机号已注册」），这里不重复弹
+    captchaRef.value.refresh()
   } finally {
     loading.value = false
   }

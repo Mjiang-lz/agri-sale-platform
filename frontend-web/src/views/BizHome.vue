@@ -17,31 +17,34 @@
          实物大图商品卡（图占卡片约 52%）→ 产地求购 → 专家照片墙 →
          惠农信贷 → 农技知识收尾。不做窄屏塌缩，只面向桌面端。
 
-         ★ 顶部为什么是「业务数据带」（而不是问候语或资讯）：
-         这里先后放过三样东西，最终只留下数据带 ——
+         ★ 顶部为什么是「平台概览数字带」（2026-10-13 改，原为「业务数据带」）：
+         这一条先后放过三样东西，最终收敛成平台级 4 个数字 ——
            · 「早上好，X」+ 待办胶囊：是「我的东西」，已挪去个人中心；
            · 「农技知识」：是「逛完之后再看的内容」，2026-10-10 挪到页面末尾；
-           · 「业务数据带」：一进页面就回答「我手上还有几件事」，留在顶部。
+           · 「业务数据带」（我手上还有几件事）：**只有一条数据时被
+             `.biz-bar.is-solo` 锁死在 380px，右侧整片留白**，用户明确反馈
+             「就一张卡片，感觉没必要」。
+         改成平台概览后，`flex: 1 1 0` 四格等分铺满整行；同时删掉首屏右栏
+         `.hero-stats` 里那份**完全相同**的四个数字 —— 同一批数字只出现一次。
          ================================================================ -->
 
-    <!-- ---------- 业务数据带 ----------
-         原「指标条」与「我的业务」两块显示的是同一批数字（采购 0 / 卖出 4 /
-         融资 2 / 已通过 2 vs 融资 2 / 订单 4 / 预约 1），合计占 383px。
-         合并成一条紧凑数据带：一张卡一个业务域，主数字 + 一行摘要，
-         原来多出来的数字全部并进摘要行。点击直达该业务的列表页。 -->
-    <section v-if="bizTiles.length" class="biz-bar" :class="{ 'is-solo': bizTiles.length === 1 }">
+    <!-- ---------- 平台概览数字带 ----------
+         固定 4 格：在售货源 / 有效求购 / 入驻专家 / 农业知识。
+         数据来自 GET /home/stats（该路径在 PublicEndpoints 白名单里，
+         未登录访客同样拿得到），所以不存在「游客看到空白带」的情况。
+         四格全部可点，直达对应列表页；等分铺满，不再有 380px 孤卡。 -->
+    <section v-if="platformStats.length" class="biz-bar">
       <button
-        v-for="t in bizTiles"
-        :key="t.key"
+        v-for="s in platformStats"
+        :key="s.label"
         type="button"
         class="bt-item"
-        :class="`is-${t.tone}`"
-        @click="go(t.path)"
+        @click="go(statPath(s.label))"
       >
-        <span class="bt-num">{{ t.value }}</span>
+        <span class="bt-num">{{ s.value }}</span>
         <span class="bt-text">
-          <span class="bt-label">{{ t.label }}</span>
-          <span class="bt-sub">{{ t.sub }}</span>
+          <span class="bt-label">{{ s.label }}</span>
+          <span class="bt-sub">{{ statSub(s.label) }}</span>
         </span>
       </button>
     </section>
@@ -113,13 +116,11 @@
            原来这里是 4 张缩略图，就是轮播图本身的缩小版（纯冗余），
            却把整行撑到 677px，而 .hero-main 只有 360px。
            换成带标题的快捷入口，高度不变但内容不重复。 -->
+      <!-- 右列：只剩「快捷办理」。
+           平台概览那 4 个数字已挪到页面顶部数据带（v-if platformStats），
+           首屏右栏不再放第二份 —— 同一批数字只出现一次。
+           .hero-side 的 grid-rows 相应从「1fr auto」改成单行，见下方样式。 -->
       <div class="hero-side">
-        <div class="hero-stats">
-          <div v-for="s in platformStats" :key="s.label" class="hs-item">
-            <span class="hss-num">{{ s.value }}</span>
-            <span class="hss-label">{{ s.label }}</span>
-          </div>
-        </div>
         <div class="hero-quick" v-if="quickLinks.length">
           <h4 class="hq-title">快捷办理</h4>
           <button
@@ -507,6 +508,7 @@ import request from '@/api/request'
 import { useUserStore } from '@/store/user'
 import { isReadable } from '@/utils/text'
 import { APPLY_STATUS, isApprovedApply } from '@/constants/finance'
+import { useCategories } from '@/composables/useCategories'
 import {
   productImage,
   assetUrl,
@@ -659,18 +661,32 @@ function searchBy(w) {
 }
 
 /* ---------------- 品类入口 ----------------
-   圆形裁到 74px，所以要选**主体占满画面**的特写图。
-   例：「水果」原用 p01（草地上的苹果箱，竖构图、主体只占中间一小块），
-   缩成圆图后糊成一团黄绿色，第一眼看着像土豆 —— 换成 p10 满幅红苹果特写。
-   ★ img 同样要过 assetUrl()，理由见上面 HERO_IMAGES 的注释。 */
-const categories = [
-  { name: '水果', img: '/products/p10.jpg' },
-  { name: '蔬菜', img: '/products/p26.jpg' },
-  { name: '水产', img: '/products/p19.jpg' },
-  { name: '畜禽产品', img: '/products/p27.jpg' },
-  { name: '粮油', img: '/products/g02.jpg' },
-  { name: '干货', img: '/products/p22.jpg' }
-].map((c) => ({ ...c, img: assetUrl(c.img) }))
+   ★ 2026-10-13 改为接口驱动（需求 7「分类要确保覆盖所有产品」）。
+
+   原先这里是六个写死的品类。有人发布一个「茶叶」「农资」的商品，
+   它在前台既进不了这六个圆入口，也进不了列表页的下拉筛选 ——
+   只能靠手输关键词找到，成了孤儿品类。这类问题靠前端维护名单无法根治，
+   名单由后端从 t_product distinct 出来（GET /trade/categories）才叫「覆盖」。
+
+   图：圆口裁到 74px，需要**主体占满画面**的特写。这里仍为已知六类各指定一张，
+   库里出现的新品类走 CATEGORY_IMG 池（imagery.js 已有分类兜底），
+   两边都没有时用首字底色 —— 宁可少一张图，也不要碎图。 */
+const CATEGORY_ENTRY_IMG = {
+  水果: '/products/p10.jpg',
+  蔬菜: '/products/p26.jpg',
+  水产: '/products/p19.jpg',
+  畜禽产品: '/products/p27.jpg',
+  粮油: '/products/g02.jpg',
+  干货: '/products/p22.jpg'
+}
+const { categories: categoryList, load: loadCategories } = useCategories()
+const categories = computed(() =>
+  categoryList.value.map((c) => ({
+    name: c.category,
+    count: c.productCount,
+    img: assetUrl(CATEGORY_ENTRY_IMG[c.category] || productImage({ category: c.category, productId: 1 }))
+  }))
+)
 function goCategory(name) {
   router.push({ path: '/trade/products', query: { category: name } })
 }
@@ -851,22 +867,24 @@ const myTiles = computed(() => {
   return list.slice(0, 4)
 })
 
-/* 没有任何业务数据时（专家角色最典型），至少给一条与本角色相关的数，
-   而不是让首屏空着。注意这不参与空态判断 —— 空态说的是「没有业务记录」。 */
-const bizTiles = computed(() => {
-  if (myTiles.value.length) return myTiles.value
-  if (showExpert.value && knowledgeAll.value.length) {
-    return [{
-      key: 'know',
-      value: knowledgeAll.value.length,
-      label: '农业知识',
-      tone: 'green',
-      path: '/expert/knowledge',
-      sub: '平台专家与农技站发布的实用内容'
-    }]
-  }
-  return []
-})
+/* 平台概览数字带的「跳去哪」与「摘要行」。
+   四个标签与 loadStats() 里 platformStats 的 label 一一对应，换标签要同步改这里。 */
+const STAT_META = {
+  在售货源: { path: '/trade/products', sub: '产地直发，今日可发' },
+  有效求购: { path: '/trade/demand', sub: '采购方正在收的货' },
+  入驻专家: { path: '/expert/appointment', sub: '可预约的农技与经营顾问' },
+  农业知识: { path: '/expert/knowledge', sub: '平台专家与农技站发布的实用内容' }
+}
+function statPath(label) {
+  const path = STAT_META[label]?.path ?? '/trade/products'
+  // 求购页要登录（不在公开白名单，MainLayout 对游客也隐藏这一项）。
+  // 游客点这张卡时退回货源市场，而不是点出去吃一个 401 再被守卫弹去登录页。
+  if (path === '/trade/demand' && !isLoggedIn.value) return '/trade/products'
+  return path
+}
+function statSub(label) {
+  return STAT_META[label]?.sub ?? ''
+}
 
 /* ---------------- 首屏右侧快捷入口 ----------------
    按角色权限给，与 MainLayout 的 menuPerms 同一口径：
@@ -1136,6 +1154,9 @@ watch(
 onMounted(async () => {
   startHero()
   window.addEventListener('resize', measureRail)
+  // 品类入口靠它，数据驱动；不 await —— 它有自己的兜底名单，
+  // 慢一点只会让圆入口晚几十毫秒出现，不该拖住首屏其余区块
+  loadCategories()
   loadProducts()
   loadDemands()
   loadKnowledge()
@@ -1275,7 +1296,10 @@ onUnmounted(() => {
   margin-bottom: 18px;
 }
 .bt-item {
-  flex: 1 1 260px;
+  /* 四格等分铺满的关翥：统一的 flex-basis + 相同的 grow 系数，
+     宽屏下四张卡精确各占 25%（含 gap 均摊），窄屏按 basis 自动换行。
+     原来单条数据时有 `flex: 0 1 380px` 的上限，右侧整片留白。 */
+  flex: 1 1 240px;
   min-width: 0;
   display: flex; align-items: center; gap: 16px;
   padding: 17px 22px;
@@ -1291,15 +1315,12 @@ onUnmounted(() => {
   transform: translateY(-2px);
   box-shadow: var(--rxt-shadow-md);
 }
-/* 只有一条数据时不要拉满整行，看着像标题栏 */
-.biz-bar.is-solo .bt-item { flex: 0 1 380px; }
 .bt-num {
   flex: none; min-width: 46px; text-align: center;
   font-size: 32px; font-weight: 700; line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--rxt-primary);
 }
-.bt-item.is-amber .bt-num { color: var(--rxt-accent); }
 .bt-text { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .bt-label { font-size: 15px; font-weight: 600; }
 .bt-sub {
@@ -1406,32 +1427,17 @@ onUnmounted(() => {
 }
 .hd-dot.is-on { background: #fff; border-color: #fff; transform: scale(1.45); }
 
-/* 右列：平台数据 + 快捷办理。
-   高度锁在 .hero-main 的 360px 内（1fr + auto），不会把整行撑高。 */
-.hero-side { display: grid; grid-template-rows: 1fr auto; gap: 14px; }
-.hero-stats {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
-  background: var(--rxt-border);
-  border: 1px solid var(--rxt-border);
-  border-radius: var(--rxt-radius-lg);
-  overflow: hidden;
-}
-.hs-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  padding: 12px 8px;
-  background: var(--el-bg-color);
-}
-.hss-num {
-  font-size: 24px; font-weight: 700; line-height: 1;
-  color: var(--rxt-primary); font-variant-numeric: tabular-nums;
-}
-.hss-label { font-size: 12px; color: var(--el-text-color-secondary); }
+/* 右列：只剩「快捷办理」。
+   平台概览那 4 个数字挪到页面顶部数据带后，右栏不再需要「1fr + auto」两行，
+   改成单行让快捷办理占满 .hero-main 的 300px 高度。 */
+.hero-side { display: grid; grid-template-rows: 1fr; }
+.hero-quick { display: flex; flex-direction: column; }
 
-/* 快捷办理：按角色权限给的三个入口，替代原来的重复缩略图。
-   ⚠️ 这三条的 padding 会**反向撑高整个轮播行** ——
-   .hero-side 是 grid 的「1fr + auto」，快捷办理是 auto 那行，
-   它比 .hero-main 高时整行就跟着长。实测 padding 8px 时
-   轮播行被撑到 313px（.hero-main 只设了 300px）。收到 6px 刚好压回 300。 */
+/* 快捷办理：按角色权限给的入口，替代原来的重复缩略图。
+   2026-10-13：平台概览数字挪去顶部数据带后，右栏只有这一块，
+   .hero-side 改为单行 grid、本块是唯一子项 ⇒ 高度由 .hero-main 的 300px 决定，
+   padding 不再反向撑高整行（旧的「1fr + auto」警告随之作废）。
+   条目用 flex:1 均分这 300px，条目太少时也不会缩成一小条贴在顶部。 */
 .hero-quick {
   padding: 12px 16px 8px;
   border: 1px solid var(--rxt-border);
@@ -1440,6 +1446,7 @@ onUnmounted(() => {
 }
 .hq-title { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--rxt-ink-weak); }
 .hq-item {
+  flex: 1;
   width: 100%;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 6px 0;
@@ -1458,8 +1465,17 @@ onUnmounted(() => {
 
 /* ---------- 品类入口 ---------- */
 .cats {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  display: flex;
+  /* ★ 2026-10-13 从 grid 改成 flex。品类改接口驱动后列数不再固定，
+     而 grid 的 auto-fill/auto-fit 都解决不了「六类要铺满、十几类要折行」：
+     auto-fill 在 1404px 宽下按 minmax(120px) 算出 10 列，六个圆口各只占
+     1/10 宽、缩成 125px，右侧空一大片；auto-fit 更糟（空轨道被折叠，格子更挤）。
+
+     flex 的好处：列数完全由品类数决定，每格按自身内容取宽，多余空间均分 ——
+     六类时每格 ≈ (容器宽 - 5×gap)/6，正好铺满；品类涨到十几类自动折行。
+     ★ flex-wrap 必须显式写，默认 nowrap 会把十几个圆口挤成一条。 */
+  flex-wrap: wrap;
+  justify-content: space-between;
   gap: 14px;
   margin-bottom: 22px;
   padding: 12px;
@@ -1471,6 +1487,11 @@ onUnmounted(() => {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   padding: 0; border: 0; background: none;
   font-family: inherit; cursor: pointer;
+  /* 均分容器宽度：六类时每格 (容器宽 - 5×gap)/6，正好铺满整行不右侧留白。
+     min-width 0 是必须的 —— flex 项默认 min-width:auto，
+     「畜禽产品」这类四字标签会把格子撑得比 1fr 更宽，导致排不满 */
+  flex: 1 1 0;
+  min-width: 0;
 }
 .cat-circle {
   width: 74px; height: 74px;
@@ -1481,7 +1502,15 @@ onUnmounted(() => {
 }
 .cat-circle img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cat-cell:hover .cat-circle { transform: scale(1.08); border-color: var(--rxt-primary); }
-.cat-name { font-size: 14px; color: var(--el-text-color-primary); }
+/* 品类名：不加省略号会把「畜禽产品」撑宽整格（flex 项默认 min-width:auto） */
+.cat-name {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ================================================================
    分区通用

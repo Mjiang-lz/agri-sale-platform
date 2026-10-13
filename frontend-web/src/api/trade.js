@@ -46,6 +46,19 @@ export function getTradeProducts(params = {}) {
   })
 }
 
+/**
+ * 品类字典（公开接口，游客可访问）。
+ * 返回 [{ category, productCount }]，按在架商品数降序。
+ *
+ * ★ 这是「分类要覆盖所有商品」的唯一真源。此前四个视图各自硬编码了
+ *   同一份六类字符串（蔬菜/水果/粮油/干货/水产/畜禽产品），谁发布一个
+ *   「茶叶」的商品，它就成了在下拉与首页入口里都点不到的孤儿品类。
+ *   只有从库里 distinct 出来才算覆盖。
+ */
+export function getTradeCategories() {
+  return request.get('/trade/categories')
+}
+
 /** 商品详情：商品全字段 + 库存 + 发布农户公开信息 + 已过审评论。只返回审核通过的商品。 */
 export function getTradeProductDetail(productId) {
   return request.get(`/trade/products/${productId}`)

@@ -66,7 +66,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getExpertPendingQuestions, submitExpertAnswer } from '@/api/expert'
-import { expertOptions, getExpertName } from '@/constants/experts'
+import { expertOptions, getExpertName, useExperts } from '@/constants/experts'
 import { useUserStore } from '@/store/user'
 
 /**
@@ -85,7 +85,9 @@ const formRef = ref()
 const form = reactive({ content: '' })
 const rules = { content: [{ required: true, message: '请填写回答内容', trigger: 'blur' }, { min: 2, max: 500, message: '回答内容需为 2 至 500 个字', trigger: 'blur' }] }
 
-const expert = computed(() => expertOptions.find((item) => item.userId === Number(userStore.profile?.userId)) || { realName: userStore.profile?.realName || '专家', expertDomain: '农业技术服务' })
+// ★ expertOptions 现在是响应式 ref（数据驱动），脚本里必须取 .value ——
+//   模板会自动解包，JS 不会。不取会抛「expertOptions.find is not a function」
+const expert = computed(() => expertOptions.value.find((item) => item.userId === Number(userStore.profile?.userId)) || { realName: userStore.profile?.realName || '专家', expertDomain: '农业技术服务' })
 const publicCount = computed(() => pendingQuestions.value.filter((item) => !item.expertId).length)
 const assignedCount = computed(() => pendingQuestions.value.filter((item) => item.expertId).length)
 
@@ -123,7 +125,13 @@ function formatDateTime(value) {
   return value ? String(value).replace('T', ' ').slice(0, 16) : '--'
 }
 
-onMounted(loadPending)
+// 面板要从专家列表里反查「我自己是哪位专家」（按 userId 匹配）。
+// 列表走接口，不 load 的话新注册的专家会落到兜底对象上、显示不出真实领域
+const { load: loadExperts } = useExperts()
+onMounted(() => {
+  loadExperts()
+  loadPending()
+})
 </script>
 
 <style scoped>

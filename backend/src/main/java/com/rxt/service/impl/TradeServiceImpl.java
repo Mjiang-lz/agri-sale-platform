@@ -27,6 +27,7 @@ import com.rxt.service.NotificationService;
 import com.rxt.service.TradeService;
 import com.rxt.vo.AddressVO;
 import com.rxt.vo.CartVO;
+import com.rxt.vo.CategoryStatVO;
 import com.rxt.vo.CommentVO;
 import com.rxt.vo.OrderVO;
 import com.rxt.vo.ProductDetailVO;
@@ -104,6 +105,11 @@ public class TradeServiceImpl implements TradeService {
      * 另外三类（问答 / 预约 / 融资）由各自的模块接入，本类只负责订单。
      */
     private final NotificationService notificationService;
+
+    @Override
+    public List<CategoryStatVO> listCategories() {
+        return productMapper.countByCategory();
+    }
 
     @Override
     public IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword,

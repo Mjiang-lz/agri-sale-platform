@@ -11,12 +11,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import com.rxt.security.PermissionChecker;
 import com.rxt.vo.AppointmentVO;
+import com.rxt.vo.ExpertDetailVO;
 import com.rxt.vo.ExpertProfileVO;
 import com.rxt.vo.ExpertVO;
 import jakarta.validation.Valid;
 import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
 import com.rxt.dto.ExpertProfileUpdateDTO;
+import com.rxt.dto.ExpertCertifyDTO;
 
 @RestController
 @RequestMapping("/expert")
@@ -88,6 +90,39 @@ public class ExpertController {
     @GetMapping("/experts")
     public Result<List<ExpertVO>> experts(@RequestParam(required = false) String domain) {
         return Result.success(expertService.listExperts(domain));
+    }
+
+    /**
+     * 专家详细介绍页（需求 9：每个专家要有一个单独的详细介绍页）。
+     *
+     * <p>列表页那张卡只够写一句履历，用户挑专家是照着自己的难题挑的，
+     * 看完卡片仍不知道这位能不能解决自己的问题。详情页把擅长领域、
+     * 答复过的问题、高频预约主题摊开，才是「对号入座」的依据。</p>
+     *
+     * <p>未过审的专家与不存在的专家返回同一个「不存在」，理由见
+     * {@code ExpertServiceImpl#getExpertDetail}。</p>
+     */
+    @GetMapping("/experts/{expertId}")
+    public Result<ExpertDetailVO> expertDetail(@PathVariable Long expertId) {
+        return Result.success(expertService.getExpertDetail(expertId));
+    }
+
+    /**
+     * 提交专家资格认证材料（需求 10）。
+     *
+     * <p>与 {@link #profile()} 的区别：那个用于「已通过的专家维护自己那一份」，
+     * 本接口用于「刚注册、还没通过认证」的人首次提交资质。
+     * 二者的关键差别是<b>能不能改审核状态</b>：本接口只写材料，
+     * {@code audit_status} 一律由管理员侧接口决定。</p>
+     *
+     * <p>需要专家角色 —— 非专家账号进来直接 403，这是「专家才能申请成为专家」
+     * 的第一道闸；真正的准入判断在 Service 层（是否已有档案/是否已通过）。</p>
+     */
+    @PostMapping("/certify")
+    public Result<Void> certify(@RequestBody @Valid ExpertCertifyDTO dto) {
+        permissionChecker.requireRole(RoleConstant.EXPERT);
+        expertService.certify(UserContext.currentUserId(), dto);
+        return Result.success();
     }
 
     /**

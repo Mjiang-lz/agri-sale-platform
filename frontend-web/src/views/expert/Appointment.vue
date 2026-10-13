@@ -32,14 +32,30 @@
     </el-card>
 
     <section class="expert-grid">
-      <article v-for="expert in filteredExperts" :key="expert.expertId" class="expert-card">
+      <article
+        v-for="expert in filteredExperts"
+        :key="expert.expertId"
+        class="expert-card"
+      >
         <div class="expert-card-head">
-          <el-avatar :size="56">{{ expert.realName.slice(0, 1) }}</el-avatar>
+          <!-- ★ 必须接 :src：expertAvatar() 优先用库里 avatarUrl（OBS 绝对地址，
+               实测 200 可取），库里为空的落到 public/experts/ 的本地图。
+               原先这里只有 {{ realName.slice(0,1) }}，所以无论库里有没有头像
+               都显示首字方块 —— 这正是「专家页头像要正常显示」的真实病因 -->
+          <el-avatar :size="56" :src="expertAvatar(expert)">
+            {{ expertInitial(expert.realName) }}
+          </el-avatar>
           <div><h3>{{ expert.realName }}</h3><el-tag type="success" effect="plain">{{ expert.expertDomain }}</el-tag></div>
         </div>
         <p>{{ expert.introduction }}</p>
-        <div class="workload">{{ expert.workloadStat }}</div>
-        <el-button type="primary" style="width: 100%" :disabled="!canBookAppointment" @click="openDialog(expert)">预约该专家</el-button>
+        <!-- ★ v-if：接口兜底名单里 workloadStat 是空串，留着会渲染出一块空黄色条 -->
+        <div v-if="expert.workloadStat" class="workload">{{ expert.workloadStat }}</div>
+        <div class="expert-card-acts">
+          <!-- 介绍页是「想知道这位能不能解决我的问题」的入口（需求 9），
+               所以和「预约」并列，而不是把介绍藏在姓名里 -->
+          <el-button plain @click="goDetail(expert)">查看介绍</el-button>
+          <el-button type="primary" :disabled="!canBookAppointment" @click="openDialog(expert)">预约该专家</el-button>
+        </div>
       </article>
       <el-empty v-if="!filteredExperts.length" description="没有找到符合条件的专家" />
     </section>
@@ -96,7 +112,7 @@
     <el-dialog v-model="dialogVisible" title="提交专家预约" width="min(620px, 94vw)" destroy-on-close>
       <div v-if="selectedExpert" class="selected-expert">
         <el-avatar :size="46">{{ selectedExpert.realName.slice(0, 1) }}</el-avatar>
-        <div><strong>{{ selectedExpert.realName }} · {{ selectedExpert.expertDomain }}</strong><span>{{ selectedExpert.workloadStat }}</span></div>
+        <div><strong>{{ selectedExpert.realName }} · {{ selectedExpert.expertDomain }}</strong><span v-if="selectedExpert.workloadStat">{{ selectedExpert.workloadStat }}</span></div>
       </div>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
         <el-form-item label="预约专家" prop="expertId">
@@ -122,10 +138,11 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ExpertAppointmentPanel from '@/components/expert/ExpertAppointmentPanel.vue'
 import { getMyAppointments, submitAppointment } from '@/api/expert'
-import { expertOptions } from '@/constants/experts'
+import { expertOptions, useExperts } from '@/constants/experts'
+import { expertAvatar, expertInitial } from '@/utils/imagery'
 import { useUserStore } from '@/store/user'
 
 /**
@@ -138,11 +155,18 @@ import { useUserStore } from '@/store/user'
  * 换浏览器/清缓存就没了，也拿不到专家的处理意见。现已改为读取服务端数据。
  */
 const userStore = useUserStore()
+const router = useRouter()
+// 专家列表来自 GET /expert/experts（原先是 constants/experts.js 里写死的两位）
+const { load: loadExperts } = useExperts()
 // 管理员与农户同口径（与 MainLayout 的 isFarmerLike 一致）：
 // 农户是平台主体、预约是通用能力，管理员也应当能看到预约入口。
 // ⚠️ 这只管「能否看到/预约」，真正写入仍由后端 requireRole 拦截。
 const canBookAppointment = computed(() => ['农户', '管理员'].includes(userStore.profile?.roleName))
 const isExpert = computed(() => userStore.profile?.roleName === '专家')
+// ★ expertOptions 现在是响应式 ref（数据驱动）。模板里 ref 会自动解包，
+//   但 JS 里拿到的是 ref 对象 —— 直接 experts.filter(...) 会抛
+//   「experts.filter is not a function」，整页白屏且控制台只有一条
+//   Vue warn，没有别的线索。脚本里一律取 .value。
 const experts = expertOptions
 const appointments = ref([])
 const loadingAppointments = ref(false)
@@ -162,7 +186,12 @@ const route = useRoute()
 const keyword = ref(pickQuery(route.query.keyword))
 const domain = ref('全部')
 const formRef = ref()
-const domains = ['全部', '种植与植保', '畜牧与水产']
+/**
+ * 领域筛选（需求 6）。原先写死 ['全部','种植与植保','畜牧与水产'] ——
+ * 新增专家后他的领域不在这个列表里，用户就筛不出来（虽然卡片还在，
+ * 但「按领域找专家」这个最自然的用法直接失效了）。改成从专家列表派生。
+ */
+const domains = computed(() => ['全部', ...new Set(experts.value.map((e) => e.expertDomain).filter(Boolean))])
 const form = reactive({ expertId: null, apptTime: '', apptTopic: '', remark: '' })
 
 function validateFutureTime(rule, value, callback) {
@@ -182,7 +211,7 @@ const rules = {
   apptTopic: [{ required: true, message: '请填写咨询主题', trigger: 'blur' }]
 }
 
-const filteredExperts = computed(() => experts.filter((item) => {
+const filteredExperts = computed(() => experts.value.filter((item) => {
   const domainMatch = domain.value === '全部' || item.expertDomain === domain.value
   const key = keyword.value.trim()
   const keywordMatch = !key || `${item.realName}${item.expertDomain}${item.introduction}`.includes(key)
@@ -237,6 +266,9 @@ function statusTagType(status) {
 
 function openDialog(expert) { selectedExpert.value = expert; form.expertId = expert.expertId; form.apptTime = ''; form.apptTopic = ''; form.remark = ''; dialogVisible.value = true }
 
+/** 跳到该专家的介绍页（需求 9） */
+function goDetail(expert) { router.push(`/expert/${expert.expertId}`) }
+
 async function handleSubmit() {
   if (!canBookAppointment.value) {
     ElMessage.warning('只有农户账号可以提交专家预约')
@@ -258,7 +290,11 @@ async function handleSubmit() {
 }
 
 function formatDateTime(value) { return value ? String(value).replace('T', ' ').slice(0, 16) : '--' }
-onMounted(loadAppointments)
+onMounted(() => {
+  // 专家列表走接口（原先是写死的两位），不拉就只有兜底名单
+  loadExperts()
+  loadAppointments()
+})
 </script>
 
 <style scoped>
@@ -281,6 +317,9 @@ onMounted(loadAppointments)
 .expert-card-head h3 { margin: 0 0 7px; }
 .expert-card > p { min-height: 74px; color: var(--el-text-color-secondary); line-height: 1.7; }
 .workload { margin: 14px 0; padding: 11px; border-radius: 10px; color: #8d6424; background: #fff8e8; font-size: 12px; }
+/* 「查看介绍」与「预约」并列：介绍页是「这位能不能解决我的问题」的判断依据 */
+.expert-card-acts { display: flex; gap: 10px; }
+.expert-card-acts .el-button { flex: 1; margin-left: 0; }
 .recent-card { border-radius: 16px; }
 .recent-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
 .recent-head strong, .recent-head span { display: block; }

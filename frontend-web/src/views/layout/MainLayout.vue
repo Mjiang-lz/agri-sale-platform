@@ -46,7 +46,7 @@
                  后端 pageMyProducts 是 requireRole(FARMER)，管理员调它直接 403。
                  治理要看全平台在售货源，那是「商品货源」那一项，不在这里。 -->
             <el-menu-item v-if="isFarmer" index="/trade/my-products">
-              <RxtIcon name="ico-source" />
+              <RxtIcon name="ico-myproduct" />
               <span>我的商品</span>
             </el-menu-item>
           </el-sub-menu>
@@ -83,7 +83,19 @@
               <span>融资审批</span>
             </el-menu-item>
           </el-sub-menu>
-          <template v-if="canSeeExpert && actualRole === '专家'">
+          <!--
+            专家角色且**尚未通过资格认证**：不给专家工作台，只留一条去认证的入口。
+            未过审的专家看不到待处理提问/预约，是因为「能处理别人的提问」本身就是
+            一种执业资格，认证通过才该给（后端 /expert/qa/pending 等接口也会 403，
+            这里只是不让人看见一个点了就报错的入口）。
+          -->
+          <template v-if="isPendingExpert">
+            <el-menu-item index="/user/profile">
+              <RxtIcon name="ico-expert" />
+              <span>专家资格认证</span>
+            </el-menu-item>
+          </template>
+          <template v-else-if="canSeeExpert && actualRole === '专家'">
             <el-menu-item index="/expert/knowledge">
               <RxtIcon name="ico-knowledge" />
               <span>农业知识</span>
@@ -125,26 +137,73 @@
               <span>个人信息</span>
             </el-menu-item>
             <el-menu-item index="/user/address">
-              <RxtIcon name="ico-order" />
+              <RxtIcon name="ico-address" />
               <span>收货地址</span>
             </el-menu-item>
           </el-sub-menu>
         </el-menu>
 
-        <el-dropdown v-if="isLoggedIn" trigger="click" @command="handleUserCommand">
-          <button class="user-button" type="button">
+        <!-- 已登录：退出登录 + 消息提醒 + 头像（自左向右，两项都在头像左边）。
+             2026-10-13 改版，原先是 el-dropdown（账号身份 / 个人中心 / 退出登录）：
+               · 「账号身份」是一行 disabled 文字，信息与顶栏按角色的菜单分流重复；
+               · 退出登录藏在两层菜单最里面，用户明确反馈「这个没必要要了」。
+             现在：退出提成常驻按钮；头像本身即「进个人中心」的入口，点一下直达。 -->
+        <div v-if="isLoggedIn" class="user-area">
+          <el-button class="logout-btn" size="small" plain @click="handleLogout">
+            <RxtIcon name="ico-logout" :size="15" />
+            <span>退出登录</span>
+          </el-button>
+
+          <el-popover
+            v-model:visible="msgOpen"
+            placement="bottom-end"
+            :width="372"
+            trigger="click"
+            popper-class="msg-popover"
+            @show="loadMessages(true)"
+          >
+            <template #reference>
+              <el-badge :value="msgTotal" :hidden="msgTotal === 0" :max="99" class="msg-badge">
+                <button class="icon-btn" type="button" aria-label="消息提醒">
+                  <RxtIcon name="ico-bell" :size="20" />
+                </button>
+              </el-badge>
+            </template>
+
+            <!-- v-loading：EP 全量注册时该指令是全局的（main.js 走 app.use(ElementPlus)） -->
+            <div class="msg-panel" v-loading="msgLoading">
+              <header class="msg-head">
+                <strong>消息提醒</strong>
+                <span>{{ msgTotal ? `${msgTotal} 项待处理` : '暂无待处理' }}</span>
+              </header>
+              <ul v-if="msgItems.length" class="msg-list">
+                <li
+                  v-for="m in msgItems"
+                  :key="m.key"
+                  class="msg-item"
+                  @click="goMessage(m)"
+                >
+                  <span class="msg-dot" :class="`is-${m.tone}`"></span>
+                  <div class="msg-body">
+                    <strong>{{ m.title }}<em v-if="m.count > 1">×{{ m.count }}</em></strong>
+                    <small>{{ m.desc }}</small>
+                  </div>
+                  <span class="msg-go">→</span>
+                </li>
+              </ul>
+              <p v-else class="msg-empty">当前没有需要你处理的事项</p>
+              <footer class="msg-foot">
+                <span>按当前账号角色实时汇总，点条目进入对应页面</span>
+                <el-button link type="primary" :loading="msgLoading" @click="loadMessages(true)">刷新</el-button>
+              </footer>
+            </div>
+          </el-popover>
+
+          <button class="user-button" type="button" title="进入个人中心" @click="router.push('/user/profile')">
             <el-avatar :size="34" :src="avatarUrl">{{ nameInitial }}</el-avatar>
             <span class="ub-name">{{ displayName }}</span>
           </button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item disabled>账号身份：{{ actualRole || '未同步' }}</el-dropdown-item>
-              
-              <el-dropdown-item divided command="profile">个人中心</el-dropdown-item>
-              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        </div>
 
         <!-- 未登录访客：商品货源与商品详情已经开放，此时不能显示身份切换器 ——
              activeRole 在无登录态时会退回 '农户' 这个默认值，展示出来就是一句
@@ -162,16 +221,17 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { useMessages } from '@/composables/useMessages'
+import { getExpertProfile } from '@/api/expert'
 import RxtIcon from '@/components/RxtIcon.vue'
 import RxtLogo from '@/components/RxtLogo.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const activeRole = computed(() => userStore.activeRole)
 const actualRole = computed(() => userStore.profile?.roleName || '')
 
 // 顶栏显示的是「昵称」，不是「身份」。
@@ -233,8 +293,42 @@ const canSeeTrade = computed(() => isLoggedIn.value ? (menuPerms.value.includes(
 const canSeeFinance = computed(() => menuPerms.value.includes('finance'))
 const canSeeExpert = computed(() => menuPerms.value.includes('expert'))
 const canSeeUser = computed(() => menuPerms.value.includes('user'))
-const canSwitchRole = computed(() => ['农户', '采购方'].includes(actualRole.value))
 const canAccessAppointment = computed(() => ['农户', '专家'].includes(actualRole.value))
+
+/* ---------- 专家资格认证闸门（需求 10） ---------- */
+const expertAuditStatus = ref('')
+/**
+ * 是否是「还没通过资格认证的专家」。
+ *
+ * ★ 只有真实角色是专家、且档案状态不是「已通过」时才为 true。
+ *   三种情形分别为 false：
+ *     · 非专家 —— 与认证无关；
+ *     · 档案拉取失败（游客、非专家、网络抖动）—— 不能因为一次拉取失败
+ *       就把专家的整个工作台藏起来，那比多显示一个入口糟糕得多；
+ *     · 已通过 —— 正常显示工作台。
+ *
+ * 初值为空串而不是 true/false：认证状态是**登录后异步拉**的，
+ * 初值若写成 false，用户刷新瞬间会看到完整菜单闪一下再消失。
+ * 空串在模板里与 false 同义，但语义是「还不知道」，不会误判。
+ */
+const isPendingExpert = computed(() => {
+  if (actualRole.value !== '专家') return false
+  if (!expertAuditStatus.value) return false
+  return expertAuditStatus.value !== '已通过'
+})
+
+if (actualRole.value === '专家') {
+  // 只有专家角色才拉：非专家调这个接口后端一律 403，没必要发一次注定失败的请求
+  getExpertProfile()
+    .then((p) => { expertAuditStatus.value = p?.auditStatus || '' })
+    .catch(() => { expertAuditStatus.value = '' })
+}
+
+/* ---------- 消息提醒（顶栏铃铛） ---------- */
+const msgOpen = ref(false)
+const { items: msgItems, total: msgTotal, loading: msgLoading, load: loadMessages } = useMessages()
+// 进页面就拉一次，铃铛上的角标不必等用户点开才出现
+loadMessages()
 
 const activeMenu = computed(() => {
   if (route.path.startsWith('/trade/product')) return '/trade/products'
@@ -247,19 +341,22 @@ const activeMenu = computed(() => {
   return route.path
 })
 
-function handleUserCommand(command) {
-  if (command.startsWith('role:')) {
-    userStore.setActiveRole(command.slice(5))
-    return
-  }
-  if (command === 'profile') {
-    router.push('/user/profile')
-    return
-  }
-  if (command === 'logout') {
-    userStore.logout()
-    router.push('/login')
-  }
+/**
+ * 退出登录。
+ *
+ * ★ `userStore.logout()` 必须连 activeRole 一起清（store 内部已处理），
+ *   否则下次登录另一个角色时，残留的 activeRole 会让「身份切换」显示成上一个账号的。
+ * 登出后回登录页，不带 redirect —— 此时已无登录态，回跳目标没有意义。
+ */
+function handleLogout() {
+  userStore.logout()
+  router.push('/login')
+}
+
+/** 点消息条目：关掉浮层再跳，否则浮层会挂在登录页/目标页上一瞬 */
+function goMessage(m) {
+  msgOpen.value = false
+  if (m?.path) router.push(m.path)
 }
 </script>
 
@@ -285,6 +382,23 @@ function handleUserCommand(command) {
 /* 菜单图标与文字间距。用 :deep() 是因为 RxtIcon 是子组件，
    它的根元素带的是自己那份 scope id，父组件的普通选择器选不稳。 */
 .top-nav :deep(.rxt-icon) { margin-right: 7px; }
+.user-area { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+/* 退出登录：常驻按钮（原先进下拉最里层，用户反馈藏得太深）。
+   plain + small 是不抢头像的视觉重心；字重提一档让它读起来是「可点的动作」。 */
+.logout-btn { font-weight: 600; }
+.logout-btn :deep(.rxt-icon) { margin-right: 5px; }
+/* 消息铃铛：方形图标按钮。用 button 而不是 el-button —— 这里要的是一个纯图标靶位，
+   套 el-button 会多带一层内边距与文字基线，34px 的方块会缩成 28px。 */
+.icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0;
+  border: 1px solid var(--rxt-border); border-radius: 10px;
+  background: var(--el-bg-color); color: var(--rxt-ink-weak);
+  cursor: pointer; transition: color .2s, border-color .2s;
+}
+.icon-btn:hover { color: var(--rxt-primary); border-color: var(--rxt-primary); }
+/* el-badge 是 inline-block，会和按钮之间多出一层行高，压成 inline-flex */
+.msg-badge { display: inline-flex; }
 .user-button { display: flex; align-items: center; gap: 8px; padding: 4px; border: 0; background: transparent; color: var(--el-text-color-primary); cursor: pointer; white-space: nowrap; }
 /* 顶栏右侧显示昵称。比其他文字加粗一档 —— 原来这里是「当前身份：农户」这类
    说明性文字，现在它是账号主体本身 */
@@ -294,4 +408,57 @@ function handleUserCommand(command) {
 .business-footer { width: var(--rxt-container); margin: 0 auto; padding: 18px 0 26px; display: flex; justify-content: space-between; color: var(--rxt-ink-weak); border-top: 1px solid var(--rxt-border); font-size: 12px; }
 @media (max-width: 1050px) { .header-inner { height: auto; padding: 12px 0; flex-wrap: wrap; gap: 10px; } .top-nav { order: 3; flex-basis: 100%; overflow-x: auto; } .user-button span { display: none; } }
 @media (max-width: 680px) { .header-inner, .business-main, .business-footer { width: min(100% - 24px, 1420px); } .brand small { display: none; } .business-footer { flex-direction: column; gap: 6px; } }
+</style>
+
+<!--
+  消息浮层的样式必须放**非 scoped** 块：el-popover 的内容默认 teleport 到 body，
+  带的是它自己的作用域标记，写在上面那个 scoped 块里一条都吃不到
+  （与 AuthShell 给插槽内容用的 .auth-* 是同一个道理）。
+-->
+<style>
+/* 清掉 EP 默认的 12px 内边距，让面板自己控制留白 */
+.el-popover.msg-popover { padding: 0; }
+
+.msg-panel { width: 100%; box-sizing: border-box; }
+
+.msg-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 13px 16px 11px; border-bottom: 1px solid var(--rxt-border);
+}
+.msg-head strong { font-size: 14px; }
+.msg-head span { font-size: 12px; color: var(--rxt-ink-weak); }
+
+.msg-list { margin: 0; padding: 4px 0; list-style: none; max-height: 340px; overflow-y: auto; }
+.msg-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 16px; cursor: pointer; transition: background .15s;
+}
+.msg-item:hover { background: var(--el-color-primary-light-9); }
+.msg-dot {
+  flex: none; width: 7px; height: 7px; margin-top: 6px;
+  border-radius: 50%; background: var(--rxt-ink-weak);
+}
+.msg-dot.is-warning { background: var(--el-color-warning); }
+.msg-dot.is-danger  { background: var(--el-color-danger); }
+.msg-dot.is-primary { background: var(--el-color-primary); }
+.msg-dot.is-success { background: var(--el-color-success); }
+.msg-body { flex: 1; min-width: 0; }
+.msg-body strong { display: block; font-size: 13px; font-weight: 600; }
+.msg-body strong em {
+  margin-left: 5px; font-style: normal; font-size: 12px; font-weight: 700;
+  color: var(--el-color-danger); font-variant-numeric: tabular-nums;
+}
+.msg-body small {
+  display: block; margin-top: 3px; font-size: 12px; color: var(--rxt-ink-weak);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.msg-go { flex: none; margin-top: 2px; color: var(--rxt-primary); }
+
+.msg-empty { margin: 0; padding: 30px 16px; text-align: center; font-size: 13px; color: var(--rxt-ink-weak); }
+
+.msg-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 12px 9px 16px; border-top: 1px solid var(--rxt-border);
+  font-size: 12px; color: var(--rxt-ink-weak);
+}
 </style>

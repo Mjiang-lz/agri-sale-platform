@@ -6,8 +6,10 @@ import com.rxt.dto.AdminExpertUpdateDTO;
 import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
 import com.rxt.dto.ExpertProfileUpdateDTO;
+import com.rxt.dto.ExpertCertifyDTO;
 import com.rxt.entity.Appointment;
 import com.rxt.entity.ExpertInfo;
+import com.rxt.entity.Question;
 import com.rxt.mapper.AppointmentMapper;
 import com.rxt.mapper.ExpertInfoMapper;
 import com.rxt.mapper.KnowledgeMapper;
@@ -17,6 +19,7 @@ import com.rxt.entity.User;
 import com.rxt.security.PermissionChecker;
 import com.rxt.service.ExpertService;
 import com.rxt.vo.AppointmentVO;
+import com.rxt.vo.ExpertDetailVO;
 import com.rxt.vo.ExpertProfileVO;
 import com.rxt.vo.ExpertVO;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -28,6 +31,7 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +43,16 @@ public class ExpertServiceImpl implements ExpertService {
 
     /** 审核结论词表里的「通过」。全仓没有共享常量类，各服务各自持有（同 HomeServiceImpl:49）。 */
     private static final String AUDIT_APPROVED = "已通过";
+
+    /** 审核结论词表里的「待审核」：自助注册后、资质材料待管理员核对 */
+    private static final String AUDIT_PENDING = "待审核";
+
+    /** 提问状态：已回复（专家详情页的「答复过的问题」只认这个状态） */
+    private static final String QUESTION_ANSWERED = "已回复";
+
+    /** 预约状态：已接受 / 已完成（两者都算服务真正闭环了） */
+    private static final String APPT_ACCEPTED = "已接受";
+    private static final String APPT_FINISHED = "已完成";
 
     @Autowired private KnowledgeMapper knowledgeMapper;
     @Autowired private QuestionMapper questionMapper;
@@ -262,6 +276,141 @@ public class ExpertServiceImpl implements ExpertService {
             result.add(vo);
         }
         return result;
+    }
+
+    @Override
+    public ExpertDetailVO getExpertDetail(Long expertId) {
+        ExpertInfo expert = expertInfoMapper.selectById(expertId);
+        // 未过审的专家与不存在的专家返回同一个错：分开报错等于给未过审的人
+        // 一个「专家存在、只是还没过审」的存在性探测接口。
+        if (expert == null || !AUDIT_APPROVED.equals(expert.getAuditStatus())) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "专家不存在或尚未通过资格认证");
+        }
+
+        User user = expert.getUserId() == null ? null : userMapper.selectById(expert.getUserId());
+
+        ExpertDetailVO vo = new ExpertDetailVO();
+        vo.setExpertId(expert.getExpertId());
+        vo.setUserId(expert.getUserId());
+        vo.setExpertDomain(expert.getExpertDomain());
+        vo.setIntroduction(expert.getIntroduction());
+        vo.setWorkloadStat(expert.getWorkloadStat());
+        vo.setRealName(user == null || user.getRealName() == null ? "" : user.getRealName());
+        vo.setAvatarUrl(user == null ? null : user.getAvatarUrl());
+
+        // 下面四个统计全部现算，不读 workload_stat —— 那是手写文案，
+        // 与真实条数对不上（库里写「已回复提问 42 条」，实际可能只有个位数）。
+        // 详情页摆一个点进去对不上的数字，整页可信度就没了。
+        vo.setAnsweredCount(countToInt(questionMapper.selectCount(Wrappers.<Question>lambdaQuery()
+                .eq(Question::getExpertId, expertId)
+                .eq(Question::getStatus, QUESTION_ANSWERED))));
+        vo.setAskedCount(countToInt(questionMapper.selectCount(Wrappers.<Question>lambdaQuery()
+                .eq(Question::getExpertId, expertId))));
+
+        List<Appointment> appointments = appointmentMapper.selectList(
+                Wrappers.<Appointment>lambdaQuery()
+                        .eq(Appointment::getExpertId, expertId));
+        vo.setAppointmentCount(appointments.size());
+        vo.setFinishedCount((int) appointments.stream()
+                .filter(a -> APPT_ACCEPTED.equals(a.getApptStatus()) || APPT_FINISHED.equals(a.getApptStatus()))
+                .count());
+
+        vo.setRecentAnswers(loadRecentAnswers(expertId));
+        vo.setAppointmentTopics(extractTopics(appointments));
+        return vo;
+    }
+
+    /** 该专家最近答复过的提问摘要（最多 5 条）。 */
+    private List<ExpertDetailVO.AnsweredQuestion> loadRecentAnswers(Long expertId) {
+        List<Question> questions = questionMapper.selectList(
+                Wrappers.<Question>lambdaQuery()
+                        .eq(Question::getExpertId, expertId)
+                        .eq(Question::getStatus, QUESTION_ANSWERED)
+                        .orderByDesc(Question::getAskTime)
+                        .orderByDesc(Question::getQuestionId)
+                        .last("LIMIT 5"));
+        List<ExpertDetailVO.AnsweredQuestion> result = new ArrayList<>(questions.size());
+        for (Question q : questions) {
+            ExpertDetailVO.AnsweredQuestion item = new ExpertDetailVO.AnsweredQuestion();
+            item.setContent(truncate(q.getContent(), 60));
+            item.setAskTime(q.getAskTime() == null ? null
+                    : q.getAskTime().toLocalDate().toString());
+            result.add(item);
+        }
+        return result;
+    }
+
+    /**
+     * 从预约主题里提取高频关键词。
+     *
+     * <p>直接摆原始 {@code appt_topic} 没意义 —— 用户写的是「李子不熟怎么办」
+     * 这种一句话，重复率低、互相比对不上。这里只取出现 2 次以上的主题，
+     * 让「找他的人都在问什么」这件事真的看得出来；一个都没有就不返回该分区。</p>
+     */
+    private List<String> extractTopics(List<Appointment> appointments) {
+        Map<String, Integer> counter = new LinkedHashMap<>();
+        for (Appointment a : appointments) {
+            String topic = a.getApptTopic();
+            if (!StringUtils.hasText(topic)) {
+                continue;
+            }
+            String key = truncate(topic.trim(), 16);
+            counter.merge(key, 1, Integer::sum);
+        }
+        return counter.entrySet().stream()
+                .filter(e -> e.getValue() >= 2)
+                .sorted((a, b) -> b.getValue() - a.getValue())
+                .limit(5)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+    }
+
+    /** 按字符截断并补省略号。中文按字算即可，这里不做词边界处理。 */
+    private String truncate(String text, int max) {
+        if (text == null) {
+            return "";
+        }
+        String t = text.trim();
+        return t.length() <= max ? t : t.substring(0, max) + "…";
+    }
+
+    /** selectCount 回 Long，VO 里声明的是 Integer；null 一律归 0，别把 null 抛给前端。 */
+    private Integer countToInt(Long count) {
+        return count == null ? 0 : count.intValue();
+    }
+
+    /**
+     * 提交专家资格认证材料（需求 10）。
+     *
+     * <p>自助注册选「专家」时已经建好一份 {@code auditStatus='待审核'} 的空档案，
+     * 本方法负责把领域与简介填进去。<b>不改审核状态</b> —— 能否执业由管理员决定，
+     * 本人只能提交材料。</p>
+     *
+     * <p>已通过的专家再调一次会走到「已认证过」的分支：允许补资料但不再重置状态。
+     * 若这里把状态打回「待审核」，等于让任何已通过的专家点一下就把自己从
+     * 公开专家列表里摘掉。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void certify(Long userId, ExpertCertifyDTO dto) {
+        ExpertInfo expert = requireOwnExpert(userId);
+        if (AUDIT_APPROVED.equals(expert.getAuditStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "你的专家资格已通过认证，如需修改资料请在「个人中心 → 专家信息」里编辑");
+        }
+
+        ExpertInfo update = new ExpertInfo();
+        update.setExpertId(expert.getExpertId());
+        update.setExpertDomain(dto.getExpertDomain().trim());
+        update.setIntroduction(dto.getIntroduction().trim());
+        // 资料有实质变化才重新送审。重复点提交会把管理员的待办列表刷一遍，
+        // 让人以为又多了一份新申请。
+        boolean changed = !dto.getExpertDomain().trim().equals(expert.getExpertDomain())
+                || !dto.getIntroduction().trim().equals(expert.getIntroduction());
+        if (changed) {
+            update.setAuditStatus(AUDIT_PENDING);
+        }
+        expertInfoMapper.updateById(update);
     }
 
     @Override
