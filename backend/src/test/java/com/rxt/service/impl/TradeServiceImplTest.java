@@ -3,6 +3,7 @@ package com.rxt.service.impl;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.rxt.common.BizException;
+import com.rxt.common.NotificationType;
 import com.rxt.common.ResultCode;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.entity.Cart;
@@ -15,8 +16,12 @@ import com.rxt.mapper.ProductMapper;
 import com.rxt.mapper.UserMapper;
 import com.rxt.security.PermissionChecker;
 import com.rxt.security.RoleConstant;
+import com.rxt.service.AddressService;
 import com.rxt.service.CommentService;
+import com.rxt.service.NotificationService;
+import com.rxt.vo.AddressVO;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +40,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -106,6 +113,12 @@ class TradeServiceImplTest {
     private static final Long PRODUCT_ID = 41L;
     private static final Long CART_ID = 11L;
 
+    /** 收货地址主键。10-10 起 createOrder 会先校验它 */
+    private static final Long ADDRESS_ID = 900L;
+
+    /** 订单号。通知正文要带上它，否则用户拿着「你的订单已发货」不知道是哪一单 */
+    private static final String ORDER_NO = "RX20260906001";
+
     /** 订单状态常量，取值与 t_order.order_status 一致 */
     private static final String PENDING_PAY = "待支付";
     private static final String WAIT_DELIVER = "待发货";
@@ -127,9 +140,37 @@ class TradeServiceImplTest {
     private CommentService commentService;
     @Mock
     private PermissionChecker permissionChecker;
+    /**
+     * 收货地址服务。10-10 组长给 createOrder 加了「校验收货地址」这一步
+     * （affe4c2），新增了构造依赖但没同步这里 —— 于是从那天起本类有 8 个下单用例
+     * 一直以 NPE 失败，只是没人跑过（本机 Maven 起不来）。
+     */
+    @Mock
+    private AddressService addressService;
+    /**
+     * 站内通知。订单状态流转会往里写通知（付款通知卖家、发货通知买家、收货与取消通知卖家），
+     * 少这个 mock 会让四个流转全部 NPE。
+     */
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private TradeServiceImpl tradeService;
+
+    /**
+     * 统一给「校验收货地址」这一步备好一笔合法地址。
+     *
+     * <p>放在 {@code @BeforeEach} 而不是逐个下单用例里 stub：8 个用例都要它，
+     * 复制 8 遍迟早漏一处。购物车等不下单的用例不会用到，但 Mockito 的
+     * 「多余 stub」判定是按<b>整个类</b>看的，只要有一个用例用上就不算多余。</p>
+     */
+    @BeforeEach
+    void stubPickableAddress() {
+        // 用 lenient：本类的严格模式是**按用例**判定「多余 stub」的，
+        // 而购物车等不下单的用例根本不会走到地址校验 —— 不放宽的话它们全会被
+        // 判成 UnnecessaryStubbing 而失败（实测 26 个用例里 15 个因此变红）。
+        lenient().when(addressService.loadOwned(anyLong(), any())).thenReturn(addressFixture());
+    }
 
     // ---------------- 测试夹具 ----------------
 
@@ -145,10 +186,11 @@ class TradeServiceImplTest {
         return p;
     }
 
-    /** 指定状态的订单：买家 BUYER、卖家 SELLER、买 3 件 */
+    /** 指定状态的订单：买家 BUYER、卖家 SELLER、买 3 件、订单号 RX20260906001 */
     private Order orderWithStatus(String status) {
         Order o = new Order();
         o.setOrderId(ORDER_ID);
+        o.setOrderNo(ORDER_NO);
         o.setBuyerId(BUYER);
         o.setSellerId(SELLER);
         o.setProductId(PRODUCT_ID);
@@ -162,6 +204,20 @@ class TradeServiceImplTest {
         dto.setProductId(PRODUCT_ID);
         dto.setQuantity(quantity);
         return dto;
+    }
+
+    /** 一笔合法的收货地址快照（省 + 市 + 区县 + 详细地址拼好的整串） */
+    private AddressVO addressFixture() {
+        AddressVO vo = new AddressVO();
+        vo.setAddressId(ADDRESS_ID);
+        vo.setConsignee("刘美玲");
+        vo.setPhone("13800000006");
+        vo.setProvince("江西省");
+        vo.setCity("赣州市");
+        vo.setDistrict("信丰县");
+        vo.setDetail("嘉定镇 1 号");
+        vo.setFullAddress("江西省赣州市信丰县嘉定镇 1 号");
+        return vo;
     }
 
     private Cart cartOf(Long cartId, Long buyerId) {
@@ -479,5 +535,98 @@ class TradeServiceImplTest {
                 () -> tradeService.updateCartQuantity(BUYER, CART_ID, -1));
 
         verifyNoInteractions(cartMapper);
+    }
+
+    // ==================== 七、站内通知：订单流转的挂载点 ====================
+
+    /**
+     * 这一组守的是「通知到底发没发、发给谁、失败了会不会多发」。
+     *
+     * <p>为什么值得单独守护：通知是<b>只读副本</b>，写错不会让任何业务数据变脏 ——
+     * 发漏了用户只是「没收到提醒」（很难被主动发现），发重了用户看到两条一样的
+     * （也不会有人报障）。两类问题都不会产生报错或日志，靠联调几乎发现不了。</p>
+     */
+
+    @Test
+    @DisplayName("★ 支付成功 → 通知卖家（不是买家）：只有发货方能推动下一步")
+    void payOrder_success_notifiesSeller() {
+        when(orderMapper.selectById(ORDER_ID)).thenReturn(orderWithStatus(PENDING_PAY));
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+
+        tradeService.payOrder(BUYER, ORDER_ID);
+
+        ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
+        verify(notificationService).send(eq(SELLER), eq(NotificationType.ORDER),
+                title.capture(), content.capture(), eq(ORDER_ID));
+        assertEquals("买家已付款", title.getValue());
+        // 正文必须带订单号：一条只说「已付款」的通知，卖家不知道是哪个单
+        assertTrue(content.getValue().contains("RX"),
+                "通知正文应带订单号，实际：" + content.getValue());
+    }
+
+    @Test
+    @DisplayName("★ 发货成功 → 通知买家")
+    void deliverOrder_success_notifiesBuyer() {
+        when(orderMapper.selectById(ORDER_ID)).thenReturn(orderWithStatus(WAIT_DELIVER));
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+
+        tradeService.deliverOrder(SELLER, ORDER_ID);
+
+        verify(notificationService).send(eq(BUYER), eq(NotificationType.ORDER),
+                eq("订单已发货"), any(), eq(ORDER_ID));
+    }
+
+    @Test
+    @DisplayName("★ 确认收货成功 → 通知卖家")
+    void receiveOrder_success_notifiesSeller() {
+        when(orderMapper.selectById(ORDER_ID)).thenReturn(orderWithStatus(WAIT_RECEIVE));
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+
+        tradeService.receiveOrder(BUYER, ORDER_ID);
+
+        verify(notificationService).send(eq(SELLER), eq(NotificationType.ORDER),
+                eq("买家已确认收货"), any(), eq(ORDER_ID));
+    }
+
+    @Test
+    @DisplayName("★ 取消成功 → 通知卖家（订单从「我卖出的」里消失，卖家不会主动发现）")
+    void cancelOrder_success_notifiesSeller() {
+        when(orderMapper.selectById(ORDER_ID)).thenReturn(orderWithStatus(PENDING_PAY));
+        when(orderMapper.update(isNull(), any())).thenReturn(1);
+
+        tradeService.cancelOrder(BUYER, ORDER_ID);
+
+        verify(notificationService).send(eq(SELLER), eq(NotificationType.ORDER),
+                eq("订单已取消"), any(), eq(ORDER_ID));
+    }
+
+    @Test
+    @DisplayName("★ 状态流转失败 → 一条通知都不发（否则用户会收到「已发货」，订单却没变）")
+    void failedTransition_sendsNoNotification() {
+        // 状态本来就不对
+        when(orderMapper.selectById(ORDER_ID)).thenReturn(orderWithStatus(WAIT_RECEIVE));
+        expectBizException(ResultCode.BAD_REQUEST.getCode(),
+                () -> tradeService.payOrder(BUYER, ORDER_ID));
+
+        // 并发重复提交：rows == 0
+        when(orderMapper.selectById(ORDER_ID)).thenReturn(orderWithStatus(PENDING_PAY));
+        when(orderMapper.update(isNull(), any())).thenReturn(0);
+        expectBizException(ResultCode.BAD_REQUEST.getCode(),
+                () -> tradeService.payOrder(BUYER, ORDER_ID));
+
+        // 通知写在状态推进**之后**，所以这两种失败都不该产生任何通知
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    @DisplayName("★ 非参与方操作 → 404，且不发通知")
+    void outsiderAction_sendsNoNotification() {
+        when(orderMapper.selectById(ORDER_ID)).thenReturn(orderWithStatus(WAIT_DELIVER));
+
+        expectBizException(ResultCode.NOT_FOUND.getCode(),
+                () -> tradeService.deliverOrder(OUTSIDER, ORDER_ID));
+
+        verifyNoInteractions(notificationService);
     }
 }

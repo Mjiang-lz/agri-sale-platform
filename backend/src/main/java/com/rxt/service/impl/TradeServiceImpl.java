@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.rxt.common.BizException;
+import com.rxt.common.NotificationType;
 import com.rxt.common.ResultCode;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.dto.ProductPublishDTO;
@@ -22,6 +23,7 @@ import com.rxt.security.PermissionChecker;
 import com.rxt.security.RoleConstant;
 import com.rxt.service.AddressService;
 import com.rxt.service.CommentService;
+import com.rxt.service.NotificationService;
 import com.rxt.service.TradeService;
 import com.rxt.vo.AddressVO;
 import com.rxt.vo.CartVO;
@@ -97,6 +99,11 @@ public class TradeServiceImpl implements TradeService {
     private final CommentService commentService;
     private final AddressService addressService;
     private final PermissionChecker permissionChecker;
+    /**
+     * 站内通知（跨模块公共能力）。订单状态流转是四类通知事件里的一类 ——
+     * 另外三类（问答 / 预约 / 融资）由各自的模块接入，本类只负责订单。
+     */
+    private final NotificationService notificationService;
 
     @Override
     public IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword,
@@ -632,6 +639,11 @@ public class TradeServiceImpl implements TradeService {
                 .set(Order::getOrderStatus, ORDER_WAIT_DELIVER)
                 .setSql("pay_time = NOW()"));
         requireStatusChanged(rows, "支付");
+
+        // 通知放在 requireStatusChanged **之后**：放在它之前的话，
+        // 并发重复提交（rows=0、抛 400）会先发出一条「已付款」的假通知。
+        // 收件人是**卖家** —— 付款这件事只有发货方能推动下一步。
+        notifyOrder(order, order.getSellerId(), "买家已付款", "已付款，请及时发货。");
     }
 
     @Override
@@ -653,6 +665,10 @@ public class TradeServiceImpl implements TradeService {
                 .set(Order::getOrderStatus, ORDER_WAIT_RECEIVE)
                 .setSql("deliver_time = NOW()"));
         requireStatusChanged(rows, "发货");
+
+        // 收件人是**买家**：这条通知就是「货已经在路上了」的唯一主动告知 ——
+        // 此前买家只能靠自己反复打开「我的订单」刷新才知道。
+        notifyOrder(order, order.getBuyerId(), "订单已发货", "已发货，请留意查收。");
     }
 
     @Override
@@ -671,6 +687,9 @@ public class TradeServiceImpl implements TradeService {
                 .set(Order::getOrderStatus, ORDER_FINISHED)
                 .setSql("receive_time = NOW()"));
         requireStatusChanged(rows, "收货");
+
+        // 收件人是**卖家**：买家确认收货意味着这笔交易结束，卖家需要知道结果。
+        notifyOrder(order, order.getSellerId(), "买家已确认收货", "买家已确认收货，交易完成。");
     }
 
     @Override
@@ -699,6 +718,11 @@ public class TradeServiceImpl implements TradeService {
 
         // 4. 回滚库存：下单时扣了多少就还多少。用原子加法，避免与并发下单互相覆盖
         productMapper.restoreStock(order.getProductId(), order.getQuantity());
+
+        // 5. 通知卖家。订单从「我卖出的」列表里悄悄消失，卖家不主动去看就完全不知道
+        //    —— 这正是通知要补的洞。
+        //    收件人固定取 sellerId（取消只可能由买家发起），不靠 isParticipant 反推。
+        notifyOrder(order, order.getSellerId(), "订单已取消", "已被买家取消。");
     }
 
     /**
@@ -776,6 +800,48 @@ public class TradeServiceImpl implements TradeService {
             vo.setStatus(product.getStatus());
         }
         return vo;
+    }
+
+    /**
+     * 给订单事件写一条站内通知。
+     *
+     * <p>文案统一在这里拼。订单号与商品名是每个事件都必须带的两项信息，
+     * 让四处调用各自拼一遍，早晚会出现某一处漏掉订单号 ——
+     * 用户拿着一条「你的订单已发货」的通知，却不知道是哪一个订单。</p>
+     *
+     * <p>本方法<b>不抛异常</b>：{@code NotificationService.send} 内部对非法入参与
+     * 写库异常都已收口（见该类注释）。通知失败绝不能连累订单状态流转。</p>
+     *
+     * @param order      订单，取 orderId / orderNo / productId
+     * @param receiverId 接收人。付款、收货、取消通知<b>卖家</b>；发货通知<b>买家</b>
+     * @param title      标题
+     * @param action     动作短句，接在「商品「X」（订单号 N）」之后，如「已发货，请留意查收。」
+     */
+    private void notifyOrder(Order order, Long receiverId, String title, String action) {
+        String productName = loadProductName(order.getProductId());
+
+        StringBuilder content = new StringBuilder();
+        // 商品可能已被删除（convertToOrderVO 也允许 product 为 null）。
+        // 这时退化为不带商品名的文案，而不是让用户看到「商品「null」」。
+        content.append(productName == null ? "你的订单" : "商品「" + productName + "」");
+        if (StringUtils.hasText(order.getOrderNo())) {
+            content.append("（订单号 ").append(order.getOrderNo()).append("）");
+        }
+        content.append(action);
+
+        notificationService.send(receiverId, NotificationType.ORDER, title, content.toString(),
+                order.getOrderId());
+    }
+
+    /**
+     * 取商品名。商品可能已被删除，取不到时返回 null，由调用方降级文案。
+     */
+    private String loadProductName(Long productId) {
+        if (productId == null) {
+            return null;
+        }
+        Product product = productMapper.selectById(productId);
+        return product == null ? null : product.getProductName();
     }
 
     /**

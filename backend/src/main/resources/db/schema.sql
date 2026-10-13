@@ -527,6 +527,34 @@ CREATE TABLE `t_address` (
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_general_ci COMMENT = '收货地址';
 
+-- 表 3-20　t_notification 站内通知表
+-- 对应《软件需求规格说明书》表 3-1「用户界面需求」的消息通知一行：
+--   融资申请状态变更、订单状态变更、问答与预约回复均生成站内通知，通知中心支持查看与标记已读。
+-- 说明：四类事件（ORDER / QA / APPOINTMENT / FINANCE）共用本表，前端一个通知中心入口，
+--       未读数一次请求即可拿到；若每类事件各建一张表，前端要拼四个列表、四次求和。
+--       通知是「每个事件 × 每个接收人」一行（一单通知买卖双方即两行），与业务表是 1:N，
+--       因此不塞进 t_order / t_question 等业务表。
+--       biz_id 指向哪张表由 type 决定，属多态关联，按设计不建外键（同 t_audit.target_id）。
+DROP TABLE IF EXISTS `t_notification`;
+CREATE TABLE `t_notification` (
+  `notification_id` BIGINT       NOT NULL AUTO_INCREMENT             COMMENT '通知主键',
+  `user_id`         BIGINT       NOT NULL                            COMMENT '接收人（t_user.user_id）',
+  `type`            VARCHAR(20)  NOT NULL                            COMMENT '事件类型：ORDER 订单 / QA 问答 / APPOINTMENT 预约 / FINANCE 融资',
+  `title`           VARCHAR(50)  NOT NULL                            COMMENT '标题',
+  `content`         VARCHAR(200) NOT NULL                            COMMENT '正文摘要',
+  `biz_id`          BIGINT           NULL                            COMMENT '关联业务主键（订单 / 提问 / 申请 id），多态字段不建外键',
+  `is_read`         TINYINT      NOT NULL DEFAULT 0                  COMMENT '是否已读：0 未读，1 已读',
+  `read_time`       DATETIME         NULL                            COMMENT '已读时间，NULL 表示未读',
+  `create_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP  COMMENT '产生时间',
+  `update_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`notification_id`),
+  -- 我的通知列表 + 顶栏未读数（两者都按 user_id 取，未读另有 is_read 过滤）
+  KEY `idx_notification_user_read` (`user_id`, `is_read`, `create_time`)
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci COMMENT = '站内通知';
+
 -- ===========================================================================
 -- 五、外键约束
 -- 说明：统一在建表完成后添加，避免建表顺序依赖；不引入级联删除（见 3.1 第 8 条）。
@@ -555,6 +583,8 @@ ALTER TABLE `t_comment`
     ADD CONSTRAINT `fk_comment_user_id` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`user_id`);
 ALTER TABLE `t_address`
     ADD CONSTRAINT `fk_address_user` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`user_id`);
+ALTER TABLE `t_notification`
+    ADD CONSTRAINT `fk_notification_user` FOREIGN KEY (`user_id`) REFERENCES `t_user` (`user_id`);
 
 -- 融资域
 ALTER TABLE `t_loan_group`
