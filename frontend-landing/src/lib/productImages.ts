@@ -23,7 +23,8 @@ const NAME_PHOTO: Record<string, string> = {
   // 水果
   '赣南脐橙5kg装': '/products/p03.jpg',
   '砂糖橘10斤装': '/products/p13.jpg',
-  '蜜柚单果约2.5kg': '/products/p12.jpg',
+  // p12 是挂在树上的青皮柚（偏暗绿），不像蜜柚；改用 p30（半个红心蜜柚实拍）
+  '蜜柚单果约2.5kg': '/products/p30.jpg',
   '猕猴桃5斤装': '/products/p11.jpg',
   '脐橙次果特惠': '/products/p09.jpg',
   // 蔬菜
@@ -34,9 +35,13 @@ const NAME_PHOTO: Record<string, string> = {
   '大棚黄瓜': '/products/p26.jpg',
   '农家自种小番茄': '/products/p05.jpg',
   // 粮油
-  '菜籽油5L': '/products/p24.jpg',
-  '有机小米5斤': '/products/p08.jpg',
-  '现磨玉米面5斤': '/products/p07.jpg',
+  // p24 是橄榄油静物（画面里有橄榄果与橄榄枝），与菜籽油语义不符，改用 p29（散装黄色食用油实拍）
+  '菜籽油5L': '/products/p29.jpg',
+  // p08 是晒谷场翻晒谷物的远景（frontend-web 当粮油兜底图、专家横幅在用），
+  // 「小米」另配 p31（一碗黄小米实拍），语义更直接
+  '有机小米5斤': '/products/p31.jpg',
+  // p07 是「田间/农事」场景图（frontend-web imagery.js 也在用），玉米面另配 p28
+  '现磨玉米面5斤': '/products/p28.jpg',
   '五常大米10kg': '/products/p14.jpg',
   '红薯10斤装': '/products/p15.jpg',
   // 畜禽产品
@@ -62,16 +67,18 @@ const KEYWORD_PHOTO: Array<[RegExp, string]> = [
   [/鱼|鳝|泥鳅/, '/products/p20.jpg'],
   [/香菇|木耳|银耳|菌|笋干|腐竹/, '/products/p22.jpg'],
   [/辣椒|花椒|胡椒|八角/, '/products/p21.jpg'],
-  [/菜油|花生油|香油|食用油|调和油|油/, '/products/p24.jpg'],
+  [/菜油|花生油|香油|食用油|调和油|油/, '/products/p29.jpg'],
   [/莲藕|藕/, '/products/p23.jpg'],
   [/红薯|地瓜|紫薯|山药/, '/products/p15.jpg'],
   [/土豆|马铃薯|芋/, '/products/p04.jpg'],
   [/白菜|甘蓝|卷心菜/, '/products/p25.jpg'],
   [/黄瓜|丝瓜|苦瓜|西葫芦/, '/products/p26.jpg'],
   [/西红柿|番茄/, '/products/p02.jpg'],
-  [/玉米/, '/products/p08.jpg'],
+  [/玉米/, '/products/p28.jpg'],
+  // 必须排在下面的 `/米|谷|麦|豆|面/` 之前，否则「小米」会被宽泛的「米」抢走配成大米
+  [/小米|黄小米|谷子|黍/, '/products/p31.jpg'],
   [/猕猴桃|奇异果/, '/products/p11.jpg'],
-  [/柚/, '/products/p12.jpg'],
+  [/柚/, '/products/p30.jpg'],
   [/砂糖橘|砂糖桔|蜜橘|橘|桔|柑|橙/, '/products/p03.jpg'],
   [/桃|李|杏|梨|枣|莓|葡萄|樱桃|荔枝|龙眼|苹果/, '/products/p09.jpg'],
   [/米|谷|麦|豆|面/, '/products/p14.jpg'],
@@ -81,7 +88,7 @@ const KEYWORD_PHOTO: Array<[RegExp, string]> = [
 const CATEGORY_PHOTOS: Record<string, string[]> = {
   水果: ['/products/p03.jpg', '/products/p13.jpg', '/products/p12.jpg', '/products/p11.jpg', '/products/p09.jpg'],
   蔬菜: ['/products/p02.jpg', '/products/p04.jpg', '/products/p25.jpg', '/products/p26.jpg', '/products/p05.jpg'],
-  粮油: ['/products/p14.jpg', '/products/p08.jpg', '/products/p24.jpg', '/products/p15.jpg'],
+  粮油: ['/products/p14.jpg', '/products/p08.jpg', '/products/p29.jpg', '/products/p15.jpg'],
   畜禽产品: ['/products/p16.jpg', '/products/p27.jpg', '/products/p17.jpg', '/products/p18.jpg'],
   水产: ['/products/p19.jpg', '/products/p20.jpg'],
   干货: ['/products/p21.jpg', '/products/p22.jpg'],
