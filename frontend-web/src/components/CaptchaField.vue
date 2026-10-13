@@ -6,15 +6,21 @@
  *   失败后刷新」四步状态，两页各写一份必然慢慢漂开（其中一页忘了失败时刷新图，
  *   用户就永远卡在同一张已失效的图上反复报错）。
  *
- * 父组件通过 v-model:key / v-model:code 两个双向绑定拿值，通过 ref 调 validate() 做提交前校验。
- * 提交时把这两个字段并进表单体即可（字段名与后端 LoginDTO/RegisterDTO 一致）。
+ * 父组件通过 v-model:captchaKey / v-model:captchaCode 两个双向绑定拿值，
+ * 通过 ref 调 validate() 做提交前校验。
+ *
+ * ★ prop 名**不能叫 key**：`key` 是 Vue 保留属性，`defineModel('key')` 会报
+ *   「Invalid prop name: "key" is a reserved property」+「useModel() called with
+ *   prop "key" which is not declared」两条警告，双向绑定静默失效 ——
+ *   表现是提交时 captchaCode 有值而 captchaKey 恒为空，后端一律判验证码错。
+ *   组件内部的名字改了，**提交给后端的字段名仍是 captchaKey**（LoginDTO 要求）。
  */
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getCaptcha } from '@/api/auth'
 
-const captchaKey = defineModel('key', { type: String, default: '' })
-const captchaCode = defineModel('code', { type: String, default: '' })
+const captchaKey = defineModel('captchaKey', { type: String, default: '' })
+const captchaCode = defineModel('captchaCode', { type: String, default: '' })
 const captchaImage = ref('')
 const loading = ref(false)
 

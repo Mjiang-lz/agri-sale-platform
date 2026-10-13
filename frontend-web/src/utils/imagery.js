@@ -151,15 +151,36 @@ export function productFallbackText(p) {
 }
 
 /**
- * 专家头像：演示数据里 `t_user.avatar_url` 大多为 NULL 或死链，
- * 所以为两位专家生成写实头像，按 expertId 映射。
+ * 专家头像：按 expertId 落到 public/experts/ 的本地图。
+ *
+ * ★ 两级回落，缺一不可：
+ *   1. 库里 t_user.avatar_url 有值 → 优先用它（用户自己传的头像，
+ *      走 /api/files/… 或 OBS，两种都试过能取到）；
+ *   2. 为空 → 用下面的本地图。库里 13 个用户有 8 个 avatar_url 是 NULL，
+ *      只靠库里那列，演示时专家头像全是首字方块。
+ *
+ * ⚠️ OBS 那个绝对地址是**写死在库里的**：桶名或 endpoint 一变，
+ *    所有历史头像同时失效。本地图走 BASE_URL，换服务器不用重建。
+ *    所以新增专家一律往 public/experts/ 放图，别往 OBS 传。
  */
 const EXPERT_IMG = {
-  1: '/experts/zhao-guoqiang.png',
-  2: '/experts/sun-lihua.png'
+  1: '/experts/zhao-guoqiang.jpg',
+  2: '/experts/sun-lihua.jpg',
+  3: '/experts/wu-jianping.jpg',
+  4: '/experts/lin-shufen.jpg',
+  5: '/experts/huang-zhigang.jpg'
 }
 
 export function expertAvatar(e) {
+  const url = e?.avatarUrl || e?.avatar_url
+  // 库里可能存三种形态，都要能显示：
+  //   · 完整外链（OBS，https://…）      —— 原样用
+  //   · '/api/files/…'（后端本地存储）—— 走 dev 代理/同域，直接用
+  //   · '/experts/…'（前端 public 目录）—— ★ 必须补 BASE_URL，
+  //     web 端部署在 /app/ 下，写死 /experts/… 会 404（表现为碎图或首字方块）
+  if (url && typeof url === 'string' && url.trim()) {
+    return url.startsWith('/experts/') ? assetUrl(url) : url
+  }
   const id = Number(e?.expertId || 0)
   return assetUrl(EXPERT_IMG[id]) || ''
 }

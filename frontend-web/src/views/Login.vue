@@ -39,8 +39,9 @@
           placeholder="请输入密码"
         />
       </el-form-item>
-      <!-- 图形验证码：每次提交都会一次性消费掉这个 key，所以成功/失败后都要刷新 -->
-      <CaptchaField ref="captchaRef" v-model:key="form.captchaKey" v-model:code="form.captchaCode" @submit="onSubmit" />
+      <!-- 图形验证码：每次提交都会一次性消费掉这个 key，所以成功/失败后都要刷新。
+           ★ v-model 用 captchaKey 而非 key —— key 是 Vue 保留属性，用它双向绑定会静默失效 -->
+      <CaptchaField ref="captchaRef" v-model:captcha-key="form.captchaKey" v-model:captcha-code="form.captchaCode" @submit="onSubmit" />
       <el-form-item class="auth-submit">
         <el-button type="primary" :loading="loading" @click="onSubmit">登 录</el-button>
       </el-form-item>

@@ -66,7 +66,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { expertOptions } from '@/constants/experts'
+import { expertOptions, useExperts } from '@/constants/experts'
 import { getExpertAppointments, handleExpertAppointment } from '@/api/expert'
 import { useUserStore } from '@/store/user'
 
@@ -81,7 +81,8 @@ const rejectFormRef = ref()
 const rejectForm = reactive({ remark: '' })
 const rejectRules = { remark: [{ required: true, message: '请填写拒绝原因', trigger: 'blur' }] }
 
-const expert = computed(() => expertOptions.find((item) => item.userId === Number(userStore.profile?.userId)) || { realName: userStore.profile?.realName || '专家', expertDomain: '农业技术服务' })
+// ★ expertOptions 现在是响应式 ref（数据驱动），脚本里必须取 .value（同 ExpertAnswerPanel）
+const expert = computed(() => expertOptions.value.find((item) => item.userId === Number(userStore.profile?.userId)) || { realName: userStore.profile?.realName || '专家', expertDomain: '农业技术服务' })
 const pendingCount = computed(() => appointments.value.filter((item) => item.apptStatus === '待处理').length)
 const acceptedCount = computed(() => appointments.value.filter((item) => item.apptStatus === '已接受').length)
 const completedCount = computed(() => appointments.value.filter((item) => item.apptStatus === '已完成').length)
@@ -137,7 +138,12 @@ function formatDateTime(value) {
   return value ? String(value).replace('T', ' ').slice(0, 16) : '--'
 }
 
-onMounted(loadAppointments)
+// 同 ExpertAnswerPanel：要按 userId 反查自己是哪位专家，列表必须来自接口
+const { load: loadExperts } = useExperts()
+onMounted(() => {
+  loadExperts()
+  loadAppointments()
+})
 </script>
 
 <style scoped>

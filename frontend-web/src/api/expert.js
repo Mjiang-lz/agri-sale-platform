@@ -65,6 +65,19 @@ export function getExperts(domain) {
   })
 }
 
+/**
+ * 专家详细介绍（需求 9）。
+ *
+ * 返回：基础资料（姓名 / 头像 / 领域 / 简介）+ **实时统计**的服务业绩
+ * （答复数、被提问数、预约数、闭环数）+ 最近答复过的提问摘要 + 高频预约主题。
+ *
+ * ★ 不要在页面里另算这些数字、或拿 workloadStat（「已回复提问 42 条」这种
+ *   手写文案）来展示：那是静态字段，与真实条数对不上，用户点进去一对就露馅。
+ */
+export function getExpertDetail(expertId) {
+  return request.get(`/expert/experts/${expertId}`)
+}
+
 /** 专家工作台：查询当前专家可回复的待处理问题。 */
 export function getExpertPendingQuestions() {
   return request.get('/expert/qa/pending')

@@ -43,7 +43,8 @@
           <el-option v-for="r in ROLES" :key="r" :label="r" :value="r" />
         </el-select>
       </el-form-item>
-      <CaptchaField ref="captchaRef" v-model:key="form.captchaKey" v-model:code="form.captchaCode" @submit="onSubmit" />
+      <!-- ★ v-model 用 captchaKey 而非 key —— key 是 Vue 保留属性，用它双向绑定会静默失效 -->
+      <CaptchaField ref="captchaRef" v-model:captcha-key="form.captchaKey" v-model:captcha-code="form.captchaCode" @submit="onSubmit" />
       <el-form-item class="auth-submit">
         <el-button type="primary" :loading="loading" @click="onSubmit">注 册</el-button>
       </el-form-item>

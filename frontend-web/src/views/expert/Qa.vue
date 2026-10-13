@@ -99,7 +99,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import ExpertAnswerPanel from '@/components/expert/ExpertAnswerPanel.vue'
 import { askQuestion, getMyQuestions, getQuestionAnswers } from '@/api/expert'
-import { expertOptions, getExpertName } from '@/constants/experts'
+import { expertOptions, getExpertName, useExperts } from '@/constants/experts'
 import { useUserStore } from '@/store/user'
 
 /**
@@ -173,7 +173,13 @@ function formatDateTime(value) {
   return String(value).replace('T', ' ').slice(0, 16)
 }
 
-onMounted(loadQuestions)
+// 专家列表走接口（原先是 constants/experts.js 里写死的两位），
+// 否则「指定专家提问」的下拉与回答区的姓名都会停在兜底名单上
+const { load: loadExperts } = useExperts()
+onMounted(() => {
+  loadExperts()
+  loadQuestions()
+})
 </script>
 
 <style scoped>

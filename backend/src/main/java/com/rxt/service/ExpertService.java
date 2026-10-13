@@ -5,6 +5,7 @@ import com.rxt.dto.AppointmentDTO;
 import com.rxt.dto.AppointmentHandleDTO;
 import com.rxt.dto.ExpertProfileUpdateDTO;
 import com.rxt.vo.AppointmentVO;
+import com.rxt.vo.ExpertDetailVO;
 import com.rxt.vo.ExpertProfileVO;
 import com.rxt.vo.ExpertVO;
 
@@ -53,6 +54,16 @@ public interface ExpertService {
      * @param userId 当前登录用户主键
      * @return 档案视图，含 {@code auditStatus} 供本人了解过审情况
      */
+    /**
+     * 专家详细介绍：基础资料 + 实时统计的服务业绩 + 答复过的提问摘要 + 高频预约主题。
+     *
+     * <p>统计项一律现算，不读 {@code workload_stat}（那是手写文案，与真实条数对不上）。
+     * 未通过资格认证的专家与不存在的专家返回同一个「不存在」。</p>
+     *
+     * @param expertId 专家主键
+     */
+    ExpertDetailVO getExpertDetail(Long expertId);
+
     ExpertProfileVO getProfile(Long userId);
 
     /**

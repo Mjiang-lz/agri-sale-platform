@@ -56,6 +56,11 @@ const routes = [
       { path: 'knowledge/:id', component: () => import('@/views/knowledge/KnowledgeDetail.vue'), meta: { title: '农业知识详情' } },
       { path: 'expert/qa', component: () => import('@/views/expert/Qa.vue'), meta: { title: '专家问答' } },
       { path: 'expert/appointment', component: () => import('@/views/expert/Appointment.vue'), meta: { title: '专家预约' } },
+      // 专家详细介绍页（需求 9）。放在 expert/appointment **之前**：
+      //   path 是静态段与动态段并存时，Vue Router 按声明顺序匹配，
+      //   'expert/appointment' 若排在 'expert/:id' 之后不会被吃掉（它不是 id 形态），
+      //   但仍按惯例把具体路径写在前面，少一次依赖顺序的推理。
+      { path: 'expert/:id', component: () => import('@/views/expert/ExpertDetail.vue'), meta: { title: '专家介绍' } },
       { path: 'user/profile', component: () => import('@/views/user/Profile.vue'), meta: { title: '个人中心' } },
       { path: 'user/address', component: () => import('@/views/user/Address.vue'), meta: { title: '收货地址' } }
     ]
