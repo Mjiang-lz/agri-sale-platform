@@ -7,14 +7,19 @@
     —— 全站 .page-head 被复制 9 份就是这个剧本。
 
     版式（2026-10-13 按要求调整）：底图铺满整屏，表单盒不再居中，
-    改为**贴右侧的抽屉**，宽 40%、盒体半透明 40%。
+    改为**贴右侧的抽屉**，盒体半透明 40%。宽度经用户三轮微调
+    （40% → 45% → **42%**），当前写在下面 .auth-drawer 的 width 上，
+    这里不复述具体数字（改版式时最容易漏改注释）。
     这样左侧留出完整的油菜花田与人物，视觉重心在图上，表单只占右侧一条。
 
     ★ 版式又调过一版（"图标放头部、别分开、右侧铺满"）：
     之前标识在左下角、页脚在右下角，各自垫一块小牌子 —— 结果是
     「一条右侧面板上散着两个孤立方块」，盒子感被切碎了。
     现在改成**右侧一整块通栏盒子**：标识在盒内头部、表单占中间、
-    页脚沉底，40% 宽从上到下铺满整屏。左侧只留纯底图。
+    页脚沉底，从上到下铺满整屏。左侧只留纯底图。
+
+    ★ 页脚返回项按当前页分流（见脚本里的 footBack）：
+    登录页回首页、注册页回登录页且带 ?redirect=。
 
     ★ 半透明带来的代价：油菜花田是高饱和黄绿，40% 透明度下
     表单文字会糊在花纹上。所以**输入框自己补了一层近不透明底**，
@@ -41,7 +46,7 @@
       </main>
 
       <footer class="auth-foot">
-        <router-link class="auth-link" to="/home">返回首页</router-link>
+        <router-link class="auth-link" :to="footBack.to">{{ footBack.text }}</router-link>
         <span>基于数字经济的农产品融销一体平台</span>
       </footer>
     </aside>
@@ -50,6 +55,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import RxtLogo from '@/components/RxtLogo.vue'
 
 // ★ public/ 下的图必须跟 BASE_URL 走（web 端构建期是 /app/），写死 /auth/… 会 404
@@ -60,6 +66,32 @@ import RxtLogo from '@/components/RxtLogo.vue'
 //   页面照常渲染、computed background-image 只是 none，看不出任何报错。
 //   长写法 background-image/size/attachment 同样丢，别以为换长写法能绕开。
 const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field.jpg")`)
+
+/* ★ 页脚的「返回」在两页指向不同的地方：
+ *   登录页 → 回首页（还没登录，没别的地方可去）
+ *   注册页 → 回登录页（注册是登录的前一步，回首页等于把用户甩到
+ *              一个还要再点一次「登录」的地方，白绕一圈）
+ *
+ * 刻意在这里读路由自己判断，而不是让 Login/Register 各传一个 prop：
+ * 两页共用同一个外壳，页脚位置与样式也完全相同，多一个 prop 就多一处
+ * 「以后新增第三页忘了传」的坑。
+ *
+ * ★ 注册页回登录必须带上 ?redirect= —— 用户多半是「被守卫从某个受保护页
+ * 踢到 /login → 点立即注册过来」的，不带 redirect 的话从页脚退回登录页
+ * 就丢了原本要去的地方，登录完被扔到首页。loginLink 的同款过滤：
+ * 只认站内绝对路径，挡掉 ?redirect=//evil.com。 */
+const route = useRoute()
+const footBack = computed(() => {
+  if (route.path === '/register') {
+    const r = route.query.redirect
+    const dest = typeof r === 'string' && r.startsWith('/') && !r.startsWith('//') ? r : ''
+    return {
+      text: '返回登录页',
+      to: dest ? { path: '/login', query: { redirect: dest } } : '/login'
+    }
+  }
+  return { text: '返回首页', to: '/home' }
+})
 </script>
 
 <style scoped>
@@ -92,11 +124,12 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
 .auth-drawer {
   position: relative;
   z-index: 1;
-  width: 45%;
+  width: 42%;
   min-width: 420px;
-  /* ★ 45% 在 1440px 视口下是 648px，比 45% 小屏多出来的部分全靠
-     max-width 收口。旧值 640px 会把 45% 压回 44.4% —— 数字看着改了、
-     实测比值对不上，所以两者要一起调 */
+  /* ★ 42% 在 1440px 视口下是 605px，比 max-width 小得多，
+     留 760px 是给更宽的屏留余量。**width 与 max-width 有交叉** ——
+     上限比目标宽度小时，实测会顶到 max-width 而非 width%，
+     数字改了而比值对不上。判宽度一律量 getBoundingClientRect 算比值 */
   max-width: 760px;
   min-height: 100vh;
   display: flex;
