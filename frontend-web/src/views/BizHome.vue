@@ -253,15 +253,19 @@
          ★ v-if="showExpert" 是 2026-10-10 补的权限判断。
          此前这块对所有角色都渲染，但银行用户的 menuPerms 是
          `home,finance,user` —— 没有 expert。结果是银行用户能看到整面照片墙，
-         点「去预约」（以及点卡片本身）都会跳到 /expert/appointment，
+         点「去预约」（2026-10-13 之前点卡片本身也一样）会跳到 /expert/appointment，
          该页拉 /api/expert/appointment/my 时拿到 **HTTP 200 + body code 403**
          （后端刻意如此：HTTP 仍是 200，拒绝写在 body 的 code 里），
          表现为「页面能进、数据全空」，看上去像功能坏了。
 
          两种改法里选了「整块隐藏」而不是「只隐藏去预约按钮」：
-         卡片本身也是点击跳同一个 403 页面的入口，只去掉按钮等于留了个假出口。
+         卡片本身也是点击跳转的入口，只去掉按钮等于留了个假出口。
          判断条件与顶部导航的「专家助力」菜单同源（menuPerms 含 expert），
-         菜单没了、内容也没了，两边口径一致。 -->
+         菜单没了、内容也没了，两边口径一致。
+         ★ 2026-10-13 附注：卡片点击已改为进「该专家的介绍页」(/expert/:id)，
+           该页不卡角色，所以上面那个 403 的坑现在只剩「去预约」一个入口踩得到。
+           整块隐藏的判断照旧保留 —— 银行用户的 menuPerms 里没有 expert，
+           露出一个全是专家卡片的区块本身就不合理。 -->
     <section v-if="showExpert" class="sec">
       <div class="sec-head">
         <div class="sh-left">
@@ -331,9 +335,14 @@
             v-for="e in experts"
             :key="e.expertId"
             class="expert-card"
-            @click="go('/expert/appointment')"
+            @click="go(`/expert/${e.expertId}`)"
           >
-            <!-- 横幅用该专家领域对应的农业实景图：真实田间照片，不是占位插画 -->
+            <!-- ★ 2026-10-13 改：横幅原先复用**商品图池**（按领域关键词取
+                 /products/*.jpg），于是「种植与植保」的专家配的是一颗大白菜、
+                 「畜牧与水产」配一条草鱼，而关键词没命中的三位**共用同一张兜底图**
+                 （实测 5 张卡的 src = p25, p20, p08, p08, p08，只有 3 张不同）。
+                 现在换成「人物在工作」的实景照片，素材与取图纪律见
+                 utils/imagery.js 的 expertBanner()。 -->
             <div class="ec-banner">
               <img :src="expertBanner(e)" :alt="e.expertDomain" loading="lazy" @error="onImgError" />
             </div>

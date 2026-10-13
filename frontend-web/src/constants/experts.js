@@ -16,6 +16,13 @@ import { getExperts } from '@/api/expert'
  *
  * 现在统一从接口取，四处引用（问答指定专家、预约选专家、专家回答面板、
  * 预约工作台）共用这一份。
+ *
+ * ★★ 2026-10-13 补注（第二次踩同一个坑）：改完这份清单**并没有**把头像问题改完 ——
+ *    `Qa.vue` 的专家卡与回答区、`Appointment.vue` 的预约弹窗这三处当时漏了，
+ *    仍然只渲染 `realName.slice(0,1)`，于是「专家页头像显示姓氏首字」原样存在，
+ *    只是病因从「没有接口」变成了「接上了接口但没接 :src」。
+ *    ⇒ 查这类问题的正确顺序是**先把 `<el-avatar>` 全部列出来逐个数**，
+ *      而不是相信「这个需求已经做过了」。
  */
 
 /** 兜底名单：接口不可用时页面不至于空白。仍是写死的，但只作为降级用。 */
@@ -76,8 +83,21 @@ function getExpertName(expertId) {
   return hit?.realName || `专家 #${expertId}`
 }
 
+/**
+ * 由 expertId 取**整条专家对象**（取不到给 null）。
+ *
+ * ★ 2026-10-13 补：原先只有 getExpertName()，只能拿姓名 —— 于是「回答区要显示
+ *   回答者头像」就没有数据可用，只能退化成姓名首字方块。要头像就必须拿到整条
+ *   ExpertVO（expertAvatar 读的是 avatarUrl / expertId），所以补这个出口。
+ * ★ 与 getExpertName 一样读**响应式**的 list，理由见上面的注释。
+ */
+function getExpert(expertId) {
+  if (expertId == null) return null
+  return list.value.find((item) => item.expertId === Number(expertId)) || null
+}
+
 export function useExperts() {
-  return { expertOptions: list, loading, load, getExpertName }
+  return { expertOptions: list, loading, load, getExpertName, getExpert }
 }
 
 /**
@@ -85,5 +105,5 @@ export function useExperts() {
  * 拿到的就是这里的响应式数组与函数，不必改成 composable 形式也能用。
  * ★ 它们仍需各自 onMounted 调一次 load()，否则停留在兜底名单。
  */
-export { getExpertName }
+export { getExpertName, getExpert }
 export const expertOptions = list
