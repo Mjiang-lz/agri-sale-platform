@@ -72,11 +72,10 @@ const NAME_IMG = [
   { keys: ['西红柿', '番茄'], img: '/products/p02.jpg' },
   { keys: ['干香菇', '香菇'], img: '/products/p22.jpg' },
   { keys: ['红薯', '地瓜'], img: '/products/p15.jpg' },
-  // 粮油三件与落地页对齐：大米用 p14（一碗米）、玉米面用 p28（大盆玉米面）、小米用 p08
-  // ⚠️ 小米那张（p08）实为麦田远景，语义偏弱，两端一致但都不够贴，待另行订正
+  // 粮油三件与落地页对齐：大米用 p14（一碗米）、玉米面用 p28（大盆玉米面）、小米用 p31（一碗黄小米）
   { keys: ['五常大米', '大米'], img: '/products/p14.jpg' },
   { keys: ['玉米面', '玉米粉'], img: '/products/p28.jpg' },
-  { keys: ['小米'], img: '/products/p08.jpg' },
+  { keys: ['小米'], img: '/products/p31.jpg' },
   { keys: ['黄瓜'], img: '/products/p26.jpg' },
   { keys: ['大白菜', '白菜'], img: '/products/p25.jpg' },
   { keys: ['土豆', '马铃薯'], img: '/products/p04.jpg' },
@@ -270,7 +269,8 @@ const KNOWLEDGE_TITLE_IMG = [
   // —— 大田 / 粮油 ——（水稻/稻田/稻瘟 已上移到专题组）
   { keys: ['麦田', '大田'], img: '/products/p08.jpg' },
   { keys: ['大米', '稻米'], img: '/products/g02.jpg' },
-  { keys: ['小米', '谷子'], img: '/products/g03.jpg' },
+  // g03 画面是「燕麦片 + 糙米 + 豆」的混合杂粮，与「小米」不是一回事；改用 p31（一碗黄小米实拍）
+  { keys: ['小米', '谷子'], img: '/products/p31.jpg' },
   { keys: ['玉米'], img: '/products/g07.jpg' },
   { keys: ['菜籽油', '榨油', '油菜'], img: '/products/p29.jpg' },
   // —— 水产 ——（小龙虾 已上移到专题组；原先这里指向的是「螃蟹」，物种就不对）
