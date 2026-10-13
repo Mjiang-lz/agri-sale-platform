@@ -9,10 +9,15 @@ import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
 // 四类角色对应四个 tab，内容与平台真实模块对齐；点击可切换
 // route = 该 tab 对应的平台前端路由（「进入平台」按当前 tab 跳过去）
 // 注意：这里写的是 frontend-web 的 Vue 路由（/trade/demand），不是接口路径（/api/demand/list）
+//
+// title = 大标题，desc = 副标题，两者都跟随当前 tab 切换。
+// ⚠️ 大标题必须与同一 tab 的 desc 语义一致（改 desc 时同步改 title），且控制在 7 个汉字以内
+//    —— 标题是 60px 且带 lg:whitespace-nowrap，超过 7 字会在窄屏被 section 的 overflow-hidden 裁掉。
 const TABS = [
   {
     label: "找货源",
     route: "/trade/products",
+    title: "货源需求对上号",
     desc: "平台按品类、产地、价格与信用画像做双边匹配，把货源和需求放进同一个池子里对上——实时更新",
     items: [
       "按品类、产地、价格区间检索货源",
@@ -24,6 +29,7 @@ const TABS = [
   {
     label: "找销路",
     route: "/trade/demand",
+    title: "好货不等人上门",
     desc: "农户与合作社发布货源后，由平台撮合采购方、商超与批发市场，好货不再等人上门",
     items: [
       "发布货源后自动进入采购方推荐池",
@@ -35,6 +41,7 @@ const TABS = [
   {
     label: "找资金",
     route: "/finance/apply",
+    title: "订单变成周转金",
     desc: "凭真实交易数据对接银行与担保公司，让每一笔订单都能变成周转资金",
     items: [
       "凭历史成交与信用记录申请授信",
@@ -46,6 +53,7 @@ const TABS = [
   {
     label: "找专家",
     route: "/expert/qa",
+    title: "种到卖全程护航",
     desc: "从种到卖全程有专家护航：农技、经营、电商、政策，四类顾问在线应答",
     items: [
       "农技问诊：病虫害拍照上传即有答复",
@@ -93,14 +101,17 @@ export function Section4() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 w-full max-w-[1728px] mx-auto">
         {/* Left Column */}
         <div className="col-span-1 lg:col-span-6 flex flex-col">
+          {/* key 里带 active：切 tab 时强制重建，让 whileInView 的入场动画重播一遍
+              （副标题同样用 key={`desc-${active}`} 达到这个效果） */}
           <motion.h2
+            key={`title-${active}`}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
             viewport={{ once: true, margin: "-50px" }}
             className="text-[36px] sm:text-5xl lg:text-[60px] leading-tight mb-4 lg:whitespace-nowrap"
           >
-            精准找到对的人
+            {tab.title}
           </motion.h2>
           <motion.p
             key={`desc-${active}`}
