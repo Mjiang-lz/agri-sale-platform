@@ -13,6 +13,23 @@
 
     <el-skeleton v-if="loading && !addresses.length" animated :rows="3" />
 
+    <!--
+      加载出错时的错误态。必须排在「空态」前面判断：
+      两者在界面上都是「没有卡片」，但含义完全相反 ——
+      出错时若也显示「还没有收货地址」，等于告诉用户「你还没填过地址」，
+      他会去反复点「新增地址」，而每次提交都会再次失败。
+    -->
+    <el-card v-else-if="loadError" shadow="never" class="content-card">
+      <el-result icon="error" title="收货地址暂时无法加载">
+        <template #sub-title>
+          <p class="load-error-text">{{ loadError }}</p>
+        </template>
+        <template #extra>
+          <el-button type="primary" @click="loadList">重新加载</el-button>
+        </template>
+      </el-result>
+    </el-card>
+
     <el-card v-else-if="addresses.length" shadow="never" class="content-card">
       <div class="addr-grid">
         <article
@@ -83,16 +100,30 @@ const loading = ref(false)
 const addresses = ref([])
 const formVisible = ref(false)
 const editing = ref(null)
+/**
+ * 加载是否出错。
+ *
+ * ⚠️ 为什么要单独一个标记：出问题时addresses 被置空，若不区分，
+ * 页面会显示「还没有收货地址」+「新增地址」按钮 ——
+ * 把「服务挂了」伪装成「你还没有数据」，用户会以为是自己操作问题，
+ * 反复点「新增地址」然后再次失败，完全摸不到真相。
+ * 历史上就踩过这个坑：t_address 表未建导致整页 500，界面却一直显示空态。
+ */
+const loadError = ref('')
 
 onMounted(loadList)
 
 async function loadList() {
   loading.value = true
+  loadError.value = ''
   try {
     addresses.value = (await getAddressList()) || []
   } catch (err) {
     // 加载失败保持空数组，错误提示由 request.js 拦截器统一给出
     addresses.value = []
+    // 行内也要说一句：用户可能错过一闪而过的 toast，
+    // 而这里恰好是「没有数据」的假象最容易被误读的地方。
+    loadError.value = err?.rawMessage || err?.message || '收货地址加载失败'
     console.error('收货地址加载失败：', err)
   } finally {
     loading.value = false
