@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { getToken } from '@/utils/auth'
 import { useUserStore } from '@/store/user'
 
@@ -16,18 +17,34 @@ const routes = [
       // 结果是「游客能调接口、却看不到页面」。路由 meta.public 与白名单保持一致。
       { path: 'trade/products', component: () => import('@/views/trade/ProductList.vue'), meta: { title: '商品货源', public: true } },
       { path: 'trade/product/:id', component: () => import('@/views/trade/ProductDetail.vue'), meta: { title: '商品详情', public: true } },
+// 求购需求：**不对管理员设限**，去掉 buyerOnly。
+      // 管理员的职责含「商品货源与求购需求审核」，必须能看到这些数据；
+      // 该页对管理员是纯只读（不显示发布按钮与右侧「我发布的」）。
+      // 发布权限由 DemandList 内部的 canPublishDemand 按角色控制，
+      // 与「能否进入这个页面」是两件事，不要混在一起用 buyerOnly 表达。
       { path: 'trade/demand', component: () => import('@/views/trade/DemandList.vue'), meta: { title: '求购需求' } },
       // 我的商品：农户发布与上下架的入口。
       // 后端 /trade/my-products 等四个接口早在骨架期就实现了，前端一直缺这一页，
       // 于是「农户登录后没有任何入口发布自己的农产品」——供给侧闭环是断的。
+      // ⚠️ **刻意不加 buyerOnly**：菜单里已对管理员隐藏，这里也放行。
+      // 管理员直接输 URL 进来时，MyProducts 会渲染一个「管理员无需管理自有商品」的
+      // 说明页（而不是后端 403 的红色报错）—— 拦住不如说清楚。
       { path: 'trade/my-products', component: () => import('@/views/trade/MyProducts.vue'), meta: { title: '我的商品' } },
-      { path: 'trade/cart', component: () => import('@/views/trade/Cart.vue'), meta: { title: '购物车' } },
+      // 下面两项是买家侧动作，管理员一律不进（加购与下单会写入真实订单数据）。
+      // meta 标记是为了挡住直接输 URL / 手改地址栏的进入路径 ——
+      // 只藏菜单不挡路由的话，管理员知道地址就能进，属于假防护。
+      { path: 'trade/cart', component: () => import('@/views/trade/Cart.vue'), meta: { title: '购物车', buyerOnly: true } },
       // 结算确认页。购物车点「结算」跳这里 —— 下单必须带收货地址，
       // 所以地址选择与商品核对得有独立页面，弹窗里塞不下。
-      { path: 'trade/checkout', component: () => import('@/views/trade/Checkout.vue'), meta: { title: '确认订单' } },
-      { path: 'trade/orders', component: () => import('@/views/trade/OrderList.vue'), meta: { title: '我的订单' } },
+      { path: 'trade/checkout', component: () => import('@/views/trade/Checkout.vue'), meta: { title: '确认订单', buyerOnly: true } },
+      { path: 'trade/orders', component: () => import('@/views/trade/OrderList.vue'), meta: { title: '我的订单', buyerOnly: true } },
       { path: 'finance/apply', component: () => import('@/views/finance/FinanceApply.vue'), meta: { title: '融资申请' } },
       { path: 'finance/my', component: () => import('@/views/finance/MyApplies.vue'), meta: { title: '我的融资' } },
+      // 融资台账：管理员只读查看全平台融资申请。
+      // 与 /finance/my 的区别是数据范围 —— 后者只返回本人提交（且要求 FARMER 角色），
+      // 前者走 /admin/finance/applies，是 requireAdmin() 放行的只读台账。
+      // 放这里是为了让管理员在业务端也能看到融资全景，不必切到管理后台那一套界面。
+      { path: 'finance/ledger', component: () => import('@/views/finance/FinanceLedger.vue'), meta: { title: '融资台账' } },
       // 融资审批（银行用户视角）。与上面的「我的融资」是两个模块：
       // /finance/* 是申请人看自己的，/loan-admin/* 是银行看别人提交的。
       { path: 'finance/bank-review', component: () => import('@/views/finance/BankReview.vue'), meta: { title: '融资审批' } },
@@ -79,6 +96,29 @@ router.beforeEach(async (to) => {
   if (!getToken()) return toLogin(to)
 
   const userStore = useUserStore()
+
+  // 「管理员不可进入」页面的角色闸门。
+  //
+  // 覆盖范围：购物车 / 结算 / 我的订单 —— 这些都会写入或依赖
+  // 管理员不该产生的交易数据（自己的订单、加购记录）。
+  //
+  // ⚠️ 求购需求与「我的商品」都**不在此列**：
+  //   · 求购需求 —— 管理员要审核求购，需要能看，该页对他只读即可；
+  //   · 我的商品 —— 菜单里已隐藏，但路由放行，直输 URL 进来会看到一句
+  //     「管理员无需管理自有商品」的说明页，比弹回首页更清楚。
+  // 「能否进入页面」与「能否在该页操作」是两件事，别用同一个标记表达。
+  //
+  // 为什么路由层也要拦一道：MainLayout 里那些菜单项对管理员隐藏了，
+  // 但**路由本身没有限制** —— 管理员手输 /trade/cart 或改地址栏照样进得去。
+  // 隐藏菜单只是「不让看见」，路由拦截才是「进不去」。
+  //
+  // 落点是 /home 而不是登录页：这类越权访问不该把已登录用户踢出去，
+  // 那会让他以为会话失效，重新输一遍密码。给个首页 + 明确提示更合理。
+  if (to.meta.buyerOnly && userStore.profile?.roleName === '管理员') {
+    ElMessage.warning('管理员不参与买家侧交易，请从首页进入相关功能')
+    return '/home'
+  }
+
   // 需要补拉的两种情况：
   //   1) 缺 menuPerms —— 老会话（rxt_user_profile 是后加的），菜单会只剩「首页」；
   //   2) profile 里**没有 avatarUrl 这个字段** —— 登录接口（LoginVO）此前不下发头像，

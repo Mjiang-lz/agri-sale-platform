@@ -113,9 +113,27 @@
 
     <el-card v-else shadow="never">
       <el-empty :description="emptyText">
-        <el-button v-if="hasFilter" type="primary" @click="resetQuery">清空筛选条件</el-button>
+        <!-- 两块内容包一层 flex 容器：el-empty 的 bottom 槽本身不是 flex，
+             直接堆两个子元素会左对齐且贴在一起。 -->
+        <div class="empty-actions">
+          <el-button v-if="hasFilter" type="primary" @click="resetQuery">清空筛选条件</el-button>
+          <!-- ★ 2026-10-12 搜索兜底引导：
+               首页搜索框的文案是「搜农产品、产地、专家」，但商品搜索只匹配
+               商品名 / 品类 / 产地三个字段，输专家姓名必然 0 条 ——
+               用户会以为「搜索坏了」。这里在「确实用关键词搜过、且一条商品都没有」时
+               给一条去专家页的出路，让文案里的「专家」这个承诺有着落。
+               （背景见 搜索不到专家-排查结论-2026-10-12.md） -->
+          <div v-if="expertHintKeyword" class="expert-hint">
+            <span>这个关键词也许是专家姓名</span>
+            <!-- 按钮内容必须写成单行：换行+缩进会被当作插槽文本保留，渲染成「在 专家里搜」中间多一个空格 -->
+            <el-button link type="primary" @click="goExpertSearch">在专家里搜「{{ expertHintKeyword }}」→</el-button>
+          </div>
+        </div>
       </el-empty>
     </el-card>
+
+    <!-- 返回顶部按钮。样式与参数统一由 components/PageBackTop.vue 提供，各页不再各写一份。 -->
+    <PageBackTop />
   </div>
 </template>
 
@@ -125,6 +143,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getTradeProducts } from '@/api/trade'
 import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
+import PageBackTop from '@/components/PageBackTop.vue'
 
 /**
  * 页面用途：商品货源列表（公开接口，游客可访问）。
@@ -172,6 +191,25 @@ const emptyText = computed(() =>
   hasFilter.value ? '没有符合条件的商品，试试放宽筛选条件' : '暂无在架商品'
 )
 
+/**
+ * 「搜索兜底引导」用的关键词，空串表示不展示引导。
+ *
+ * 为什么用 ref 记「最近一次实际搜过的词」，而不是直接读 query.keyword：
+ * 输入框是 v-model 绑定的，用户敲字时 query.keyword 立刻变，但请求还没发。
+ * 若直接读它，用户刚打第一个字就会冒出一条指向半个词的引导，属于噪声。
+ * 这里的值是 loadProducts 拿到响应后才写的 = 一定是「搜过且结果是 0」。
+ */
+const expertHintKeyword = ref('')
+
+/**
+ * 带着当前关键词跳到专家预约页继续搜。
+ * 专家页（Appointment.vue）会读 route.query.keyword 预填搜索框，落地即可见结果。
+ */
+function goExpertSearch() {
+  const k = expertHintKeyword.value
+  router.push({ path: '/expert/appointment', query: k ? { keyword: k } : {} })
+}
+
 /** 图片 404 时隐藏 img，露出下层的首字底色，避免碎图 */
 function onImgError(e) {
   e.target.style.opacity = '0'
@@ -211,12 +249,19 @@ async function loadProducts() {
     products.value = records
     total.value = Number(data?.total ?? records.length)
     if (!records.length) {
+      // 只有「带了关键词还是 0 条」才给专家兜底引导：无关键词的空列表是真的暂无商品，
+      // 指去专家页没有意义（用户本来就没在搜东西）。
+      expertHintKeyword.value = query.keyword.trim()
       ElMessage.info(hasFilter.value ? '没有符合条件的商品' : '暂无在架商品')
+    } else {
+      expertHintKeyword.value = ''
     }
   } catch (err) {
     products.value = []
     total.value = 0
     errorState.value = true
+    // 接口失败 ≠ 「搜不到」：不能因为网关抖一下就引导用户去搜专家，先清掉引导
+    expertHintKeyword.value = ''
     // toast 已由 request.js 统一弹过（err.notified === true），这里只渲染行内错误态
     console.error('商品货源加载失败：', err)
   } finally {
@@ -283,6 +328,23 @@ onMounted(() => {
 
 <style scoped>
 .product-list-page { color: var(--el-text-color-primary); }
+
+/* 空态里的操作区：el-empty 的 bottom 槽不是 flex，这里自己排一下 */
+.empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 商品 0 条时的专家搜索兜底引导（见模板中的注释） */
+.expert-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
 
 
 .filter-card { margin-bottom: 18px; border-radius: 14px; }

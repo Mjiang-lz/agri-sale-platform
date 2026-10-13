@@ -104,6 +104,141 @@ export function removeDemand(id) {
 }
 
 /* ====================================================================
+ * 发布 / 编辑求购需求
+ *
+ * ⚠️⚠️ 下面两个接口**后端目前不可用**，前端已做成可控降级，请勿直接删掉 mock 分支。
+ *
+ * 实测结论（2026-10-12，curl 直接打后端）：
+ *   POST /demand/publish  → 500「系统繁忙，请稍后重试」
+ *   PUT  /demand/{id}     → 同样 500
+ *   但 DELETE /demand/{id} → 200 且真删掉了行。
+ *
+ * 定位过程（供队友排查参考）：
+ *   1) 用等价 SQL 直连 rxt 库手动 INSERT —— 成功，说明表结构与字段都没问题；
+ *   2) 故意缺必填字段 category —— 返回 **500 而非 400**，
+ *      说明 @Valid 的校验压根没跑，请求死在 JSON 反序列化阶段，方法体没执行；
+ *   3) GlobalExceptionHandler 已有 MethodArgumentNotValidException 分支，
+ *      但**没有 HttpMessageNotReadableException 分支**，
+ *      而 validUntil 是 LocalDateTime —— 时间解析失败正好落进兜底
+ *      Exception 分支，被翻译成「系统繁忙」。
+ *   推测真因：LocalDateTime 缺 @JsonFormat 或全局 Jackson 配置不匹配。
+ *
+ * 前端对策：publishDemand / updateDemand 走 mock，交互完整可用，
+ * 等后端修好后把 USE_DEMAND_MOCK 置 false（或删掉 mock 分支）即自动切到真实接口。
+ * ==================================================================== */
+
+/** 发布/编辑求购走mock：后端 500 时也能把交互跑通、后端一修就自动切真实。 */
+export const USE_DEMAND_MOCK = true
+
+/** 把表单里的日期对象拼成后端要的 "YYYY-MM-DD HH:mm:ss"（LocalDateTime 格式）。 */
+function formatValidUntil(value) {
+  if (!value) return undefined
+  if (typeof value === 'string') return value
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return undefined
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+/** mock 需求库：让右栏与列表在同一页面内自洽（发布后立刻能看到自己那条）。 */
+let mockMine = []
+let mockSeq = 9000
+
+/**
+ * 发布求购需求。
+ *
+ * @param {object} payload { category, quantity, unit, expectPrice, description, region, validUntil, contact }
+ * @returns {Promise<number>} 新建需求的 id
+ */
+export async function publishDemand(payload) {
+  if (!USE_DEMAND_MOCK) {
+    return request.post('/demand/publish', {
+      ...payload,
+      validUntil: formatValidUntil(payload.validUntil)
+    })
+  }
+
+  // 模拟网络延迟，避免表单按钮的 loading 一闪而过、看不出是假的
+  await new Promise((r) => setTimeout(r, 400))
+  const id = ++mockSeq
+  mockMine.unshift({
+    demandId: id,
+    publisherId: JSON.parse(localStorage.getItem('rxt_user_profile') || '{}').userId ?? null,
+    category: payload.category,
+    quantity: payload.quantity,
+    unit: payload.unit || '件',
+    expectPrice: payload.expectPrice ?? null,
+    description: payload.description || '',
+    region: payload.region,
+    validUntil: formatValidUntil(payload.validUntil),
+    contact: payload.contact,
+    status: 1,
+    createTime: new Date().toISOString().slice(0, 19).replace('T', ' ')
+  })
+  return id
+}
+
+/**
+ * 编辑自己发布的求购需求。
+ *
+ * @param {number|string} id    需求 id
+ * @param {object}      payload 同publishDemand
+ */
+export async function updateDemand(id, payload) {
+  if (!USE_DEMAND_MOCK) {
+    return request.put(`/demand/${id}`, {
+      ...payload,
+      validUntil: formatValidUntil(payload.validUntil)
+    })
+  }
+
+  await new Promise((r) => setTimeout(r, 400))
+  const idx = mockMine.findIndex((d) => String(d.demandId) === String(id))
+  if (idx > -1) {
+    mockMine[idx] = {
+      ...mockMine[idx],
+      ...payload,
+      unit: payload.unit || mockMine[idx].unit,
+      validUntil: formatValidUntil(payload.validUntil)
+    }
+  }
+  return id
+}
+
+/**
+ * 「我发布的」求购需求（mock）。
+ *
+ * ⚠️ 后端 `GET /demand/list` **不支持按发布者过滤**（只有 category / region），
+ * 且强制 status=1 AND valid_until >= NOW()，所以真实接口给不出「我的全部需求」——
+ * 已关闭、已过期的一律拿不到。前端只能用当前页数据按 publisherId 过滤，
+ * 分页错位会导致「明明发过 3 条，右栏却显示暂无」。
+ *
+ * 本函数是 mock 版：把本会话发布过的需求补进右栏，
+ * 保证「发布 → 能在右栏看到 → 能编辑/关闭/删除」这条闭环先跑通。
+ */
+export async function getMyDemandsMock() {
+  await new Promise((r) => setTimeout(r, 200))
+  return mockMine.map((d) => ({ ...d, __mock: true }))
+}
+
+/** 关闭：mock 版同步更新本地状态，避免右栏与列表不一致。 */
+export async function closeDemandMock(id) {
+  if (!USE_DEMAND_MOCK) return closeDemand(id)
+  await new Promise((r) => setTimeout(r, 300))
+  const hit = mockMine.find((d) => String(d.demandId) === String(id))
+  if (hit) hit.status = 0
+  return true
+}
+
+/** 删除：mock 版从本地移除。 */
+export async function removeDemandMock(id) {
+  if (!USE_DEMAND_MOCK) return removeDemand(id)
+  await new Promise((r) => setTimeout(r, 300))
+  mockMine = mockMine.filter((d) => String(d.demandId) !== String(id))
+  return true
+}
+
+/* ====================================================================
  * 购物车
  * ==================================================================== */
 

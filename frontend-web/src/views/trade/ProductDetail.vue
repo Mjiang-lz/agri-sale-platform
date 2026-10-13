@@ -71,7 +71,14 @@
 
             <p class="description">{{ product.description || '卖家暂未填写商品描述' }}</p>
 
-            <div class="buy-row">
+            <!-- 购买区。
+                 管理员**整块隐藏**而不是置灰：他的职责是看货源做治理核对，
+                 不参与交易。置灰仍留着一排不能用的控件，看着像功能坏了；
+                 整块换成一句说明，页面语义更干净。
+                 ⚠️ 后端 /trade/cart、/trade/order 目前没有角色校验，
+                 这里藏起来是**展示层**的拦截，不是安全边界。
+                 真正的写操作防护在网关与接口鉴权上。 -->
+            <div v-if="!isAdmin" class="buy-row">
               <el-input-number
                 v-model="quantity"
                 :min="1"
@@ -86,7 +93,16 @@
             </div>
 
             <el-alert
-              v-if="product.status !== 1"
+              v-if="isAdmin"
+              class="buy-alert"
+              type="info"
+              :closable="false"
+              show-icon
+              title="管理员为只读查看"
+              description="你正在以管理员身份核对货源信息。加购与下单属于买家操作，管理员账号不参与，因此此处不提供购买入口。"
+            />
+            <el-alert
+              v-else-if="product.status !== 1"
               class="buy-alert"
               type="warning"
               :closable="false"
@@ -201,6 +217,24 @@ const currentImage = ref('')
 
 const loggedIn = computed(() => Boolean(getToken()))
 
+/**
+ * 管理员只读。
+ *
+ * 管理员可以浏览、搜索全平台货源做治理核对，但不应参与交易 ——
+ * 加购与下单会写入真实的订单数据。
+ *
+ * ⚠️ 这只是展示层判断：后端 /trade/cart 与 /trade/order 目前**没有** requireRole，
+ * 所以真正兜住写入的是 handleAddToCart / goCart 里的显式拦截。
+ * 若日后后端补上角色校验，这里的判断可以退化成纯展示。
+ */
+const isAdmin = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('rxt_user_profile') || 'null')?.roleName === '管理员'
+  } catch {
+    return false
+  }
+})
+
 /** 图集：主图排第一，去重后展示。演示数据 imageUrl 全 NULL，所以主图走 productImage 兜底。 */
 const images = computed(() => {
   const list = Array.isArray(product.value?.images)
@@ -267,8 +301,23 @@ function requireLogin() {
   return false
 }
 
+/**
+ * 管理员拦截。后端 addToCart / createOrder 没有角色校验，
+ * 这里必须挡住，否则管理员真的能写入订单数据。
+ *
+ * 为什么要挡这一层：购买区只是 v-if 隐藏的，直连 URL 改参数或控制台调
+ * handleAddToCart 依然会发出请求 —— 而后端那边是放行的。
+ */
+function denyAdmin(action) {
+  if (!isAdmin.value) {
+    return false
+  }
+  ElMessage.warning(`管理员为只读查看，不能${action}`)
+  return true
+}
+
 async function handleAddToCart() {
-  if (!canBuy.value || !requireLogin()) {
+  if (denyAdmin('加入购物车') || !canBuy.value || !requireLogin()) {
     return
   }
   adding.value = true
@@ -283,7 +332,8 @@ async function handleAddToCart() {
 }
 
 function goCart() {
-  if (!requireLogin()) {
+  // 管理员同样拦：购物车是买家侧数据，菜单里已对管理员隐藏，这里是第二道
+  if (denyAdmin('进入购物车') || !requireLogin()) {
     return
   }
   router.push('/trade/cart')
