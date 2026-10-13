@@ -59,27 +59,37 @@ export function assetUrl(path) {
 
 /** 商品名关键词 → 精确图片。这是让「文案 / 搜索结果 / 图片」三者匹配的核心表。 */
 const NAME_IMG = [
-  { keys: ['赣南脐橙', '脐橙'], img: '/products/p03.jpg' },
+  { keys: ['赣南脐橙'], img: '/products/p03.jpg' },
+  // 落地页对「脐橙次果 特惠」单独配一篮水果（p09），避免与「赣南脐橙」同图
+  { keys: ['脐橙次果'], img: '/products/p09.jpg' },
+  { keys: ['脐橙'], img: '/products/p03.jpg' },
   { keys: ['砂糖橘', '沙糖橘'], img: '/products/p13.jpg' },
   // p12 是挂在树上的青皮柚（通体暗绿），不像蜜柚；改用 p30（半个红心蜜柚实拍）
   { keys: ['蜜柚', '柚子'], img: '/products/p30.jpg' },
   { keys: ['猕猴桃', '奇异果'], img: '/products/p11.jpg' },
-  { keys: ['小番茄', '西红柿', '番茄'], img: '/products/p02.jpg' },
-  { keys: ['干香菇', '香菇'], img: '/products/g04.jpg' },
+  // 与落地页对齐：「农家自种小番茄」用 p05（菜摊实拍），「露天西红柿」用 p02（藤上番茄）
+  { keys: ['小番茄'], img: '/products/p05.jpg' },
+  { keys: ['西红柿', '番茄'], img: '/products/p02.jpg' },
+  { keys: ['干香菇', '香菇'], img: '/products/p22.jpg' },
   { keys: ['红薯', '地瓜'], img: '/products/p15.jpg' },
-  { keys: ['五常大米', '大米'], img: '/products/g02.jpg' },
-  { keys: ['玉米面', '玉米粉'], img: '/products/g07.jpg' },
-  { keys: ['小米'], img: '/products/g03.jpg' },
+  // 粮油三件与落地页对齐：大米用 p14（一碗米）、玉米面用 p28（大盆玉米面）、小米用 p08
+  // ⚠️ 小米那张（p08）实为麦田远景，语义偏弱，两端一致但都不够贴，待另行订正
+  { keys: ['五常大米', '大米'], img: '/products/p14.jpg' },
+  { keys: ['玉米面', '玉米粉'], img: '/products/p28.jpg' },
+  { keys: ['小米'], img: '/products/p08.jpg' },
   { keys: ['黄瓜'], img: '/products/p26.jpg' },
   { keys: ['大白菜', '白菜'], img: '/products/p25.jpg' },
   { keys: ['土豆', '马铃薯'], img: '/products/p04.jpg' },
   { keys: ['干辣椒', '辣椒'], img: '/products/p21.jpg' },
   { keys: ['鸡蛋'], img: '/products/p17.jpg' },
-  { keys: ['土鸡', '老母鸡', '母鸡'], img: '/products/p27.jpg' },
-  { keys: ['腊肉'], img: '/products/g05.jpg' },
-  { keys: ['草鱼'], img: '/products/g06.jpg' },
+  // 与落地页对齐：「老母鸡」用 p16（白条整鸡实拍），「土鸡」用 p27（草地散养活鸡）
+  { keys: ['老母鸡'], img: '/products/p16.jpg' },
+  { keys: ['土鸡', '母鸡'], img: '/products/p27.jpg' },
+  // 与落地页对齐：腊肉 p18（挂晒腊味）、草鱼 p20（活水鱼）、莲藕 p23（白盘藕片）
+  { keys: ['腊肉'], img: '/products/p18.jpg' },
+  { keys: ['草鱼'], img: '/products/p20.jpg' },
   { keys: ['小龙虾'], img: '/products/p19.jpg' },
-  { keys: ['莲藕'], img: '/products/g10.jpg' },
+  { keys: ['莲藕'], img: '/products/p23.jpg' },
   { keys: ['菜籽油', '菜油'], img: '/products/p29.jpg' },
   { keys: ['大闸蟹', '螃蟹'], img: '/products/g08.jpg' },
   { keys: ['松茸'], img: '/products/g09.jpg' },
