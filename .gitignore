@@ -63,6 +63,16 @@ application-prod.yml
 *.keystore
 *.jks
 
+# docker compose 的 .env。
+# ⚠️ 这一条以前是漏的：`.env` 是 docker compose **自动读取**的、和 docker-compose.yml
+#    同目录的文件，正是放 RXT_DB_PASSWORD / RXT_JWT_SECRET 的地方。缺了它，
+#    服务器上 `git add .` 会把数据库密码和 JWT 签名密钥一起提交进版本库 ——
+#    而且提交后即使删除，密钥也已经留在历史里了，必须重新生成才算干净。
+#    模板见 .env.example（那个是要入库的）。
+.env
+.env.*
+!.env.example
+
 # ---------------------- 数据库导出 / 转储 ----------------------
 # 结构变更一律改 db/schema.sql 或 db/migrations/ 下的脚本，
 # 不要提交从 Navicat 等工具导出的数据库文件（含真实数据、密码哈希）。
@@ -73,3 +83,13 @@ dump-*.sql
 *_backup.sql
 *_bak.sql
 data-backup*/
+
+# ---------------------- 别的部署平台的配置 ----------------------
+# `frontend-landing/public/edgeone.json` 是腾讯云 EdgeOne Pages 的 SPA 回退规则
+# （`/*` → `/index.html`，作用等价于 nginx 的 try_files 回退）。它是某次部署实验留下的，
+# 本项目实际走宝塔 + nginx（分流规则见 deploy/nginx.conf、部署手册见
+# docs/部署-腾讯云共享环境.md），这份文件不参与任何构建。
+#
+# 刻意「忽略但不删」：本机留着（将来真要试 EdgeOne 就直接可用），
+# 同时不再一直挂在 `git status` 上让人以为漏提交了什么。
+frontend-landing/public/edgeone.json

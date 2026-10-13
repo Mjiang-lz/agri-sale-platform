@@ -509,6 +509,7 @@ import { isReadable } from '@/utils/text'
 import { APPLY_STATUS, isApprovedApply } from '@/constants/finance'
 import {
   productImage,
+  assetUrl,
   productFallbackBg,
   productFallbackText,
   expertInitial,
@@ -600,12 +601,16 @@ function onKnowledgeImgError(e, k) {
 
 /* ---------------- 首屏轮播 ---------------- */
 /* 这四张全部是真实田间/产地实拍图，不用抽象插画。 */
+/* ★ 路径必须过 assetUrl()：表里写的是「站点根绝对路径」，而本应用构建后挂在 `/app/` 下。
+   不过这一步，部署到子路径后浏览器会去**站点根**找图 —— 那里若恰好没有同名文件，
+   nginx 的 SPA 回退会返回 `200 + index.html`，图片静默变碎图：状态码全绿、
+   控制台无报错，只有肉眼看得出（2026-10-13 实际踩过一次）。 */
 const HERO_IMAGES = [
   '/products/p08.jpg',
   '/products/p25.jpg',
   '/products/p20.jpg',
   '/products/p17.jpg'
-]
+].map((p) => assetUrl(p))
 const HERO_ALT = ['水稻田里的稻谷长势', '田间蔬菜批发市场的货架', '养殖基地的鱼塘', '农场的散养鸡蛋']
 const HERO_TEXT = [
   { kicker: '产地直供', title: '田间到餐桌，少中间一环', desc: '24 个在售货源全部来自产地直发，看得到产地、看得到库存' },
@@ -656,7 +661,8 @@ function searchBy(w) {
 /* ---------------- 品类入口 ----------------
    圆形裁到 74px，所以要选**主体占满画面**的特写图。
    例：「水果」原用 p01（草地上的苹果箱，竖构图、主体只占中间一小块），
-   缩成圆图后糊成一团黄绿色，第一眼看着像土豆 —— 换成 p10 满幅红苹果特写。 */
+   缩成圆图后糊成一团黄绿色，第一眼看着像土豆 —— 换成 p10 满幅红苹果特写。
+   ★ img 同样要过 assetUrl()，理由见上面 HERO_IMAGES 的注释。 */
 const categories = [
   { name: '水果', img: '/products/p10.jpg' },
   { name: '蔬菜', img: '/products/p26.jpg' },
@@ -664,7 +670,7 @@ const categories = [
   { name: '畜禽产品', img: '/products/p27.jpg' },
   { name: '粮油', img: '/products/g02.jpg' },
   { name: '干货', img: '/products/p22.jpg' }
-]
+].map((c) => ({ ...c, img: assetUrl(c.img) }))
 function goCategory(name) {
   router.push({ path: '/trade/products', query: { category: name } })
 }
