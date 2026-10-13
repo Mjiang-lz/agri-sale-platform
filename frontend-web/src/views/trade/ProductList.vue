@@ -116,6 +116,9 @@
         <el-button v-if="hasFilter" type="primary" @click="resetQuery">清空筛选条件</el-button>
       </el-empty>
     </el-card>
+
+    <!-- 返回顶部按钮。样式与参数统一由 components/PageBackTop.vue 提供，各页不再各写一份。 -->
+    <PageBackTop />
   </div>
 </template>
 
@@ -125,6 +128,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getTradeProducts } from '@/api/trade'
 import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
+import PageBackTop from '@/components/PageBackTop.vue'
 
 /**
  * 页面用途：商品货源列表（公开接口，游客可访问）。

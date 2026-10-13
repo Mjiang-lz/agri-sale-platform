@@ -1,5 +1,38 @@
 <template>
   <div class="my-products-page">
+    <!--
+      管理员视角：本页对他没有意义（他不发布商品，名下也没有商品）。
+      但**保留整页结构与提示**而不是空白或报错：
+      直接输URL 进来时（路由已挡一道，这里是第二层）给一个说得清楚的交代，
+      比一个红色 403 报错友好得多。
+    -->
+    <template v-if="isAdmin">
+      <div class="page-head">
+        <div>
+          <h2>我的商品</h2>
+          <p>管理员不参与商品发布，这里没有属于你的商品。</p>
+        </div>
+        <div class="head-actions">
+          <el-tag type="info" effect="plain">管理员只读</el-tag>
+          <el-button type="primary" @click="router.push('/trade/products')">去商品货源</el-button>
+        </div>
+      </div>
+
+      <el-card shadow="never" class="content-card">
+        <el-result icon="info" title="管理员无需管理自有商品">
+          <template #sub-title>
+            <div class="admin-hint">
+              <p>商品发布、编辑与上下架属于农户操作，管理员账号不参与供给侧业务。</p>
+              <p>需要查看全平台在售货源、核对商品状态，请前往「农产品交易 › 商品货源」。</p>
+            </div>
+          </template>
+        </el-result>
+      </el-card>
+      <PageBackTop />
+    </template>
+
+    <!-- 农户视角：原有功能完整保留 -->
+    <template v-else>
     <div class="page-head">
       <div>
         <h2>我的商品</h2>
@@ -92,7 +125,14 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="210" fixed="right">
+          <!-- 管理员只读：整列隐藏，而不是把三个按钮置灰。
+                 置灰一排「编辑 / 下架 / 删除」看起来像坏了；
+                 隐藏后该列本身消失，页面语义更清楚 ——
+                 管理员在这页只做状态核对，不改数据。
+                 ⚠️ 后端 publishProduct / updateProduct / updateProductStatus /
+                 deleteProduct 四处都是 requireRole(FARMER)，真点也会 403。
+                 这里做的是展示层清理，不是安全边界。 -->
+          <el-table-column v-if="!isAdmin" label="操作" width="210" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="openForm(row)">编辑</el-button>
               <!--
@@ -129,7 +169,8 @@
 
           <template #empty>
             <el-empty :description="emptyText">
-              <el-button v-if="!auditFilter" type="primary" @click="openForm(null)">发布第一件商品</el-button>
+              <el-button v-if="!auditFilter && !isAdmin" type="primary" @click="openForm(null)">发布第一件商品</el-button>
+              <el-button v-else-if="!auditFilter && isAdmin" @click="loadList">刷新</el-button>
               <el-button v-else @click="auditFilter = ''">查看全部商品</el-button>
             </el-empty>
           </template>
@@ -236,11 +277,13 @@
         </el-button>
       </template>
     </el-dialog>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getMyProducts,
@@ -251,6 +294,7 @@ import {
 } from '@/api/trade'
 import { checkImageFile, uploadProductImage } from '@/api/common'
 import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
+import PageBackTop from '@/components/PageBackTop.vue'
 
 /**
  * 页面用途：我的商品（农户视角）。
@@ -282,6 +326,9 @@ const CATEGORIES = ['蔬菜', '水果', '粮油', '干货', '水产', '畜禽产
 /** 与 data.sql 里既有商品的单位取值保持一致，避免同一个意思出现「斤 / 市斤 / 500g」三种写法 */
 const UNITS = ['斤', '公斤', '箱', '袋', '盒', '桶', '个', '只']
 
+/** 管理员只读分支里的「去商品货源」按钮要用。 */
+const router = useRouter()
+
 const loading = ref(false)
 const errorState = ref(false)
 const products = ref([])
@@ -307,9 +354,26 @@ const form = reactive({
   imageUrl: ''
 })
 
-const emptyText = computed(() =>
-  auditFilter.value ? `没有「${auditFilter.value}」的商品` : '还没有发布过商品'
-)
+/**
+ * 管理员只读。
+ *
+ * 管理员账号不参与供给侧操作：发布、编辑、上下架、删除四项后端都是
+ * requireRole(FARMER)（TradeServiceImpl 的 publishProduct / updateProduct /
+ * updateProductStatus / deleteProduct）。本页对管理员隐藏全部写入口，
+ * 只保留状态核对。
+ */
+const isAdmin = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('rxt_user_profile') || 'null')?.roleName === '管理员'
+  } catch {
+    return false
+  }
+})
+
+const emptyText = computed(() => {
+  if (isAdmin.value) return '你名下暂无商品'
+  return auditFilter.value ? `没有「${auditFilter.value}」的商品` : '还没有发布过商品'
+})
 
 /**
  * 校验规则与后端 ProductPublishDTO 的注解逐条对齐
@@ -327,7 +391,16 @@ const rules = {
   stock: [{ required: true, message: '请填写库存', trigger: 'blur' }]
 }
 
-onMounted(loadList)
+/**
+ * 管理员进来时**不发这个请求**。
+ * 后端 pageMyProducts 是 requireRole(FARMER)，管理员调它必定 403 ——
+ * 与其让红色报错出现在一个「对他本来就没意义」的页面上，不如不请求，
+ * 由模板里的 v-else 分支给一句清楚的说明。
+ */
+onMounted(() => {
+  if (isAdmin.value) return
+  loadList()
+})
 
 async function loadList() {
   loading.value = true
@@ -576,6 +649,14 @@ function coverClass(item) {
 <style scoped>
 .my-products-page {
   color: var(--el-text-color-primary);
+}
+
+/* 管理员只读分支里 el-result 的副标题：两行说明，居中、别太长 */
+.admin-hint p {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-secondary);
 }
 
 .filter-bar {

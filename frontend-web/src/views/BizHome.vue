@@ -896,17 +896,24 @@ const isEmptyState = computed(() => {
   return true
 })
 
+// 管理员与农户同口径：农户是平台主体，管理员看到的「我的业务」视图与农户一致。
+// 不加这条的话管理员会掉到最后一行兜底，首页显示「暂无业务记录」+「发布货源」，
+// 既不像农户也不像管理员，看着像功能缺失（实测截图就是这个状态）。
+const isFarmerLike = computed(() => ['农户', '管理员'].includes(actualRole.value))
+
 const emptyTitle = computed(() => {
-  if (actualRole.value === '农户') return '你还没有业务记录'
+  if (isFarmerLike.value) return '你还没有业务记录'
   if (actualRole.value === '采购方') return '你还没有订单'
   if (actualRole.value === '银行用户') return '当前没有待审批的申请'
   return '暂无业务记录'
 })
 const emptyDesc = computed(() => {
-  if (actualRole.value === '农户') return '先看看下面的在售行情与田间求购，定下价再发布你的货源；需要周转可以提交融资意向'
-  if (actualRole.value === '采购方') return '挑中上面的商品加入购物车即可下单，订单会出现在这里'
-  if (actualRole.value === '银行用户') return '农户提交融资申请后，清单会出现在这里'
-  return '当前没有待处理事项'
+
+  if (isFarmerLike.value) return '先看看下面的在售行情与田间求购，定下价再发布你的货源；需要周转可以提交融资意向。'
+  if (actualRole.value === '采购方') return '挑中上面的商品加入购物车即可下单，订单会出现在这里。'
+  if (actualRole.value === '银行用户') return '农户提交融资申请后，清单会出现在这里。'
+  return '当前没有待处理事项。'
+
 })
 const emptyAction = computed(() => {
   if (actualRole.value === '采购方') return { label: '去挑货', path: '/trade/products' }
