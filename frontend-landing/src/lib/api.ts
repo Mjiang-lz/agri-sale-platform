@@ -39,6 +39,26 @@ export type ApiProduct = {
   status?: number
 }
 
+/** 求购需求（GET /demand/list）。字段与后端 DemandVO 一一对应 */
+export type ApiDemand = {
+  demandId: number
+  /** 品类，如「粮油」 */
+  category?: string
+  /** 求购数量 */
+  quantity?: number
+  /** 计量单位 */
+  unit?: string
+  /** 期望单价，后端 BigDecimal 可能是字符串 */
+  expectPrice?: number | string
+  /** 需求描述（用户自由填写，落地页不展示，避免把 UGC 搬上对外展示位） */
+  description?: string
+  /** 期望产区 */
+  region?: string
+  /** 有效期截止（超过即失效） */
+  validUntil?: string
+  status?: number
+}
+
 export type ApiKnowledge = {
   knowledgeId: number
   title: string
@@ -115,9 +135,14 @@ export function fetchProductPage(
   return fetchApi<ApiPage<ApiProduct>>(`/trade/products?${query.toString()}`)
 }
 
-/** 求购需求列表（公开） */
+/**
+ * 求购需求列表（公开）。
+ *
+ * 落地页的「找销路」用它 —— 农户视角下，「有人正在求购」就是销路本身，
+ * 比放一张静态图更能说明这个 tab 在讲什么。
+ */
 export const fetchDemandList = (pageSize = 6) =>
-  fetchApi<ApiPage<unknown>>(`/demand/list?pageNum=1&pageSize=${pageSize}`)
+  fetchApi<ApiPage<ApiDemand>>(`/demand/list?pageNum=1&pageSize=${pageSize}`)
 
 /** 组装图片地址：完整 URL 原样用，相对路径补 /files 前缀 */
 export function resolveImage(url?: string): string | null {
