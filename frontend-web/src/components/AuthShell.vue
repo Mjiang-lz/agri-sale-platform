@@ -10,6 +10,12 @@
     改为**贴右侧的抽屉**，宽 40%、盒体半透明 40%。
     这样左侧留出完整的油菜花田与人物，视觉重心在图上，表单只占右侧一条。
 
+    ★ 版式又调过一版（"图标放头部、别分开、右侧铺满"）：
+    之前标识在左下角、页脚在右下角，各自垫一块小牌子 —— 结果是
+    「一条右侧面板上散着两个孤立方块」，盒子感被切碎了。
+    现在改成**右侧一整块通栏盒子**：标识在盒内头部、表单占中间、
+    页脚沉底，40% 宽从上到下铺满整屏。左侧只留纯底图。
+
     ★ 半透明带来的代价：油菜花田是高饱和黄绿，40% 透明度下
     表单文字会糊在花纹上。所以**输入框自己补了一层近不透明底**，
     只有盒子的留白区透图 —— 这是「盒子透、控件不透」的分层处理，
@@ -20,16 +26,16 @@
     .auth-submit），它们写在本组件的非作用域块里，所以插槽内容也能吃到。
   -->
   <div class="auth-page" :style="{ '--auth-field': fieldUrl }">
-    <!-- 底图上的品牌标识：盒子腾给表单后，标识挪到左下角，兼顾「这是谁」 -->
-    <div class="auth-brand">
-      <RxtLogo :size="46" />
-      <div class="auth-brand-text">
-        <strong>融销通</strong>
-        <small>农产品融销一体平台</small>
-      </div>
-    </div>
-
+    <!-- ★ 右侧通栏盒子：标识在头部、表单在中间、页脚沉底，三段共用一块底 -->
     <aside class="auth-drawer">
+      <header class="auth-brand">
+        <RxtLogo :size="44" />
+        <div class="auth-brand-text">
+          <strong>融销通</strong>
+          <small>农产品融销一体平台</small>
+        </div>
+      </header>
+
       <main class="auth-card">
         <slot />
       </main>
@@ -76,27 +82,49 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
   background-color: var(--rxt-page-bg);
 }
 
-/* 品牌标识：放在左下角的白底牌子上。
-   天空区是整张图最亮的一带，标识直接压上去会看不清 */
+/* ★ 右侧通栏盒子：品牌标识在头部、表单在中间、页脚沉底。
+   半透明底与 backdrop-filter 都放在这里 —— 盒子只有这一块，
+   标识/表单/页脚三段共用同一层底，所以它们天然是「一体的」。
+
+   通栏的关键在 min-height:100vh + 三段用 flex 分配：
+   头部与页脚 flex:0 0 auto 贴着上下边，中间 .auth-card 撑开剩余高度
+   并自己居中，于是盒子在任何视口高度下都是满的。 */
+.auth-drawer {
+  position: relative;
+  z-index: 1;
+  width: 40%;
+  min-width: 420px;
+  max-width: 640px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  /* 盒子本体：透明度 40%（需求指定）+ 背景模糊。
+     单靠 40% 透明度，花田的高频黄绿纹理会直接透过文字底下、字会花掉，
+     所以模糊是这条需求的**必要配套**，不是装饰 */
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(14px) saturate(115%);
+  -webkit-backdrop-filter: blur(14px) saturate(115%);
+  /* 左缘一条发丝线，把盒子与底图分开。
+     不要用 box-shadow 横向偏移 —— 那会连右侧一起投出去，不像「一条线」 */
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: -18px 0 48px rgba(20, 52, 42, 0.12);
+}
+
+/* 头部：品牌标识。flex:0 0 auto —— 不参与剩余高度分配，永远贴顶 */
 .auth-brand {
-  position: absolute;
-  left: 40px;
-  bottom: 40px;
-  z-index: 2;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 22px 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 10px 30px rgba(20, 52, 42, 0.18);
+  padding: 34px 32px 22px;
 }
 .auth-brand-text strong,
 .auth-brand-text small {
   display: block;
 }
 .auth-brand-text strong {
-  font-size: 22px;
+  font-size: 21px;
   letter-spacing: 1px;
   color: var(--rxt-ink);
 }
@@ -106,92 +134,69 @@ const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field
   color: var(--rxt-ink-weak);
 }
 
-/* 右侧抽屉：占页面 40%，表单盒在半透明面板内 */
-.auth-drawer {
-  position: relative;
-  z-index: 1;
-  width: 40%;
-  min-width: 420px;
-  max-width: 640px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* ★ safe 兜底：注册页五个字段在矮视口里会高过屏幕，纯 center 会把标题顶出可视区
-     （flex 居中 + 溢出 ⇒ 首尾被裁）。safe center 在装得下时等价于 center，装不下时退化为 flex-start */
-  justify-content: safe center;
-  gap: 18px;
-  padding: 48px 32px;
-  box-sizing: border-box;
-  overflow-y: auto;
-  /* 抽屉自身再补一层极淡白，让右侧与左侧的图有个过渡，不至于硬切。
-     ★ 刻意做得很薄（0.12 / 0.22）：它叠在盒子的 0.4 之上，
-     早期版本给到 0.5，叠完等于 0.7 白 —— 盒子「40% 透明」的要求
-     就被这层吃掉了，视觉上又回到一张不透明的卡片。白晕的活儿
-     交给 .auth-card 里的 backdrop-filter 干，那才是给盒子该加的 */
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.12) 34%, rgba(255, 255, 255, 0.22) 100%);
-}
-
+/* 中间：表单。flex:1 撑开剩余高度并把内容居中 */
 .auth-card {
   position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   width: 100%;
-  padding: 32px 30px 24px;
+  padding: 8px 32px 24px;
   box-sizing: border-box;
-  /* ★ 盒子透明度 40%（需求指定）：白底只留四成，油菜花田透过来。
-     配套必须有 backdrop-filter 模糊 —— 单靠 40% 透明度，
-     花田的高频黄绿纹理会直接透过文字底下，字会花掉 */
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(14px) saturate(115%);
-  -webkit-backdrop-filter: blur(14px) saturate(115%);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: 18px;
-  box-shadow: 0 18px 48px rgba(20, 52, 42, 0.16);
 }
 
+/* 底部：页脚。同样 flex:0 0 auto，永远沉底 */
 .auth-foot {
-  position: relative;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  /* ★ 页脚不在 .auth-card 里，它底下就是油菜花田 —— 只靠文字阴影压不住
-     高饱和的黄绿花纹（截图里这行字基本认不出来）。所以自己垫一块浅底牌，
-     跟左下角的 .auth-brand 同一套视觉语言：一个字号的白底牌子浮在图上。 */
-  padding: 9px 20px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.66);
-  box-shadow: 0 6px 18px rgba(20, 52, 42, 0.12);
+  padding: 20px 32px 28px;
+  /* ★ 页脚与表单共用同一块半透明底，不再自己垫白牌：
+     之前它单独垫一块牌子，底色跟盒子一深一浅，反而把盒子切成了三段 */
   font-size: 12px;
   color: #2c4038;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
 }
 .auth-foot .auth-link {
   font-weight: 600;
 }
 
-/* ★ 窄屏（平板竖屏 / 手机）：40% 抽屉加 min-width:420px 会溢出，
-   一旦横向出现滚动条整页构图就废了 —— 直接让抽屉占满整宽，
-   底图退成纯底色（不然糊在表单后面的花纹会跟着一起晃） */
+/* ★ 窄屏（平板竖屏 / 手机）：40% + min-width:420px 在手机视口必然溢出，
+   一旦出现横向滚动条整页构图就废了 —— 改成满宽通栏。
+   底图同时退场：满宽之后底图完全被盒子盖住，留着只是白白占解码带宽；
+   而且半透明底 + 模糊在没有对比图案时也没意义。 */
 @media (max-width: 900px) {
   .auth-page {
-    /* 满宽时不再需要横向过渡带，也铺不了满屏底图 */
-    background:
-      linear-gradient(180deg, rgba(14, 122, 95, 0.08) 0%, rgba(14, 122, 95, 0.14) 100%),
-      var(--rxt-page-bg);
+    background: var(--rxt-page-bg);
   }
   .auth-drawer {
     width: 100%;
     min-width: 0;
     max-width: none;
-    padding: 32px 20px;
-    background: none;
+    /* 满宽时不再有左右之分，横向发丝线与投影都去掉，
+       否则左侧会出现一条莫名其妙的竖线 */
+    border-left: none;
+    box-shadow: none;
+    /* 底图退场后没有东西可透，模糊一并关掉（backdrop-filter 在
+       无图案时会让文字边缘发虚，实测比不开更糊） */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    /* 满宽时不透明 —— 半透明配纯色底 = 灰扑扑一片，比不透明更难看 */
+    background: rgba(255, 255, 255, 0.96);
   }
-  /* 品牌标识挪到顶部：满宽时它压在左下角会跟表单的「返回首页」打架 */
+  /* 头部标识居中，窄屏下左侧对齐会显得歪 */
   .auth-brand {
-    position: static;
-    align-self: center;
-    margin-bottom: 4px;
+    justify-content: center;
+    padding: 28px 20px 18px;
   }
-  .auth-page {
-    flex-direction: column;
+  .auth-card {
+    padding: 8px 20px 20px;
+  }
+  .auth-foot {
+    padding: 18px 20px 24px;
   }
 }
 </style>
