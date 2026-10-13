@@ -1,8 +1,8 @@
 <template>
   <!--
-    登录 / 注册共用的页面外壳：浅色品牌底纹 + 居中卡片 + 品牌标 + 页脚。
+    登录 / 注册共用的页面外壳：田间航拍底图 + 居中卡片 + 品牌标 + 页脚。
 
-    为什么抽出来：登录页与注册页除了表单内容之外完全同构（底纹、卡片尺寸、
+    为什么抽出来：登录页与注册页除了表单内容之外完全同构（底图、卡片尺寸、
     圆角、阴影、品牌标、页脚）。各自写一份的话，这两页的视觉一定会慢慢漂开
     —— 全站 .page-head 被复制 9 份就是这个剧本。
 
@@ -10,7 +10,7 @@
     标题/表单用下面导出的类名（.auth-title / .auth-sub / .auth-switch / .auth-link /
     .auth-submit），它们写在本组件的非作用域块里，所以插槽内容也能吃到。
   -->
-  <div class="auth-page">
+  <div class="auth-page" :style="{ '--auth-field': fieldUrl }">
     <main class="auth-card">
       <header class="auth-brand">
         <RxtLogo :size="46" />
@@ -30,11 +30,22 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import RxtLogo from '@/components/RxtLogo.vue'
+
+// ★ public/ 下的图必须跟 BASE_URL 走（web 端构建期是 /app/），写死 /auth/… 会 404
+//
+// ★ 这里必须在 JS 里就把 url() 包好，不能只把裸路径塞进 CSS 变量：
+//   background-image 的图层语法不接受裸路径（只有 url() 或 gradient），
+//   写成 `background: var(--auth-field) …` 整条声明会被**静默丢弃** ——
+//   页面照常渲染、computed background-image 只是 none，看不出任何报错。
+//   长写法 background-image/size/attachment 同样丢，别以为换长写法能绕开。
+const fieldUrl = computed(() => `url("${import.meta.env.BASE_URL}auth/auth-field.jpg")`)
 </script>
 
 <style scoped>
 .auth-page {
+  position: relative;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -43,21 +54,40 @@ import RxtLogo from '@/components/RxtLogo.vue'
   gap: 22px;
   padding: 40px 16px;
   box-sizing: border-box;
-  /* 浅色品牌底纹：顶部一层禾青薄雾向下过渡到页面底色。
-     比原来的 --el-fill-color-light 纯灰更有身份感，又不像深色那样压表单可读性 */
+  /* 田间航拍铺满整屏。
+     罩层刻意做得**薄**（0.42→0.64）：厚了虽然可读性好，但纹理会糊成一片白，
+     等于又回到「纯白渐变」。真正保证表单可读性的是卡片本身那层不透明白底，
+     罩层只需压住梯田的高光与深色梯埂，别让它们跟标题抢注意力。
+
+     顶部那一段「禾青」是给原图晨雾天空区补的：那是全图最亮最空的一带，
+     不压一下会在页面顶部留出一条突兀的白边。 */
   background:
-    radial-gradient(1100px 420px at 50% -160px, rgba(14, 122, 95, 0.1), transparent 70%),
-    linear-gradient(180deg, #eef5f2 0%, var(--rxt-page-bg) 46%, #ffffff 100%);
+    linear-gradient(180deg, rgba(14, 122, 95, 0.16) 0%, rgba(14, 122, 95, 0.04) 22%, transparent 42%),
+    radial-gradient(1100px 420px at 50% -160px, rgba(14, 122, 95, 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.54) 46%, rgba(255, 255, 255, 0.64) 100%),
+    var(--auth-field) center / cover no-repeat fixed;
+  background-color: var(--rxt-page-bg);
+}
+
+/* 图上再压一层柔化，只护住卡片所在的中段，两侧留给纹理 */
+.auth-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(680px 500px at 50% 46%, rgba(255, 255, 255, 0.5), transparent 74%);
+  pointer-events: none;
 }
 
 .auth-card {
+  position: relative;
   width: min(440px, 100%);
   padding: 34px 34px 26px;
   box-sizing: border-box;
-  background: var(--rxt-surface);
+  /* 罩层调薄后，卡片必须自己变实，否则表格会透出梯田纹理影响输入 */
+  background: #ffffff;
   border: 1px solid var(--rxt-border);
   border-radius: 18px;
-  box-shadow: var(--rxt-shadow-lg);
+  box-shadow: 0 18px 48px rgba(20, 52, 42, 0.16);
 }
 
 .auth-brand {
@@ -81,12 +111,18 @@ import RxtLogo from '@/components/RxtLogo.vue'
 }
 
 .auth-foot {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  /* 页脚压在图上，字要比平时重一档才读得清 */
   font-size: 12px;
-  color: var(--rxt-ink-weak);
+  color: #2c4038;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
+}
+.auth-foot .auth-link {
+  font-weight: 600;
 }
 </style>
 

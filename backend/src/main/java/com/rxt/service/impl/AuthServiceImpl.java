@@ -8,6 +8,7 @@ import com.rxt.entity.Role;
 import com.rxt.entity.User;
 import com.rxt.mapper.RoleMapper;
 import com.rxt.mapper.UserMapper;
+import com.rxt.security.CaptchaService;
 import com.rxt.security.JwtUtils;
 import com.rxt.security.RoleConstant;
 import com.rxt.service.AuthService;
@@ -52,9 +53,24 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
     private final JwtUtils jwtUtils;
+    private final CaptchaService captchaService;
+
+    /**
+     * 校验图形验证码。三个入口（登录/注册）共用，失败信息统一。
+     *
+     * <p>放在查库**之前**：验证码是防自动化撞库的第一道闸，先于密码比对执行，
+     * 脚本拿不到验证码时连「手机号或密码错误」都探不到，也就无法用它遍历账号。</p>
+     */
+    private void requireCaptcha(String key, String code) {
+        if (!captchaService.validate(key, code)) {
+            throw new BizException("验证码不正确或已过期，请点击图片刷新后重试");
+        }
+    }
 
     @Override
     public LoginVO login(LoginDTO dto) {
+        requireCaptcha(dto.getCaptchaKey(), dto.getCaptchaCode());
+
         User user = userMapper.selectOne(
                 Wrappers.<User>lambdaQuery().eq(User::getPhone, dto.getPhone()));
 
@@ -100,6 +116,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void register(RegisterDTO dto) {
+        requireCaptcha(dto.getCaptchaKey(), dto.getCaptchaCode());
+
         if (!REGISTRABLE_ROLES.contains(dto.getRoleName())) {
             throw new BizException("该身份不支持自助注册");
         }

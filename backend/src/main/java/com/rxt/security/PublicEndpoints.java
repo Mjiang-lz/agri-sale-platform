@@ -82,10 +82,15 @@ public class PublicEndpoints {
             // 只放行 POST。登录/注册都是写操作，没有 GET 的必要。
             rule(HttpMethod.POST.name(), "/auth/login"),
             rule(HttpMethod.POST.name(), "/auth/register"),
+            // 图形验证码：登录/注册都要先取图，不放开就是死循环（要图先登录、要登录先要图）
+            rule(HttpMethod.POST.name(), "/auth/captcha"),
 
             // —— 游客可浏览的公开只读数据。全部限定 GET ——
             rule(HttpMethod.GET.name(), "/home/**"),          // 首页推荐商品、农业知识
             rule(HttpMethod.GET.name(), "/trade/products"),   // 商品货源列表
+            // 品类字典：首页品类入口在游客首屏就要显示，下拉筛选同理。
+            // 不放开的话游客进首页会看到六个圆入口却一个都点不开。
+            rule(HttpMethod.GET.name(), "/trade/categories"),
             rule(HttpMethod.GET.name(), "/demand/list"),      // 求购需求列表
 
             // 商品详情：游客点开货源卡片就能看到价格、产地与发布农户，无需先注册。

@@ -25,4 +25,10 @@ public class RegisterDTO {
     /** 注册角色：农户 / 采购方 / 专家 / 银行用户 */
     @NotBlank(message = "请选择注册身份")
     private String roleName;
+
+    /** 图形验证码凭据，由 POST /api/auth/captcha 下发 */
+    private String captchaKey;
+
+    /** 用户在图里看到的字符（忽略大小写） */
+    private String captchaCode;
 }

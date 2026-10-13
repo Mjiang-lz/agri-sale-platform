@@ -39,6 +39,8 @@
           placeholder="请输入密码"
         />
       </el-form-item>
+      <!-- 图形验证码：每次提交都会一次性消费掉这个 key，所以成功/失败后都要刷新 -->
+      <CaptchaField ref="captchaRef" v-model:key="form.captchaKey" v-model:code="form.captchaCode" @submit="onSubmit" />
       <el-form-item class="auth-submit">
         <el-button type="primary" :loading="loading" @click="onSubmit">登 录</el-button>
       </el-form-item>
@@ -58,13 +60,16 @@ import { ElMessage } from 'element-plus'
 import request from '@/api/request'
 import { useUserStore } from '@/store/user'
 import AuthShell from '@/components/AuthShell.vue'
+import CaptchaField from '@/components/CaptchaField.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const formRef = ref()
+const captchaRef = ref()
 const loading = ref(false)
-const form = reactive({ phone: '', password: '' })
+// captchaKey / captchaCode 由 CaptchaField 双向绑定写进来，字段名与后端 LoginDTO 一致
+const form = reactive({ phone: '', password: '', captchaKey: '', captchaCode: '' })
 
 const rules = {
   phone: [
@@ -92,6 +97,8 @@ async function onSubmit() {
   // 否则表单没填全就直接抛出去，后面的 loading 逻辑根本不执行。
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
+  // 验证码单独校验：图没出来 / 没填都在这里拦，消息口径与后端一致
+  if (!captchaRef.value.validate()) return
 
   loading.value = true
   try {
@@ -99,8 +106,12 @@ async function onSubmit() {
     userStore.saveLogin(data)
     ElMessage.success('登录成功')
     router.push(safeRedirect())
+    // 这个 key 已被一次性消费，换一张新的，别让下次进页面看到一张废图
+    captchaRef.value.refresh()
   } catch {
     // 失败提示由 request 拦截器统一弹出（业务错误 / 网络异常都在那儿），这里不重复弹
+    // 但验证码必须刷新：key 无论对错都已被消费，不换图用户会一直卡在同一个废 key 上
+    captchaRef.value.refresh()
   } finally {
     loading.value = false
   }
