@@ -409,7 +409,9 @@
 
   <h2>七、复跑方式</h2>
 
-  <p>本轮验收脚本已随代码入库：</p>
+  <p>本轮验收脚本（<b>2026-10-13 已从仓库移除</b>，需要时从 git 历史
+    <code>git log --diff-filter=D -- verify/</code> 取回；下面的命令按当时原样保留，
+    作为「这份报告是怎么得出来的」的记录）：</p>
   <ul>
     <li><code>verify/scripts/mk-probe-spec.mjs</code> —— 生成测试规格。探针本体写在页面里，
       直接在页内 <code>fetch('/api/...')</code> 拿接口数据，再把 DOM 里读到的内容与接口数据<b>逐项比对</b>，
@@ -481,7 +483,7 @@ node ~/.workbuddy/skills/browser-style-probe/probe.mjs /tmp/landing_spec.json</c
   </div>
 
   <footer>
-    融销通落地页数据对接验收 · 第一轮 2026-09-22 / 第二轮 2026-10-08 · 截图目录 <code>verify/shots/</code>
+    融销通落地页数据对接验收 · 第一轮 2026-09-22 / 第二轮 2026-10-08 · 截图目录 <code>verify/shots/</code>（同批清理，见 git 历史）
   </footer>
 
 </div>
