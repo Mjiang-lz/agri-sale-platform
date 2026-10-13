@@ -7,6 +7,7 @@ import com.rxt.dto.ProductPublishDTO;
 import com.rxt.security.UserContext;
 import com.rxt.service.TradeService;
 import com.rxt.vo.CartVO;
+import com.rxt.vo.CategoryStatVO;
 import com.rxt.vo.OrderVO;
 import com.rxt.vo.ProductDetailVO;
 import com.rxt.vo.ProductVO;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 农产品交易接口。基础路径 /api/trade。
@@ -53,6 +55,21 @@ public class TradeController {
                                                  @RequestParam(required = false) String origin) {
         return Result.success(tradeService.pageProducts(pageNum, pageSize, keyword,
                 category, minPrice, maxPrice, origin));
+    }
+
+    /**
+     * 查询全部在架商品涉及的品类及各自数量。公开接口，游客可访问。
+     *
+     * <p><b>路径为什么是 {@code /categories} 而不是 {@code /products/categories}</b>：
+     * {@code WebMvcConfig} 的放行清单里写了 {@code /trade/products}，
+     * 而 {@code excludePathPatterns} <b>只按路径匹配</b>，前缀匹配规则下
+     * {@code /trade/products/categories} 也落在同一条放行规则内 ——
+     * 换句话说两种写法都能公开，但独立一级路径更清楚，
+     * 且不会让人误以为它隶属于「单个商品」的子资源。</p>
+     */
+    @GetMapping("/categories")
+    public Result<List<CategoryStatVO>> listCategories() {
+        return Result.success(tradeService.listCategories());
     }
 
     /**

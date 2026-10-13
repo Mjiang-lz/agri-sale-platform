@@ -269,6 +269,7 @@ import {
 } from '@/api/trade'
 import { useUserStore } from '@/store/user'
 import { formatDateTime, summary as sliceText } from '@/utils/text'
+import { useCategories } from '@/composables/useCategories'
 import DemandFormDialog from './components/DemandFormDialog.vue'
 import PageBackTop from '@/components/PageBackTop.vue'
 
@@ -297,8 +298,10 @@ const query = reactive({ category: '', region: '' })
 /** 接口失败标记：与「暂无需求」区分开 */
 const errorState = ref(false)
 
-// 后端没有字典接口，用已知全集兜底；新增品类后需同步这里
-const categoryOptions = ['水果', '粮油', '蔬菜', '干货', '水产', '畜禽产品']
+// ★ 2026-10-13 改为接口驱动（GET /trade/categories）。
+//   原注释「后端没有字典接口，用已知全集兜底；新增品类后需同步这里」
+//   正是需求 7 要根治的病根：名单在前端，库里加了新品类就漏在这里。
+const { categoryNames: categoryOptions, load: loadCategories } = useCategories()
 const regionOptions = ['江西赣州', '湖北荆州', '黑龙江五常']
 
 const detailVisible = ref(false)
@@ -620,6 +623,7 @@ async function handleRemove(row) {
 }
 
 onMounted(() => {
+  loadCategories()
   loadDemands()
   loadMockDemands()
 })

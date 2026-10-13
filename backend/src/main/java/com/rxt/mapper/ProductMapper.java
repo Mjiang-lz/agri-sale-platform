@@ -2,9 +2,13 @@ package com.rxt.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.rxt.entity.Product;
+import com.rxt.vo.CategoryStatVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+
+import java.util.List;
 
 /**
  * 商品货源数据访问接口（t_product）。
@@ -44,4 +48,19 @@ public interface ProductMapper extends BaseMapper<Product> {
      */
     @Update("UPDATE t_product SET stock = stock + #{quantity} WHERE product_id = #{productId}")
     int restoreStock(@Param("productId") Long productId, @Param("quantity") int quantity);
+
+    /**
+     * 按品类统计在架商品数，供分类筛选下拉与首页品类入口使用。
+     *
+     * <p><b>口径必须是「已通过 + 已上架」</b>，与 {@code TradeServiceImpl.pageProducts} 一致：
+     * 若把待审核/未通过的也算进来，筛选下拉里会出现点进去空结果的品类。</p>
+     *
+     * <p>排序用 {@code COUNT(*) DESC} 而不是按名称排：首页六个圆入口取前 N 个时，
+     * 「热门品类在前」比「按拼音顺序」更符合逛货源的直觉。</p>
+     */
+    @Select("SELECT category, COUNT(*) AS product_count FROM t_product "
+            + "WHERE audit_status = '已通过' AND status = 1 "
+            + "AND category IS NOT NULL AND TRIM(category) <> '' "
+            + "GROUP BY category ORDER BY COUNT(*) DESC, category ASC")
+    List<CategoryStatVO> countByCategory();
 }

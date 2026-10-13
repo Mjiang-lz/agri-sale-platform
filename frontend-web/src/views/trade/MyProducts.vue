@@ -294,6 +294,7 @@ import {
 } from '@/api/trade'
 import { checkImageFile, uploadProductImage } from '@/api/common'
 import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
+import { useCategories } from '@/composables/useCategories'
 import PageBackTop from '@/components/PageBackTop.vue'
 
 /**
@@ -322,7 +323,13 @@ import PageBackTop from '@/components/PageBackTop.vue'
  *      ContentChanged 的比较范围 = 名称 / 品类 / 描述 / 产地 / 主图 / 多图。
  */
 
-const CATEGORIES = ['蔬菜', '水果', '粮油', '干货', '水产', '畜禽产品']
+/**
+ * 品类下拉：接口驱动（需求 7）。
+ *
+ * ⚠️ 这里原先是第四份写死的六类名单。发布表单的品类选不到自己刚发过的那个，
+ * 就等于「发得出、改不了」。
+ */
+const { categoryNames: CATEGORIES, load: loadCategories } = useCategories()
 /** 与 data.sql 里既有商品的单位取值保持一致，避免同一个意思出现「斤 / 市斤 / 500g」三种写法 */
 const UNITS = ['斤', '公斤', '箱', '袋', '盒', '桶', '个', '只']
 
@@ -398,7 +405,9 @@ const rules = {
  * 由模板里的 v-else 分支给一句清楚的说明。
  */
 onMounted(() => {
+  // 品类下拉是这一页的关键控件（发布/编辑都要用），管理员看说明页时不必拉
   if (isAdmin.value) return
+  loadCategories()
   loadList()
 })
 

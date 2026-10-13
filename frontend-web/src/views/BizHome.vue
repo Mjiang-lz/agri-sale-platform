@@ -508,6 +508,7 @@ import request from '@/api/request'
 import { useUserStore } from '@/store/user'
 import { isReadable } from '@/utils/text'
 import { APPLY_STATUS, isApprovedApply } from '@/constants/finance'
+import { useCategories } from '@/composables/useCategories'
 import {
   productImage,
   assetUrl,
@@ -660,18 +661,32 @@ function searchBy(w) {
 }
 
 /* ---------------- 品类入口 ----------------
-   圆形裁到 74px，所以要选**主体占满画面**的特写图。
-   例：「水果」原用 p01（草地上的苹果箱，竖构图、主体只占中间一小块），
-   缩成圆图后糊成一团黄绿色，第一眼看着像土豆 —— 换成 p10 满幅红苹果特写。
-   ★ img 同样要过 assetUrl()，理由见上面 HERO_IMAGES 的注释。 */
-const categories = [
-  { name: '水果', img: '/products/p10.jpg' },
-  { name: '蔬菜', img: '/products/p26.jpg' },
-  { name: '水产', img: '/products/p19.jpg' },
-  { name: '畜禽产品', img: '/products/p27.jpg' },
-  { name: '粮油', img: '/products/g02.jpg' },
-  { name: '干货', img: '/products/p22.jpg' }
-].map((c) => ({ ...c, img: assetUrl(c.img) }))
+   ★ 2026-10-13 改为接口驱动（需求 7「分类要确保覆盖所有产品」）。
+
+   原先这里是六个写死的品类。有人发布一个「茶叶」「农资」的商品，
+   它在前台既进不了这六个圆入口，也进不了列表页的下拉筛选 ——
+   只能靠手输关键词找到，成了孤儿品类。这类问题靠前端维护名单无法根治，
+   名单由后端从 t_product distinct 出来（GET /trade/categories）才叫「覆盖」。
+
+   图：圆口裁到 74px，需要**主体占满画面**的特写。这里仍为已知六类各指定一张，
+   库里出现的新品类走 CATEGORY_IMG 池（imagery.js 已有分类兜底），
+   两边都没有时用首字底色 —— 宁可少一张图，也不要碎图。 */
+const CATEGORY_ENTRY_IMG = {
+  水果: '/products/p10.jpg',
+  蔬菜: '/products/p26.jpg',
+  水产: '/products/p19.jpg',
+  畜禽产品: '/products/p27.jpg',
+  粮油: '/products/g02.jpg',
+  干货: '/products/p22.jpg'
+}
+const { categories: categoryList, load: loadCategories } = useCategories()
+const categories = computed(() =>
+  categoryList.value.map((c) => ({
+    name: c.category,
+    count: c.productCount,
+    img: assetUrl(CATEGORY_ENTRY_IMG[c.category] || productImage({ category: c.category, productId: 1 }))
+  }))
+)
 function goCategory(name) {
   router.push({ path: '/trade/products', query: { category: name } })
 }
@@ -1139,6 +1154,9 @@ watch(
 onMounted(async () => {
   startHero()
   window.addEventListener('resize', measureRail)
+  // 品类入口靠它，数据驱动；不 await —— 它有自己的兜底名单，
+  // 慢一点只会让圆入口晚几十毫秒出现，不该拖住首屏其余区块
+  loadCategories()
   loadProducts()
   loadDemands()
   loadKnowledge()
@@ -1447,8 +1465,17 @@ onUnmounted(() => {
 
 /* ---------- 品类入口 ---------- */
 .cats {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  display: flex;
+  /* ★ 2026-10-13 从 grid 改成 flex。品类改接口驱动后列数不再固定，
+     而 grid 的 auto-fill/auto-fit 都解决不了「六类要铺满、十几类要折行」：
+     auto-fill 在 1404px 宽下按 minmax(120px) 算出 10 列，六个圆口各只占
+     1/10 宽、缩成 125px，右侧空一大片；auto-fit 更糟（空轨道被折叠，格子更挤）。
+
+     flex 的好处：列数完全由品类数决定，每格按自身内容取宽，多余空间均分 ——
+     六类时每格 ≈ (容器宽 - 5×gap)/6，正好铺满；品类涨到十几类自动折行。
+     ★ flex-wrap 必须显式写，默认 nowrap 会把十几个圆口挤成一条。 */
+  flex-wrap: wrap;
+  justify-content: space-between;
   gap: 14px;
   margin-bottom: 22px;
   padding: 12px;
@@ -1460,6 +1487,11 @@ onUnmounted(() => {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   padding: 0; border: 0; background: none;
   font-family: inherit; cursor: pointer;
+  /* 均分容器宽度：六类时每格 (容器宽 - 5×gap)/6，正好铺满整行不右侧留白。
+     min-width 0 是必须的 —— flex 项默认 min-width:auto，
+     「畜禽产品」这类四字标签会把格子撑得比 1fr 更宽，导致排不满 */
+  flex: 1 1 0;
+  min-width: 0;
 }
 .cat-circle {
   width: 74px; height: 74px;
@@ -1470,7 +1502,15 @@ onUnmounted(() => {
 }
 .cat-circle img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cat-cell:hover .cat-circle { transform: scale(1.08); border-color: var(--rxt-primary); }
-.cat-name { font-size: 14px; color: var(--el-text-color-primary); }
+/* 品类名：不加省略号会把「畜禽产品」撑宽整格（flex 项默认 min-width:auto） */
+.cat-name {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ================================================================
    分区通用

@@ -143,6 +143,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getTradeProducts } from '@/api/trade'
 import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
+import { useCategories } from '@/composables/useCategories'
 import PageBackTop from '@/components/PageBackTop.vue'
 
 /**
@@ -177,9 +178,12 @@ const query = reactive({
   maxPrice: null
 })
 
-// 分类 / 产地下拉：后端没有字典接口，这里用一份已知全集兜底。
-// 后端新增品类后需同步这里，否则新数据在下拉里选不到（仍会出现在「全部」里）。
-const categoryOptions = ['蔬菜', '水果', '粮油', '干货', '水产', '畜禽产品']
+// 分类 / 产地下拉。
+// ★ 2026-10-13：品类改由 GET /trade/categories 驱动（需求 7）。
+//   原注释写的是「后端没有字典接口，这里用一份已知全集兜底」——
+//   那份六类名单一旦落后于库里的实际品类，新发布的商品就成了「搜得到、
+//   筛不出」的孤儿品类。composable 内部另有静态兜底，接口失败时页面不空。
+const { categoryNames: categoryOptions, load: loadCategories } = useCategories()
 const originOptions = ['江西赣州', '湖北荆州', '黑龙江五常']
 
 const hasFilter = computed(() =>
@@ -225,7 +229,8 @@ function formatPrice(value) {
 /** 封面配色：按品类稳定取色，同品类颜色一致 */
 function coverClass(categoryName) {
   const palette = ['g-green', 'g-orange', 'g-blue', 'g-purple', 'g-brown', 'g-cyan']
-  const idx = categoryOptions.indexOf(categoryName)
+  // ★ categoryOptions 现在是 computed ref，JS 里必须取 .value —— 模板里会自动解包，脚本里不会
+  const idx = categoryOptions.value.indexOf(categoryName)
   if (idx >= 0) return palette[idx % palette.length]
   // 未知品类用名称做简易哈希，避免新品类全撞同一个色
   const h = String(categoryName || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
@@ -321,6 +326,8 @@ watch(
 )
 
 onMounted(() => {
+  // 品类下拉数据驱动，与商品列表并行拉，互不阻塞
+  loadCategories()
   syncFromRoute()
   loadProducts()
 })

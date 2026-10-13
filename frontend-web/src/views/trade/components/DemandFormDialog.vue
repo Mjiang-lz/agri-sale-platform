@@ -115,6 +115,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { publishDemand, updateDemand, USE_DEMAND_MOCK } from '@/api/trade'
+import { useCategories } from '@/composables/useCategories'
 
 /**
  * 求购需求发布 / 编辑弹窗。
@@ -131,8 +132,13 @@ const isEdit = ref(false)
 const editingId = ref(null)
 const formRef = ref()
 
-/** 与列表页共用同一份品类/地区全集，保证筛选与发布口径一致。 */
-const categoryOptions = ['水果', '粮油', '蔬菜', '干货', '水产', '畜禽产品']
+/**
+ * 品类下拉：接口驱动，与列表页共用同一个模块级单例。
+ * ★ 2026-10-13 从写死的六类字符串改过来。原注释说「与列表页共用同一份
+ *   全集，保证筛选与发布口径一致」，可它其实是**又抄了一遍字面量** ——
+ *   两份名单各自漂移正是「筛得到、发布时选不到」的来源。
+ */
+const { categoryNames: categoryOptions, load: loadCategories } = useCategories()
 const regionOptions = ['江西赣州', '湖北荆州', '黑龙江五常']
 
 const mockMode = USE_DEMAND_MOCK
@@ -211,6 +217,9 @@ function defaultValidUntil() {
 function open() {
   isEdit.value = false
   editingId.value = null
+  // 弹窗可能从任何入口被打开（不保证列表页先进过），这里兜一下，
+  // 否则一个从没加载过的会话点开弹窗，下拉里会是兜底名单而非真实品类
+  loadCategories()
   resetForm()
   visible.value = true
 }
@@ -219,6 +228,7 @@ function open() {
 function openEdit(row) {
   isEdit.value = true
   editingId.value = row.demandId
+  loadCategories()
   resetForm()
   // 逐字段显式回填，不整体 Object.assign：
   // row 里带着列表额外字段（__mock、publisherId 等），整体覆盖会把它们带进表单 payload。

@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.dto.OrderCreateDTO;
 import com.rxt.dto.ProductPublishDTO;
 import com.rxt.vo.CartVO;
+import com.rxt.vo.CategoryStatVO;
 import com.rxt.vo.OrderVO;
 import com.rxt.vo.ProductDetailVO;
 import com.rxt.vo.ProductVO;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 农产品交易模块业务接口。
@@ -46,6 +48,14 @@ public interface TradeService {
     IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword,
                                   String category, BigDecimal minPrice, BigDecimal maxPrice,
                                   String origin);
+
+    /**
+     * 查询全部在架商品涉及的品类及其商品数（按数量降序）。
+     *
+     * <p>前端不再维护硬编码的品类名单 —— 那样新增品类会变成「在库里存在、
+     * 却在下拉与首页入口里点不到」的孤儿品类。本接口是该问题的唯一解法。</p>
+     */
+    List<CategoryStatVO> listCategories();
 
     /**
      * 发布商品。仅农户可操作，新商品进入待审核队列且默认下架。

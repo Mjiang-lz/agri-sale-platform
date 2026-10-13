@@ -25,6 +25,7 @@ import com.rxt.service.CommentService;
 import com.rxt.service.TradeService;
 import com.rxt.vo.AddressVO;
 import com.rxt.vo.CartVO;
+import com.rxt.vo.CategoryStatVO;
 import com.rxt.vo.CommentVO;
 import com.rxt.vo.OrderVO;
 import com.rxt.vo.ProductDetailVO;
@@ -97,6 +98,11 @@ public class TradeServiceImpl implements TradeService {
     private final CommentService commentService;
     private final AddressService addressService;
     private final PermissionChecker permissionChecker;
+
+    @Override
+    public List<CategoryStatVO> listCategories() {
+        return productMapper.countByCategory();
+    }
 
     @Override
     public IPage<ProductVO> pageProducts(long pageNum, long pageSize, String keyword,
