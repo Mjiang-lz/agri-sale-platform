@@ -17,31 +17,34 @@
          实物大图商品卡（图占卡片约 52%）→ 产地求购 → 专家照片墙 →
          惠农信贷 → 农技知识收尾。不做窄屏塌缩，只面向桌面端。
 
-         ★ 顶部为什么是「业务数据带」（而不是问候语或资讯）：
-         这里先后放过三样东西，最终只留下数据带 ——
+         ★ 顶部为什么是「平台概览数字带」（2026-10-13 改，原为「业务数据带」）：
+         这一条先后放过三样东西，最终收敛成平台级 4 个数字 ——
            · 「早上好，X」+ 待办胶囊：是「我的东西」，已挪去个人中心；
            · 「农技知识」：是「逛完之后再看的内容」，2026-10-10 挪到页面末尾；
-           · 「业务数据带」：一进页面就回答「我手上还有几件事」，留在顶部。
+           · 「业务数据带」（我手上还有几件事）：**只有一条数据时被
+             `.biz-bar.is-solo` 锁死在 380px，右侧整片留白**，用户明确反馈
+             「就一张卡片，感觉没必要」。
+         改成平台概览后，`flex: 1 1 0` 四格等分铺满整行；同时删掉首屏右栏
+         `.hero-stats` 里那份**完全相同**的四个数字 —— 同一批数字只出现一次。
          ================================================================ -->
 
-    <!-- ---------- 业务数据带 ----------
-         原「指标条」与「我的业务」两块显示的是同一批数字（采购 0 / 卖出 4 /
-         融资 2 / 已通过 2 vs 融资 2 / 订单 4 / 预约 1），合计占 383px。
-         合并成一条紧凑数据带：一张卡一个业务域，主数字 + 一行摘要，
-         原来多出来的数字全部并进摘要行。点击直达该业务的列表页。 -->
-    <section v-if="bizTiles.length" class="biz-bar" :class="{ 'is-solo': bizTiles.length === 1 }">
+    <!-- ---------- 平台概览数字带 ----------
+         固定 4 格：在售货源 / 有效求购 / 入驻专家 / 农业知识。
+         数据来自 GET /home/stats（该路径在 PublicEndpoints 白名单里，
+         未登录访客同样拿得到），所以不存在「游客看到空白带」的情况。
+         四格全部可点，直达对应列表页；等分铺满，不再有 380px 孤卡。 -->
+    <section v-if="platformStats.length" class="biz-bar">
       <button
-        v-for="t in bizTiles"
-        :key="t.key"
+        v-for="s in platformStats"
+        :key="s.label"
         type="button"
         class="bt-item"
-        :class="`is-${t.tone}`"
-        @click="go(t.path)"
+        @click="go(statPath(s.label))"
       >
-        <span class="bt-num">{{ t.value }}</span>
+        <span class="bt-num">{{ s.value }}</span>
         <span class="bt-text">
-          <span class="bt-label">{{ t.label }}</span>
-          <span class="bt-sub">{{ t.sub }}</span>
+          <span class="bt-label">{{ s.label }}</span>
+          <span class="bt-sub">{{ statSub(s.label) }}</span>
         </span>
       </button>
     </section>
@@ -113,13 +116,11 @@
            原来这里是 4 张缩略图，就是轮播图本身的缩小版（纯冗余），
            却把整行撑到 677px，而 .hero-main 只有 360px。
            换成带标题的快捷入口，高度不变但内容不重复。 -->
+      <!-- 右列：只剩「快捷办理」。
+           平台概览那 4 个数字已挪到页面顶部数据带（v-if platformStats），
+           首屏右栏不再放第二份 —— 同一批数字只出现一次。
+           .hero-side 的 grid-rows 相应从「1fr auto」改成单行，见下方样式。 -->
       <div class="hero-side">
-        <div class="hero-stats">
-          <div v-for="s in platformStats" :key="s.label" class="hs-item">
-            <span class="hss-num">{{ s.value }}</span>
-            <span class="hss-label">{{ s.label }}</span>
-          </div>
-        </div>
         <div class="hero-quick" v-if="quickLinks.length">
           <h4 class="hq-title">快捷办理</h4>
           <button
@@ -851,22 +852,24 @@ const myTiles = computed(() => {
   return list.slice(0, 4)
 })
 
-/* 没有任何业务数据时（专家角色最典型），至少给一条与本角色相关的数，
-   而不是让首屏空着。注意这不参与空态判断 —— 空态说的是「没有业务记录」。 */
-const bizTiles = computed(() => {
-  if (myTiles.value.length) return myTiles.value
-  if (showExpert.value && knowledgeAll.value.length) {
-    return [{
-      key: 'know',
-      value: knowledgeAll.value.length,
-      label: '农业知识',
-      tone: 'green',
-      path: '/expert/knowledge',
-      sub: '平台专家与农技站发布的实用内容'
-    }]
-  }
-  return []
-})
+/* 平台概览数字带的「跳去哪」与「摘要行」。
+   四个标签与 loadStats() 里 platformStats 的 label 一一对应，换标签要同步改这里。 */
+const STAT_META = {
+  在售货源: { path: '/trade/products', sub: '产地直发，今日可发' },
+  有效求购: { path: '/trade/demand', sub: '采购方正在收的货' },
+  入驻专家: { path: '/expert/appointment', sub: '可预约的农技与经营顾问' },
+  农业知识: { path: '/expert/knowledge', sub: '平台专家与农技站发布的实用内容' }
+}
+function statPath(label) {
+  const path = STAT_META[label]?.path ?? '/trade/products'
+  // 求购页要登录（不在公开白名单，MainLayout 对游客也隐藏这一项）。
+  // 游客点这张卡时退回货源市场，而不是点出去吃一个 401 再被守卫弹去登录页。
+  if (path === '/trade/demand' && !isLoggedIn.value) return '/trade/products'
+  return path
+}
+function statSub(label) {
+  return STAT_META[label]?.sub ?? ''
+}
 
 /* ---------------- 首屏右侧快捷入口 ----------------
    按角色权限给，与 MainLayout 的 menuPerms 同一口径：
@@ -1275,7 +1278,10 @@ onUnmounted(() => {
   margin-bottom: 18px;
 }
 .bt-item {
-  flex: 1 1 260px;
+  /* 四格等分铺满的关翥：统一的 flex-basis + 相同的 grow 系数，
+     宽屏下四张卡精确各占 25%（含 gap 均摊），窄屏按 basis 自动换行。
+     原来单条数据时有 `flex: 0 1 380px` 的上限，右侧整片留白。 */
+  flex: 1 1 240px;
   min-width: 0;
   display: flex; align-items: center; gap: 16px;
   padding: 17px 22px;
@@ -1291,15 +1297,12 @@ onUnmounted(() => {
   transform: translateY(-2px);
   box-shadow: var(--rxt-shadow-md);
 }
-/* 只有一条数据时不要拉满整行，看着像标题栏 */
-.biz-bar.is-solo .bt-item { flex: 0 1 380px; }
 .bt-num {
   flex: none; min-width: 46px; text-align: center;
   font-size: 32px; font-weight: 700; line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--rxt-primary);
 }
-.bt-item.is-amber .bt-num { color: var(--rxt-accent); }
 .bt-text { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .bt-label { font-size: 15px; font-weight: 600; }
 .bt-sub {
@@ -1406,32 +1409,17 @@ onUnmounted(() => {
 }
 .hd-dot.is-on { background: #fff; border-color: #fff; transform: scale(1.45); }
 
-/* 右列：平台数据 + 快捷办理。
-   高度锁在 .hero-main 的 360px 内（1fr + auto），不会把整行撑高。 */
-.hero-side { display: grid; grid-template-rows: 1fr auto; gap: 14px; }
-.hero-stats {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
-  background: var(--rxt-border);
-  border: 1px solid var(--rxt-border);
-  border-radius: var(--rxt-radius-lg);
-  overflow: hidden;
-}
-.hs-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  padding: 12px 8px;
-  background: var(--el-bg-color);
-}
-.hss-num {
-  font-size: 24px; font-weight: 700; line-height: 1;
-  color: var(--rxt-primary); font-variant-numeric: tabular-nums;
-}
-.hss-label { font-size: 12px; color: var(--el-text-color-secondary); }
+/* 右列：只剩「快捷办理」。
+   平台概览那 4 个数字挪到页面顶部数据带后，右栏不再需要「1fr + auto」两行，
+   改成单行让快捷办理占满 .hero-main 的 300px 高度。 */
+.hero-side { display: grid; grid-template-rows: 1fr; }
+.hero-quick { display: flex; flex-direction: column; }
 
-/* 快捷办理：按角色权限给的三个入口，替代原来的重复缩略图。
-   ⚠️ 这三条的 padding 会**反向撑高整个轮播行** ——
-   .hero-side 是 grid 的「1fr + auto」，快捷办理是 auto 那行，
-   它比 .hero-main 高时整行就跟着长。实测 padding 8px 时
-   轮播行被撑到 313px（.hero-main 只设了 300px）。收到 6px 刚好压回 300。 */
+/* 快捷办理：按角色权限给的入口，替代原来的重复缩略图。
+   2026-10-13：平台概览数字挪去顶部数据带后，右栏只有这一块，
+   .hero-side 改为单行 grid、本块是唯一子项 ⇒ 高度由 .hero-main 的 300px 决定，
+   padding 不再反向撑高整行（旧的「1fr + auto」警告随之作废）。
+   条目用 flex:1 均分这 300px，条目太少时也不会缩成一小条贴在顶部。 */
 .hero-quick {
   padding: 12px 16px 8px;
   border: 1px solid var(--rxt-border);
@@ -1440,6 +1428,7 @@ onUnmounted(() => {
 }
 .hq-title { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--rxt-ink-weak); }
 .hq-item {
+  flex: 1;
   width: 100%;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 6px 0;

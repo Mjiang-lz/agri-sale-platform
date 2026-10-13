@@ -146,14 +146,15 @@
             </div>
             <div class="field-tip">
               支持 JPG / PNG / GIF / WEBP，不超过 5MB。未上传时显示昵称首字
-              <!-- 保留下面的手工输入框作为兜底：内网/离线环境下 OBS 不可用时仍可贴地址 -->
             </div>
-            <el-input
-              v-model="baseForm.avatarUrl"
-              maxlength="255"
-              placeholder="或直接填写图片地址"
-              class="avatar-url-input"
-            />
+            <!--
+              2026-10-13：删掉原来的「或直接填写图片地址」手工输入框（用户明确要求取消）。
+              它有三个问题：① 用户要手抄一长串 OBS 绝对地址，换个桶/endpoint 就全失效；
+              ② 可以填任意外链，等于绕过上传通道塞进一个不受管的图片地址；
+              ③ 与上方的「上传头像」按钮功能重叠，界面像是有两个入口。
+              兜底能力并没有丢 —— 上传失败时 request 拦截器会弹具体原因，
+              且 el-avatar 对加载失败的地址会自动回退到昵称首字，不会显示碎图。
+            -->
           </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading="savingBase" :disabled="!baseDirty" @click="saveBase">
@@ -797,8 +798,6 @@ onMounted(() => {
    尺寸跟着 el-avatar 走而不是写死，避免以后调整大小时两处不一致。 */
 .avatar-field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .avatar-preview { width: 56px; height: 56px; border-radius: 50%; }
-/* 手工填地址的兜底输入框：与主表单拉开距离，避免和上传按钮抢视觉焦点 */
-.avatar-url-input { margin-top: 8px; }
 @media (max-width: 760px) {
   .page-head { flex-direction: column; align-items: stretch; }
   .identity { gap: 16px; }

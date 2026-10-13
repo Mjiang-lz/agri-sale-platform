@@ -33,6 +33,16 @@
       <ellipse cx="15.2" cy="15.8" rx="1.8" ry="2.2" fill="currentColor" fill-opacity="0.72" transform="rotate(30 15.2 15.8)" />
     </symbol>
 
+    <!-- 我的商品：货箱（等轴立方 + 中脊）。
+         2026-10-13 新增：原来「我的商品」与「商品货源」共用 ico-source（一株苗），
+         两个菜单项图标一模一样，用户无法靠图标区分「去看别人的货」和「管我自己的货」。
+         货源那侧保留植株（品牌锚点），这一侧改成货箱 —— 「我上架的货」是物、不是苗。 -->
+    <symbol id="ico-myproduct" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M3.6 8.1 12 3.9l8.4 4.2v7.8L12 20.1l-8.4-4.2V8.1Z" />
+      <path d="M3.6 8.1 12 12.3l8.4-4.2" />
+      <path d="M12 12.3v7.8" />
+    </symbol>
+
     <!-- 求购需求：放大镜 + 清单行 = 在需求里检索 -->
     <symbol id="ico-demand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="11" cy="11" r="6.2" />
@@ -116,6 +126,26 @@
     <symbol id="ico-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="8.4" r="3.5" />
       <path d="M5.3 20.6c0-3.5 3-5.9 6.7-5.9s6.7 2.4 6.7 5.9" />
+    </symbol>
+
+    <!-- 消息提醒：铃铛。2026-10-13 新增（顶栏消息中心入口） -->
+    <symbol id="ico-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8.8a6 6 0 1 0-12 0c0 5.8-2.2 7.2-2.2 7.2h16.4S18 14.6 18 8.8Z" />
+      <path d="M13.7 19.8a2 2 0 0 1-3.4 0" />
+    </symbol>
+
+    <!-- 退出登录：门 + 外指箭头。2026-10-13 新增（顶栏常驻退出按钮） -->
+    <symbol id="ico-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14.8 4.6H6.6v14.8h8.2" />
+      <path d="M12.4 12h7" />
+      <path d="M16.8 8.9 19.5 12l-2.7 3.1" />
+    </symbol>
+
+    <!-- 收货地址：地图钉。2026-10-13 新增 —— 原与「我的订单」共用 ico-order，
+         同属「两个菜单项一个图标」的缺陷（与 ico-myproduct 同一次修）。 -->
+    <symbol id="ico-address" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20.9c0-.1-4.5-5.3-4.5-9.5a4.5 4.5 0 0 1 9 0c0 4.2-4.5 9.4-4.5 9.5Z" />
+      <circle cx="12" cy="11.4" r="1.9" />
     </symbol>
 
     <!-- 仪表盘 -->
