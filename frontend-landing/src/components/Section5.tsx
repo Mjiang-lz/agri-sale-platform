@@ -156,10 +156,10 @@ export function Section5() {
             ))}
           </div>
         ) : (
-          /* 接口没通：如实说没拿到，不拿写死的宣传数字顶上 */
+          /* 数据没取到：如实说没拿到，不拿写死的宣传数字顶上 */
           <div className="flex min-h-[110px] items-center justify-center">
             <span className="text-white/70 text-lg lg:text-xl">
-              {state === "error" ? "平台接口暂不可用，数据未加载" : "正在同步平台数据…"}
+              {state === "error" ? "数据暂时加载失败，请稍后刷新" : "正在加载…"}
             </span>
           </div>
         )}
@@ -180,8 +180,8 @@ export function Section5() {
         </motion.a>
 
         {/* 2026-10-14 用户要求去掉「数据实时同步自平台接口」这行小字。
-            本区块的数字区已有独立的状态渲染：接口异常显示「平台接口暂不可用，数据未加载」、
-            加载中显示「正在同步平台数据…」，所以这里删掉不会让失败态失去说明。 */}
+            本区块的数字区已有独立的状态渲染：失败显示「数据暂时加载失败，请稍后刷新」、
+            加载中显示「正在加载…」，所以这里删掉不会让失败态失去说明。 */}
       </div>
 
       {/* Absolute Top Layer Side Shadow */}

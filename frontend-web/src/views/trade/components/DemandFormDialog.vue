@@ -93,14 +93,14 @@
       </el-form-item>
     </el-form>
 
-    <el-alert
-      v-if="mockMode"
-      type="warning"
-      :closable="false"
-      show-icon
-      title="当前为前端演示数据，不会真正入库"
-      description="后端 POST /demand/publish 目前返回 500（本地时间字段反序列化失败），这里先用 mock 跑通交互。后端修好后会自动切换为真实提交。"
-    />
+    <!--
+      ★ 2026-10-14 用户要求全站去掉「面向开发者」的提示词，这里删掉了原 mock 提示框。
+      原文案是「当前为前端演示数据，不会真正入库 / 后端 POST /demand/publish 目前返回 500
+      （本地时间字段反序列化失败），这里先用 mock 跑通交互…」—— 后端故障单、接口路径、
+      mock 字眼都不该出现在用户界面上。
+      ⚠️ 若将来重新打开 USE_DEMAND_MOCK（api/trade.js），提交仍然不会落库，
+      请一并恢复一条面向用户的说明，别让「发布成功」变成假话。
+    -->
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
@@ -114,7 +114,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { publishDemand, updateDemand, USE_DEMAND_MOCK } from '@/api/trade'
+import { publishDemand, updateDemand } from '@/api/trade'
 import { useCategories } from '@/composables/useCategories'
 
 /**
@@ -122,7 +122,8 @@ import { useCategories } from '@/composables/useCategories'
  *
  * ⚠️ 后端 publish 与 update 目前均返回 500（见 api/trade.js 的说明），
  * 所以这里调的是带 mock 降级的 publishDemand / updateDemand。
- * mockMode 用来在界面上如实告知「提交不会入库」，而不是让用户以为发布成功了。
+ * ★ 2026-10-14：原先这里还有一个 mockMode 提示框，用来告知「提交不会入库」，
+ *   已按用户要求去掉（见模板中的说明）。USE_DEMAND_MOCK 当前为 false，该分支不会走到。
  */
 const emit = defineEmits(['saved'])
 
@@ -140,8 +141,6 @@ const formRef = ref()
  */
 const { categoryNames: categoryOptions, load: loadCategories } = useCategories()
 const regionOptions = ['江西赣州', '湖北荆州', '黑龙江五常']
-
-const mockMode = USE_DEMAND_MOCK
 
 const form = reactive({
   category: '',
@@ -281,7 +280,7 @@ async function handleSubmit() {
       ElMessage.success('求购需求已更新')
     } else {
       await publishDemand(payload)
-      ElMessage.success(mockMode ? '已提交（演示数据，未入库）' : '求购需求发布成功')
+      ElMessage.success('求购需求发布成功')
     }
 
     visible.value = false

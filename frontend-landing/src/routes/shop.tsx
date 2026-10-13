@@ -83,9 +83,9 @@ function ShopPage() {
 
   const emptyText =
     state === 'error'
-      ? '平台接口暂不可用，货源未加载。本页不展示任何演示数据，请确认后端服务已启动后刷新'
+      ? '货源暂时加载失败，请稍后刷新重试'
       : state === 'loading'
-        ? '正在同步平台货源…'
+        ? '正在加载货源…'
         : '平台当前暂无在售货源'
 
   return (
@@ -130,10 +130,11 @@ function ShopPage() {
             {state !== 'ok' && <p className="mt-3 text-white/50">{emptyText}</p>}
           </div>
           {/* 2026-10-14 用户第 6 条：去掉「数据源：平台接口」这个标签（同样属实现细节）。
-              同样保留失败态 —— 上面那行已说明原因，这里只留一句简短的状态角标。 */}
+              ★ 第二轮：连角标文案本身也去掉了「平台接口」字样，只留一句面向访客的状态话术。
+              仍然保留失败态 —— 上面那行已说明原因，这里只补一个简短角标。 */}
           {state !== 'ok' && (
             <span className="rounded-sm bg-white/10 px-3 py-1.5 text-xs text-white/50">
-              平台接口暂不可用
+              {state === 'error' ? '暂时无法加载' : '加载中'}
             </span>
           )}
         </div>

@@ -10,7 +10,7 @@
       :closable="false"
       show-icon
       title="当前账号不能提交专家预约"
-      description="只有农户账号可以提交预约；采购方仍可查看专家资料。若需要切换演示身份，请使用右上角身份切换"
+      description="只有农户账号可以提交预约，采购方仍可查看专家资料；如需提交预约，请在右上角切换到农户身份"
     />
 
     <section class="appointment-hero">
@@ -65,7 +65,7 @@
         <div class="recent-head">
           <div>
             <strong>我的预约</strong>
-            <span>来自服务端的完整预约记录，含专家的处理意见；刷新不会丢失</span>
+            <span>含专家处理意见的完整预约记录</span>
           </div>
           <el-button :loading="loadingAppointments" @click="loadAppointments">刷新</el-button>
         </div>

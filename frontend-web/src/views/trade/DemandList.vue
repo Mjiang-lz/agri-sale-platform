@@ -51,7 +51,7 @@
       class="error-alert"
     >
       <template #default>
-        <div class="error-desc">无法连接后端服务，请确认后端已启动（默认 8080 端口）后重试</div>
+        <div class="error-desc">数据加载失败，请稍后刷新重试</div>
         <div class="error-actions">
           <el-button type="danger" size="small" @click="loadDemands">重新加载</el-button>
         </div>
@@ -149,15 +149,11 @@
             </div>
           </template>
 
-          <el-alert
-            v-if="mockMode"
-            type="warning"
-            :closable="false"
-            show-icon
-            title="演示模式"
-            description="后端发布接口异常，新增与编辑仅保存在本地，刷新页面后消失。"
-            class="mine-alert"
-          />
+          <!--
+            ★ 2026-10-14 用户要求全站去掉「面向开发者」的提示词，这里删掉了原 mock 提示条。
+            原文案是「演示模式 / 后端发布接口异常，新增与编辑仅保存在本地，刷新页面后消失。」
+            USE_DEMAND_MOCK 当前为 false，该分支不会渲染。
+          -->
 
           <!--
   三态：加载中 → 空 → 列表。
@@ -180,7 +176,8 @@
                   >
                     {{ d.status === 1 ? '求购中' : '已关闭' }}
                   </el-tag>
-                  <el-tag v-if="d.__mock" size="small" type="warning" effect="plain">演示</el-tag>
+                  <!-- ★ 2026-10-14 用户要求去掉「面向开发者」的提示词：原「演示」角标
+                       （v-if="d.__mock"）已删。USE_DEMAND_MOCK 当前为 false，该分支不会渲染。 -->
                 </div>
                 <p class="mine-meta">
                   期望 ¥{{ formatPrice(d.expectPrice) }} / {{ d.unit || '件' }}
@@ -423,9 +420,7 @@ async function handleCloseMine(row) {
       await closeDemand(row.demandId)
     }
     ElMessage.success(
-      row.__mock
-        ? '已关闭（演示数据，未入库）'
-        : '已关闭。该需求已从公开列表移除，但可在「我发布的」中重新编辑开启'
+      row.__mock ? '已关闭' : '已关闭。该需求已从公开列表移除，但可在「我发布的」中重新编辑开启'
     )
     // 后端 list 强制 status=1，关闭后那条不会自己从 demands 里消失，
     // 必须显式剔除，否则左栏还会显示一条「已关闭」的行。

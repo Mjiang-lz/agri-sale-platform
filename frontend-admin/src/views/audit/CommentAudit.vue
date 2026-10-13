@@ -129,7 +129,7 @@
     </el-drawer>
 
     <el-dialog v-model="rejectVisible" title="填写评论驳回理由" width="min(540px, 92vw)">
-      <p class="reject-tip">理由会写入 t_audit.audit_remark，并反馈给评论用户</p>
+      <p class="reject-tip">驳回理由会同步告知评论用户</p>
       <el-input v-model="rejectRemark" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="例如：评论包含侮辱性言论，请修改后重新提交" />
       <template #footer>
         <el-button @click="rejectVisible = false">取消</el-button>

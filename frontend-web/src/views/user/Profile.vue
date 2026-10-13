@@ -92,7 +92,7 @@
           type="info"
           :closable="false"
           show-icon
-          title="手机号是登录账号，变更需短信验证，本页不提供修改；角色与账号状态由平台统一管理"
+          title="手机号是登录账号，变更需短信验证；角色与账号状态由平台统一管理"
         />
 
         <el-form ref="baseFormRef" :model="baseForm" :rules="baseRules" label-width="100px" class="edit-form">

@@ -14,15 +14,13 @@
 
     <ExpertKnowledgeEditor v-if="isExpert" :submissions="visibleSubmissions" @created="handleKnowledgeCreated" @dismiss="handleKnowledgeDismiss" />
 
-    <el-alert
-      v-if="demoMode"
-      class="demo-alert"
-      title="当前页面显示的是演示数据"
-      description="真实接口失败或返回空列表，且 VITE_USE_DEMO=true。请先检查后端和 rxt.t_knowledge 数据"
-      type="warning"
-      :closable="false"
-      show-icon
-    />
+    <!--
+      ★ 2026-10-14 用户要求全站去掉「面向开发者」的提示词，这里删掉了原演示数据提示框。
+      原文案是「当前页面显示的是演示数据 / 真实接口失败或返回空列表，且 VITE_USE_DEMO=true。
+      请先检查后端和 rxt.t_knowledge 数据」—— 环境变量、库名、接口名都不该出现在用户界面上。
+      ⚠️ 该分支只在 VITE_USE_DEMO=true 时才会渲染（当前默认 false）。若将来重新打开这个开关，
+      页面会退回到本地演示数据，请一并恢复一条面向用户的说明。
+    -->
 
     <el-card shadow="never" class="knowledge-card">
       <template #header>

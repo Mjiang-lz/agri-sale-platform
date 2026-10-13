@@ -245,11 +245,11 @@ export function Section2() {
           </div>
         </>
       ) : (
-        /* 接口没通，或者平台确实一件在售货源都没有 —— 两种情况都如实说，不放演示图 */
+        /* 数据没取到，或者平台确实一件在售货源都没有 —— 两种情况都如实说，不放演示图 */
         <div className="mt-10 flex min-h-[200px] w-full items-center justify-center rounded-[2px] border border-dashed border-white/15 bg-white/[0.02] px-6 py-16 lg:mt-16">
           <p className="max-w-md text-center text-sm leading-relaxed text-white/50">
             {state === "error"
-              ? "平台接口暂不可用，货源数据未加载。本页不展示任何演示数据，请确认后端服务已启动后刷新"
+              ? "货源暂时加载失败，请稍后刷新重试"
               : "平台当前暂无在售货源"}
           </p>
         </div>

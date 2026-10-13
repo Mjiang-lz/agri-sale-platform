@@ -46,7 +46,7 @@ export function Section6() {
   }));
 
   const listEmptyText =
-    state === "error" ? "平台接口暂不可用，知识条目未加载" : "平台当前暂无已发布的农业知识";
+    state === "error" ? "知识内容暂时加载失败，请稍后刷新" : "平台当前暂无已发布的农业知识";
 
   // id="news" —— Hero 顶部导航「资讯中心」的锚点。2026-10-10 补。
   // ⚠️ 注释写在 return 之外：放进 return 内且与根元素并列会让 JSX 有两个顶层节点，整页 500。

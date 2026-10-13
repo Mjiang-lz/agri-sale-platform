@@ -7,7 +7,8 @@
         <p>查看融资申请、联合小组、银行审批和放款进度。点击“查看进度”可展开完整时间轴</p>
       </div>
       <div class="head-actions">
-        <el-tag v-if="demoMode" type="warning" effect="dark">演示数据</el-tag>
+        <!-- ★ 2026-10-14 用户要求全站去掉「面向开发者」的提示词，这里删掉了「演示数据」角标
+             （原先挂在 demoMode 上，只在 VITE_USE_DEMO=true 时才会渲染，当前默认 false）。 -->
         <el-button :loading="loading" @click="loadApplies">刷新进度</el-button>
       </div>
     </div>
