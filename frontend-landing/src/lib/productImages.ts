@@ -37,7 +37,9 @@ const NAME_PHOTO: Record<string, string> = {
   // 粮油
   // p24 是橄榄油静物（画面里有橄榄果与橄榄枝），与菜籽油语义不符，改用 p29（散装黄色食用油实拍）
   '菜籽油5L': '/products/p29.jpg',
-  '有机小米5斤': '/products/p08.jpg',
+  // p08 是晒谷场翻晒谷物的远景（frontend-web 当粮油兜底图、专家横幅在用），
+  // 「小米」另配 p31（一碗黄小米实拍），语义更直接
+  '有机小米5斤': '/products/p31.jpg',
   // p07 是「田间/农事」场景图（frontend-web imagery.js 也在用），玉米面另配 p28
   '现磨玉米面5斤': '/products/p28.jpg',
   '五常大米10kg': '/products/p14.jpg',
@@ -73,6 +75,8 @@ const KEYWORD_PHOTO: Array<[RegExp, string]> = [
   [/黄瓜|丝瓜|苦瓜|西葫芦/, '/products/p26.jpg'],
   [/西红柿|番茄/, '/products/p02.jpg'],
   [/玉米/, '/products/p28.jpg'],
+  // 必须排在下面的 `/米|谷|麦|豆|面/` 之前，否则「小米」会被宽泛的「米」抢走配成大米
+  [/小米|黄小米|谷子|黍/, '/products/p31.jpg'],
   [/猕猴桃|奇异果/, '/products/p11.jpg'],
   [/柚/, '/products/p30.jpg'],
   [/砂糖橘|砂糖桔|蜜橘|橘|桔|柑|橙/, '/products/p03.jpg'],
