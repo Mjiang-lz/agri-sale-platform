@@ -316,7 +316,11 @@ const footBack = computed(() => {
    比逐个类名更稳（el-select 在 2.8 里已换成 .el-select__wrapper，
    逐个类名要写两套，少写一套就漏）。 */
 .auth-card {
-  --el-fill-color-blank: rgba(255, 255, 255, 0.96);
+  /* ★ 提到 0.985：0.96 时 4% 的透光足以让背后的山影/云影在框内显形
+     （放大截图里能看到完整山脉轮廓压在文字底下）。输入框底的第一职责是
+     「字必须清楚」，不是「透一点更透气」—— 盒子透图那部分已经在留白区了。
+     0.985 在屏幕上与纯白不可分辨，但把 4% 的透光压到 1.5%。 */
+  --el-fill-color-blank: rgba(255, 255, 255, 0.985);
   /* 表单正文色压深一档：EP 默认 #606266 在花田背景上偏灰 */
   --el-text-color-regular: #1b2f28;
   /* ★ 别指望这里改 --el-font-size-base 能放大输入框的字：
@@ -325,9 +329,15 @@ const footBack = computed(() => {
      所以字号必须写在 .el-input__inner 上，见下方规则。 */
 }
 /* 输入框内的文字：EP size="large" 是 14px，在 45% 宽的大盒子里偏小，
-   半透明底还会再吃掉一点笔画。直接写在这两个元素上，不走变量。 */
+   半透明底还会再吃掉一点笔画。直接写在这两个元素上，不走变量。
+   ★ el-select 要写 **placeholder 与 selected-item 两个类名**：只写 selected-item
+   时未选中状态的「请选择注册身份」仍是 14px。
+   ★ 探针验字号要看**真正渲染文字的那个元素**（`.el-select__placeholder`，
+     实测 16px），不是外层 `.el-select` / `.el-select__wrapper`（它们恒为 14px，
+     读错会误判成「字号没生效」）。 */
 .auth-card .el-input__inner,
-.auth-card .el-select__selected-item {
+.auth-card .el-select__selected-item,
+.auth-card .el-select__placeholder {
   font-size: 16px;
   /* 16px 字配 40px 高的框会上下顶边。抬到 46px 才透气 ——
      EP 的 --el-component-size-large 是 40px，是给 14px 字准备的 */
@@ -335,8 +345,14 @@ const footBack = computed(() => {
 }
 .auth-card .el-input__wrapper,
 .auth-card .el-select__wrapper {
+  /* ★ 两个都要写：el-select 的默认高度只有 46px，与输入框的 50px 不齐，
+     同一行里一个高一截。min-height 对它无效（它有 height），
+     所以额外显式给 height。 */
   min-height: 46px;
   align-items: center;
+}
+.auth-card .el-select__wrapper {
+  height: 50px;
 }
 
 /* ★ label 与输入框贴得太近：label-position="top" 时 EP 的 label
@@ -354,16 +370,54 @@ const footBack = computed(() => {
 .auth-card .auth-submit {
   margin-bottom: 0;
 }
+/* ============================================================
+   输入框外观：Material Design 官方 Outlined 规范
+   ============================================================
+   改之前的样子是 EP 默认的「4px 圆角 + 2px inset 阴影」，三个问题：
+   ① 圆角只有 4px —— 48px 高的框配 4px 圆几乎看不出圆，整体是方盒子；
+   ② 用 **inset** 画边框 —— 往里收的是凹槽，控件看着像刻进底图里，
+      而不是一个「浮在底上的东西」；
+   ③ 边框永远 2px 不变 —— 没有状态差，聚焦时用户看不出自己点的是哪个框。
+
+   按 Material Outlined 的做法改（容器 56px / 边框 1px→聚焦 2px /
+   圆角 / 边框色承载状态）：
+     · 边框改用真实的 `border`，不用 inset 阴影
+     · 默认 1px 中灰、聚焦 2px 主题色 —— 两档差异正好传达状态
+     · 圆角 4px → 12px
+     · 补一层很淡的外投影，让控件从半透明盒子上「浮起来」
+   盒子只有 40% 透明 + blur，控件不投影的话会跟底图糊在一起。 */
 .auth-card .el-input__wrapper,
 .auth-card .el-select__wrapper,
 .auth-card .el-textarea__inner {
-  /* ★ 边框加粗到 2px：原来的 1px rgba(...0.14) 在半透明底上
-     基本看不见，输入框像「浮在背景里」而不是一个框 */
-  box-shadow: 0 0 0 2px rgba(24, 61, 49, 0.26) inset;
+  /* ★ 必须用 `border` 而不是 `box-shadow: … inset`。
+     EP 的 wrapper 默认没有 border（border: 0），所以这里直接给全边框；
+     用 box-shadow 模拟就会得到「凹槽感」，这是改版前最大的违和点 */
+  border: 1px solid rgba(28, 68, 56, 0.28);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(12, 40, 32, 0.06);
+  transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1),
+    box-shadow 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
 }
+/* 聚焦：换成主题色 + 加粗到 2px。
+   ★ **加粗用 `outline`，不要把 border 从 1px 改成 2px**：
+   border 在盒模型里占位，改粗会让框「长大」1px、把下方内容顶下去跳一格；
+   outline 不参与布局，聚焦加粗不会引起任何位移。 */
 .auth-card .el-input__wrapper.is-focus,
 .auth-card .el-select__wrapper.is-focused {
-  box-shadow: 0 0 0 2px var(--el-color-primary) inset;
+  border-color: var(--el-color-primary);
+  /* outline 不参与布局，聚焦加粗时不会让下方内容跳一格 */
+  outline: 2px solid rgba(14, 122, 95, 0.18);
+  outline-offset: -1px;
+  box-shadow: 0 2px 8px rgba(14, 122, 95, 0.16);
+}
+/* hover：边框略深，给出「这个可以点」的暗示（Material 的 Hover 状态）。
+   ★ **必须排在 :focus 之后**，否则鼠标点进去时 hover 和 focus 同时生效、
+     同优先级下后写的 hover 会盖掉 focus 的主题色边框 ——
+     实测点击后 border 停在 rgba(28,68,56,0.45)（hover 色）而不是主题色。
+     这里额外用 :not(:focus) 排除聚焦态，两道保险 */
+.auth-card .el-input__wrapper:hover:not(.is-focus),
+.auth-card .el-select__wrapper:hover:not(.is-focused) {
+  border-color: rgba(28, 68, 56, 0.45);
 }
 .auth-card .el-form-item__label {
   /* ★ label 15px + 加重：EP 默认 14px/常规，在这套底上偏小偏淡 */

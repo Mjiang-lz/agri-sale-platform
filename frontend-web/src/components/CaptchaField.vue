@@ -91,7 +91,13 @@ defineExpose({ validate, refresh })
 /* 与后端 CaptchaService 的 120×42 等比，稍放大一点让字符更好认 */
 .captcha-img {
   width: 132px; height: 46px; flex: none;
-  border: 1px solid var(--rxt-border); border-radius: 8px;
+  /* ★ 圆角/边框/投影与登录页的输入框对齐（12px + 同款边框色 + 淡投影）。
+     原来是 8px + --rxt-border，在一排 12px 圆角的输入框旁边
+     明显「不是一家的」。图的浅米底保留 —— 后端 CaptchaService 生成的
+     就是这个色，改成纯白会与字对比不足 */
+  border: 1px solid rgba(28, 68, 56, 0.28);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(12, 40, 32, 0.06);
   background: #f6f3ec; cursor: pointer;
 }
 .captcha-img.is-ph {
