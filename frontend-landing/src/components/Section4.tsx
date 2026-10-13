@@ -207,17 +207,17 @@ const STATIC_CARDS: Record<string, CardView> = {
   },
 };
 
-/** 用真数据的两个 tab，没有数据时说什么（按 tab 名称索引） */
-const EMPTY_TEXT: Record<string, { error: string; empty: string; hint: string }> = {
+/** 用真数据的两个 tab，没有数据时说什么（按 tab 名称索引）。
+ *  ★ 2026-10-14 第二轮：去掉原先的 hint（「本卡片展示的是平台真实货源，没有数据时保持为空」）——
+ *  那是在向访客解释本页的数据策略，属于实现说明；访客只需要知道「有没有内容」。 */
+const EMPTY_TEXT: Record<string, { error: string; empty: string }> = {
   找货源: {
-    error: "平台接口暂不可用",
+    error: "数据暂时加载失败",
     empty: "平台当前暂无在售货源",
-    hint: "本卡片展示的是平台真实在售货源，没有数据时保持为空",
   },
   找销路: {
-    error: "平台接口暂不可用",
+    error: "数据暂时加载失败",
     empty: "平台当前暂无求购需求",
-    hint: "本卡片展示的是平台真实求购需求，没有数据时保持为空",
   },
 };
 
@@ -250,9 +250,8 @@ export function Section4() {
         : STATIC_CARDS[tab.label] ?? null;
 
   const emptyText = EMPTY_TEXT[tab.label] ?? {
-    error: "平台接口暂不可用",
+    error: "数据暂时加载失败",
     empty: "暂无数据",
-    hint: "本卡片展示的是平台真实数据，没有数据时保持为空",
   };
   const dataState: RemoteState = active === 0 ? productsState : demandsState;
 
@@ -412,7 +411,10 @@ export function Section4() {
                       </div>
                       <div className="mt-4 text-white text-[13px]">{card.line1}</div>
                       <div className="mt-2 text-white text-[13px]">{card.line2}</div>
-                      <div className="mt-2 text-white/40 text-[11px]">{card.footnote}</div>
+                      {/* 判空再渲染：footnote 有两个来源 —— 数据卡的 REMOTE_STATUS_TEXT（ok 态为空串，
+                          2026-10-14 用户要求去掉）与静态卡的固定文案（如「提问与答复全程留痕」）。
+                          不判空时 ok 态会留下一个占 2 行高的空 div。 */}
+                      {card.footnote && <div className="mt-2 text-white/40 text-[11px]">{card.footnote}</div>}
                     </div>
 
                     {/* 中部：该 tab 的主题配图 */}
@@ -469,12 +471,11 @@ export function Section4() {
                     </div>
                   </>
                 ) : (
-                  /* 接口没通 / 确实没有数据：卡片保持版式但如实空着，不填假数据 */
+                  /* 数据没取到 / 确实没有数据：卡片保持版式但如实空着，不填假数据 */
                   <div className="flex h-[520px] flex-col items-center justify-center gap-3 px-8 text-center">
                     <div className="text-white/80 text-[15px]">
                       {dataState === "error" ? emptyText.error : emptyText.empty}
                     </div>
-                    <div className="text-white/40 text-[12px] leading-[1.6]">{emptyText.hint}</div>
                   </div>
                 )}
               </motion.div>

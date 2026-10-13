@@ -143,7 +143,7 @@
           </el-sub-menu>
         </el-menu>
 
-        <!-- 已登录：消息提醒 + 头像 + 退出登录（自左向右）。
+        <!-- 已登录：头像 + 消息提醒 + 退出登录（自左向右）。
              2026-10-13 第一次改版，原先是 el-dropdown（账号身份 / 个人中心 / 退出登录）：
                · 「账号身份」是一行 disabled 文字，信息与顶栏按角色的菜单分流重复；
                · 退出登录藏在两层菜单最里面，用户明确反馈「这个没必要要了」。
@@ -151,10 +151,19 @@
              2026-10-13 第二次改版（用户对着截图提的两条）：
                · 退出登录**只留图标**，去掉文字；
                · 顺序改为「铃铛在左、退出在最右」，即 铃铛 → 头像 → 退出。
+             2026-10-14 第三次改版（用户对着截图提的第 1 条）：
+               · 顺序再调，头像提到最左：头像 → 铃铛 → 退出。
+               · 理由：「我是谁」应当先于「有什么通知」—— 本平台多角色切换频繁，
+                 扫顶栏时第一眼要能确认自己正以哪个账号在看。
              ★ 退出去掉文字后，语义就只能靠 title / aria-label 承载 —— 缺了它们，
                这个按钮对视障用户、以及「悬停想确认一下」的用户都是无字的。
                两个图标按钮统一成 34×34 圆角方块，视觉上算一组（见 .logout-btn）。 -->
         <div v-if="isLoggedIn" class="user-area">
+          <button class="user-button" type="button" title="进入个人中心" @click="router.push('/user/profile')">
+            <el-avatar :size="34" :src="avatarUrl">{{ nameInitial }}</el-avatar>
+            <span class="ub-name">{{ displayName }}</span>
+          </button>
+
           <el-popover
             v-model:visible="msgOpen"
             placement="bottom-end"
@@ -199,11 +208,6 @@
               </footer>
             </div>
           </el-popover>
-
-          <button class="user-button" type="button" title="进入个人中心" @click="router.push('/user/profile')">
-            <el-avatar :size="34" :src="avatarUrl">{{ nameInitial }}</el-avatar>
-            <span class="ub-name">{{ displayName }}</span>
-          </button>
 
           <!-- 退出登录：整行最右端，只留图标（用户 2026-10-13 要求去掉文字）。
                不写 size="small" —— 尺寸由 .logout-btn 定死成 34×34，与铃铛一致。 -->

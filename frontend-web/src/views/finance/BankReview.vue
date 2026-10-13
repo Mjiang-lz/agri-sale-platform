@@ -38,7 +38,7 @@
         class="error-alert"
       >
         <template #default>
-          <div class="error-desc">无法连接后端服务，或当前账号不是银行用户角色（本接口仅银行用户可用）</div>
+          <div class="error-desc">数据加载失败，请稍后刷新重试</div>
           <div class="error-actions">
             <el-button type="danger" size="small" @click="loadList">重新加载</el-button>
           </div>

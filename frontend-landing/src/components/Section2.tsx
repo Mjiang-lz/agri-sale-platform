@@ -3,7 +3,7 @@ import { useRef, useState, useMemo } from "react";
 import arrow45 from "@/assets/Arrow45.svg";
 import { fetchHotProducts, resolveImage, type ApiProduct } from "@/lib/api";
 import { pickProductPhoto } from "@/lib/productImages";
-import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
+import { useRemote } from "@/lib/useRemote";
 
 // 商品图来自 Pexels（免费可商用），已下载到 public/products/ 本地，答辩时不依赖外网。
 // 注意：这是**配图素材**而不是数据 —— 平台上架的商品目前都没传 imageUrl，
@@ -181,10 +181,10 @@ export function Section2() {
             <AnimatedWords text="从下单、担保结算到物流跟踪" delayStart={0.4} stagger={0.04} /><br />
             <AnimatedWords text="每一步都有平台在托底" delayStart={0.55} stagger={0.04} />
           </p>
-          <p className="mt-2 text-xs text-white/40 lg:text-right">
-            {REMOTE_STATUS_TEXT[state]}
-            {hasProducts && " · 点击图片进入商城页 →"}
-          </p>
+          {/* 2026-10-14 用户要求去掉这行提示词：
+              原文是「数据实时同步自平台接口 · 点击图片进入商城页 →」——
+              前半句是实现细节，后半句是引导语，整行从对外展示位移除。
+              商品区本身可点、图上有 hover 反馈，不需要再用一行小字教。 */}
         </div>
       </div>
 
@@ -245,11 +245,11 @@ export function Section2() {
           </div>
         </>
       ) : (
-        /* 接口没通，或者平台确实一件在售货源都没有 —— 两种情况都如实说，不放演示图 */
+        /* 数据没取到，或者平台确实一件在售货源都没有 —— 两种情况都如实说，不放演示图 */
         <div className="mt-10 flex min-h-[200px] w-full items-center justify-center rounded-[2px] border border-dashed border-white/15 bg-white/[0.02] px-6 py-16 lg:mt-16">
           <p className="max-w-md text-center text-sm leading-relaxed text-white/50">
             {state === "error"
-              ? "平台接口暂不可用，货源数据未加载。本页不展示任何演示数据，请确认后端服务已启动后刷新"
+              ? "货源暂时加载失败，请稍后刷新重试"
               : "平台当前暂无在售货源"}
           </p>
         </div>

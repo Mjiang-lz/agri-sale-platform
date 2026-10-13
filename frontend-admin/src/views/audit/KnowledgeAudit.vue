@@ -150,7 +150,7 @@
     </el-drawer>
 
     <el-dialog v-model="rejectVisible" title="填写知识驳回理由" width="min(540px, 92vw)">
-      <p class="reject-tip">理由会写入 t_audit.audit_remark，并反馈给知识发布专家</p>
+      <p class="reject-tip">驳回理由会同步告知发布专家</p>
       <el-input v-model="rejectRemark" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="例如：文中防治方法缺少科学依据，请补充来源和适用条件" />
       <template #footer>
         <el-button @click="rejectVisible = false">取消</el-button>

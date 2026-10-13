@@ -36,7 +36,7 @@
         class="error-alert"
       >
         <template #default>
-          <div class="error-desc">无法连接后端服务，请确认后端已启动（默认 8080 端口）后重试</div>
+          <div class="error-desc">数据加载失败，请稍后刷新重试</div>
           <div class="error-actions">
             <el-button type="danger" size="small" @click="loadOrders">重新加载</el-button>
           </div>

@@ -47,7 +47,6 @@
     <div class="page-head">
       <div>
         <h2>个人信息</h2>
-        <p>维护本人昵称与头像；农户角色可在此维护经营档案，档案将作为融资智能匹配的输入特征</p>
       </div>
       <div class="head-actions">
         <!-- 收货地址入口：顶部导航的「个人中心」子菜单里也有一个，
@@ -93,7 +92,7 @@
           type="info"
           :closable="false"
           show-icon
-          title="手机号是登录账号，变更需短信验证，本页不提供修改；角色与账号状态由平台统一管理"
+          title="手机号是登录账号，变更需短信验证；角色与账号状态由平台统一管理"
         />
 
         <el-form ref="baseFormRef" :model="baseForm" :rules="baseRules" label-width="100px" class="edit-form">

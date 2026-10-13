@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useInView, animate } from "framer-motion";
 import { fetchHomeStats, platformUrl, type HomeStats } from "@/lib/api";
-import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
+import { useRemote } from "@/lib/useRemote";
 
 // 装饰贴图已本地化到 public/landing/（原先直连 qclay.design 第三方 CDN，
 // 答辩现场断网或该站下线会让本节的噪点/侧阴影直接消失）
@@ -156,10 +156,10 @@ export function Section5() {
             ))}
           </div>
         ) : (
-          /* 接口没通：如实说没拿到，不拿写死的宣传数字顶上 */
+          /* 数据没取到：如实说没拿到，不拿写死的宣传数字顶上 */
           <div className="flex min-h-[110px] items-center justify-center">
             <span className="text-white/70 text-lg lg:text-xl">
-              {state === "error" ? "平台接口暂不可用，数据未加载" : "正在同步平台数据…"}
+              {state === "error" ? "数据暂时加载失败，请稍后刷新" : "正在加载…"}
             </span>
           </div>
         )}
@@ -179,10 +179,9 @@ export function Section5() {
           加入平台
         </motion.a>
 
-        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.7 }} viewport={{ once: true }}
-          className="mt-6 text-xs text-white/45">
-          {REMOTE_STATUS_TEXT[state]}
-        </motion.div>
+        {/* 2026-10-14 用户要求去掉「数据实时同步自平台接口」这行小字。
+            本区块的数字区已有独立的状态渲染：失败显示「数据暂时加载失败，请稍后刷新」、
+            加载中显示「正在加载…」，所以这里删掉不会让失败态失去说明。 */}
       </div>
 
       {/* Absolute Top Layer Side Shadow */}

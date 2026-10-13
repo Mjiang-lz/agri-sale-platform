@@ -6,9 +6,10 @@
         <h2>融资申请</h2>
         <p>选择贷款产品，填写额度、期限和资金用途。提交后系统将推荐经营特征相近的联保候选人</p>
       </div>
-      <div class="head-tags">
-        <el-tag v-if="demoMode" type="warning" effect="dark">演示数据</el-tag>
-      </div>
+      <!--
+        ★ 2026-10-14 用户要求全站去掉「面向开发者」的提示词，这里删掉了「演示数据」角标
+        （原先挂在 demoMode 上）。该分支只在 VITE_USE_DEMO=true 时才会渲染（当前默认 false）。
+      -->
     </div>
 
     <el-row :gutter="18">
@@ -94,7 +95,7 @@
               >
                 <el-button>选择资料</el-button>
                 <template #tip>
-                  <div class="el-upload__tip">支持 PDF/JPG/PNG，最多 5 个。当前后端未提供文件上传接口，因此只在前端展示文件名</div>
+                  <div class="el-upload__tip">支持 PDF/JPG/PNG，最多 5 个</div>
                 </template>
               </el-upload>
             </el-form-item>
@@ -111,7 +112,7 @@
               :closable="false"
               show-icon
               title="管理员为只读查看"
-              description="本页面向农户提交融资申请，后端写接口仅放行农户角色，因此管理员可查看页面与字段，但不能提交。平台代农户提交请在管理后台处理。"
+              description="本页用于农户提交融资申请，管理员可查看页面内容但不能代为提交。"
             />
           </el-form>
         </el-card>

@@ -143,7 +143,7 @@
     </el-drawer>
 
     <el-dialog v-model="rejectVisible" title="填写商品驳回理由" width="min(540px, 92vw)">
-      <p class="reject-tip">理由会写入 t_audit.audit_remark，并反馈给商品发布者</p>
+      <p class="reject-tip">驳回理由会同步告知商品发布者</p>
       <el-input v-model="rejectRemark" type="textarea" :rows="5" maxlength="200" show-word-limit placeholder="例如：商品图片与描述不一致，请补充真实产地和规格信息" />
       <template #footer>
         <el-button @click="rejectVisible = false">取消</el-button>

@@ -14,7 +14,7 @@
     <div class="page-head">
       <div>
         <h2>融资台账</h2>
-        <p>只读查看全平台融资申请与银行审批结论。审批动作由银行用户完成，本页不提供审批入口。</p>
+        <p>只读查看全平台融资申请与银行审批结论。审批动作由银行用户完成</p>
       </div>
       <div class="head-actions">
         <el-tag type="info" effect="plain">管理员只读</el-tag>
