@@ -2,7 +2,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { fetchProductPage, formatPrice, platformUrl, resolveImage, type ApiProduct } from '@/lib/api'
 import { pickProductPhoto } from '@/lib/productImages'
-import { useRemote, REMOTE_STATUS_TEXT } from '@/lib/useRemote'
+import { useRemote } from '@/lib/useRemote'
+import logo from '@/assets/logo.svg'
 
 export const Route = createFileRoute('/shop')({ component: ShopPage })
 
@@ -93,9 +94,12 @@ function ShopPage() {
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#1b1b1b]/85 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[1728px] items-center justify-between px-5 py-4 lg:px-10">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" aria-label="返回融销通首页">
-            <span className="inline-block h-6 w-6 rounded-[6px] border-2 border-[#DE7D4D] relative">
-              <span className="absolute left-1/2 bottom-[3px] h-[8px] w-[2px] -translate-x-1/2 bg-[#DE7D4D] rounded" />
-            </span>
+            {/* ★ 2026-10-14 用户第 6 条：原先这里是手画的占位方块（橙色描边 + 一根竖线），
+                换成融销通品牌标。本页是深底 #1b1b1b，**必须用反白版 logo.svg** ——
+                彩色版 logo-color.svg 的禾青环会糊进深底，这是它自己注释里写明的前提。
+                viewBox 留了 10px 内边距使图形占边长 87.5%，与原 24px 方框的视觉占比一致，
+                所以 h-6 w-6 的尺寸不变。 */}
+            <img src={logo} alt="" className="h-6 w-6" />
             <span className="text-lg font-medium tracking-wide">融销通</span>
             <span className="ml-1 hidden text-xs text-white/40 sm:inline">农产品商城</span>
           </Link>
@@ -120,19 +124,18 @@ function ShopPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-4xl font-light sm:text-5xl">今日货源</h1>
-            <p className="mt-3 text-white/50">
-              {state === 'ok'
-                ? `共 ${page?.total ?? list.length} 条在售货源 · 数据来自平台 /trade/products 接口`
-                : emptyText}
-            </p>
+            {/* 2026-10-14 用户第 6 条：去掉「共 N 条在售货源 · 数据来自平台 /trade/products 接口」。
+                「共 N 条」与上面的「今日货源」标题是一件事的两遍说法，接口路径更不该亮给访客。
+                ★ 但失败/加载态必须留着 —— 接口挂了却只给一个空标题，访客无从判断是没货还是没起服务。 */}
+            {state !== 'ok' && <p className="mt-3 text-white/50">{emptyText}</p>}
           </div>
-          <span
-            className={`rounded-sm px-3 py-1.5 text-xs ${
-              state === 'ok' ? 'bg-[#DE7D4D]/15 text-[#DE7D4D]' : 'bg-white/10 text-white/50'
-            }`}
-          >
-            {state === 'ok' ? '数据源：平台接口' : '平台接口暂不可用'}
-          </span>
+          {/* 2026-10-14 用户第 6 条：去掉「数据源：平台接口」这个标签（同样属实现细节）。
+              同样保留失败态 —— 上面那行已说明原因，这里只留一句简短的状态角标。 */}
+          {state !== 'ok' && (
+            <span className="rounded-sm bg-white/10 px-3 py-1.5 text-xs text-white/50">
+              平台接口暂不可用
+            </span>
+          )}
         </div>
 
         {/* 分类筛选 */}
@@ -211,7 +214,6 @@ function ShopPage() {
         <p className="mt-12 text-center text-xs text-white/30">
           「立即采购」先跳平台登录页（登录后落到平台货源列表）；「进入平台」直接进入平台业务界面，
           下单、担保结算与物流跟踪在那里完成
-          {state === 'ok' && ` · ${REMOTE_STATUS_TEXT[state]}`}
         </p>
       </main>
     </div>

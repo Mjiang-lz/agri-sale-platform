@@ -412,7 +412,10 @@ export function Section4() {
                       </div>
                       <div className="mt-4 text-white text-[13px]">{card.line1}</div>
                       <div className="mt-2 text-white text-[13px]">{card.line2}</div>
-                      <div className="mt-2 text-white/40 text-[11px]">{card.footnote}</div>
+                      {/* 判空再渲染：footnote 有两个来源 —— 数据卡的 REMOTE_STATUS_TEXT（ok 态为空串，
+                          2026-10-14 用户要求去掉）与静态卡的固定文案（如「提问与答复全程留痕」）。
+                          不判空时 ok 态会留下一个占 2 行高的空 div。 */}
+                      {card.footnote && <div className="mt-2 text-white/40 text-[11px]">{card.footnote}</div>}
                     </div>
 
                     {/* 中部：该 tab 的主题配图 */}

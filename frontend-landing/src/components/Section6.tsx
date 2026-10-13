@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import arrow from "@/assets/Arrow45.svg";
 import { fetchHomeNews, fetchHomeStats, formatCnDate, platformUrl, type ApiKnowledge, type HomeStats } from "@/lib/api";
@@ -5,20 +6,16 @@ import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
 
 // 本区所有内容都来自平台接口，**没有本地演示标题**：
 //   左卡精选  ← GET /api/home/knowledge 的第 1 条（标题与日期都是真实发布内容）
-//   右侧列表  ← 同上接口的 6 条
-//   品类页签  ← GET /api/home/stats 的 knowledgeByCategory（真实分类与条数）
+//   右侧列表  ← 同上接口的条目（最多列 6 条）
+//   品类页签  ← GET /api/home/stats 的 knowledgeByCategory（真实分类与条数），点击就地筛选
 // 接口没通时显示「未加载」，不再摆一批编出来的资讯标题。
 export function Section6() {
-  const { data: knowledge, state } = useRemote(() => fetchHomeNews(6), [] as ApiKnowledge[]);
+  // ★ limit 由 6 提到 50（2026-10-14）：品类页签要真的能筛，而「最新 6 条」只覆盖到
+  //   养殖技术 + 政策解读两个分类，点其余品类必然是空列表。
+  //   实测全库 16 条、limit=50 的响应体仅 9KB，代价可忽略；且分类分布与 /home/stats 的
+  //   knowledgeByCategory 完全一致 —— 页签上那串数字正是取自后者，两边同源才不会对不上。
+  const { data: knowledge, state } = useRemote(() => fetchHomeNews(50), [] as ApiKnowledge[]);
   const { data: stats, state: statsState } = useRemote<HomeStats | null>(() => fetchHomeStats(), null);
-
-  const featured = knowledge[0];
-
-  const items = knowledge.map((k) => ({
-    key: String(k.knowledgeId),
-    title: k.title,
-    date: formatCnDate(k.createTime),
-  }));
 
   // 品类页签：真实分类 + 真实条数（后端已按条数倒序），前面加一个「全部」
   const catTabs = stats
@@ -27,6 +24,26 @@ export function Section6() {
         ...Object.entries(stats.knowledgeByCategory ?? {}).map(([label, count]) => ({ label, count })),
       ]
     : [];
+
+  // 选中的分类，null 表示「全部」。
+  // ★ 存分类名而不是下标：stats 可能晚于列表到达，catTabs 一到手就会重排，
+  //   存下标会让选中项悄悄跳到另一个品类上。
+  const [activeCat, setActiveCat] = useState<string | null>(null);
+
+  // 数据刷新后旧分类可能已不存在，兜回「全部」，免得点完之后列表全空且无从解释
+  const currentCat = activeCat && catTabs.some((t) => t.label === activeCat) ? activeCat : null;
+
+  // 左卡精选与右侧列表同源于这一份过滤结果：点品类时两者一起换，
+  // 否则「精选」还停在别的品类上，看起来像筛选没生效。
+  const filtered = currentCat ? knowledge.filter((k) => k.category === currentCat) : knowledge;
+  const featured = filtered[0];
+
+  // 每类最多列 6 条，与改版前的展示口径一致；要看全量走右上角「查看全部」。
+  const items = filtered.slice(0, 6).map((k) => ({
+    key: String(k.knowledgeId),
+    title: k.title,
+    date: formatCnDate(k.createTime),
+  }));
 
   const listEmptyText =
     state === "error" ? "平台接口暂不可用，知识条目未加载" : "平台当前暂无已发布的农业知识";
@@ -72,9 +89,12 @@ export function Section6() {
                 />
               </div>
             </div>
-            <div className="px-8 pb-8 text-[12px] text-neutral-400">
-              {REMOTE_STATUS_TEXT[state]}
-            </div>
+            {/* 判空再渲染：ok 态为空串（2026-10-14 用户要求去掉这句技术提示词） */}
+            {REMOTE_STATUS_TEXT[state] && (
+              <div className="px-8 pb-8 text-[12px] text-neutral-400">
+                {REMOTE_STATUS_TEXT[state]}
+              </div>
+            )}
           </motion.div>
           <div
             className="absolute left-0 right-0 top-20 bottom-20 lg:top-[140px] lg:bottom-[140px] z-20 bg-repeat opacity-[0.15] mix-blend-overlay pointer-events-none"
@@ -115,27 +135,43 @@ export function Section6() {
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8 }}
           >
-            {catTabs.map((tab, i) => (
+            {/* ★ 2026-10-14 用户第 4 条「解决不能点击问题」：
+                这里原先是 <motion.span> —— 没有 onClick、不与任何 state 关联，纯装饰，
+                所以「点不动」不是坏了，是从来没做过。现改为 button 并接上筛选。
+                用 button 而不是给 span 挂 onClick：只有 button 才自带键盘 Tab/回车与
+                aria-pressed，读屏用户才知道它是个可切换的选项。 */}
+            {catTabs.map((tab, i) => {
+              const isActive = tab.label === (currentCat ?? "全部");
+              return (
+                <motion.button
+                  key={tab.label}
+                  type="button"
+                  onClick={() => setActiveCat(tab.label === "全部" ? null : tab.label)}
+                  aria-pressed={isActive}
+                  className={`cursor-pointer text-sm font-medium uppercase transition-colors ${
+                    isActive ? "text-white" : "text-white/40 hover:text-white/70"
+                  }`}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                >
+                  {tab.label} ({tab.count})
+                </motion.button>
+              );
+            })}
+            {/* 判空再渲染：ok 态为空串（2026-10-14 去掉「数据实时同步自平台接口」） */}
+            {REMOTE_STATUS_TEXT[statsState] && (
               <motion.span
-                key={tab.label}
-                className={`text-sm font-medium uppercase ${i === 0 ? "text-white" : "text-white/40"}`}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                className="ml-auto text-xs text-white/30"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
                 viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
               >
-                {tab.label} ({tab.count})
+                {REMOTE_STATUS_TEXT[statsState]}
               </motion.span>
-            ))}
-            <motion.span
-              className="ml-auto text-xs text-white/30"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-            >
-              {REMOTE_STATUS_TEXT[statsState]}
-            </motion.span>
+            )}
           </motion.div>
           <motion.div
             className="w-full lg:w-[calc(100%+80px)] h-[1px] bg-white/25 mt-6 mb-10 lg:mb-12 origin-left"

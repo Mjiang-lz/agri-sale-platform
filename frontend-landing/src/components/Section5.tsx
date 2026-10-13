@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useInView, animate } from "framer-motion";
 import { fetchHomeStats, platformUrl, type HomeStats } from "@/lib/api";
-import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
+import { useRemote } from "@/lib/useRemote";
 
 // 装饰贴图已本地化到 public/landing/（原先直连 qclay.design 第三方 CDN，
 // 答辩现场断网或该站下线会让本节的噪点/侧阴影直接消失）
@@ -179,10 +179,9 @@ export function Section5() {
           加入平台
         </motion.a>
 
-        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.7 }} viewport={{ once: true }}
-          className="mt-6 text-xs text-white/45">
-          {REMOTE_STATUS_TEXT[state]}
-        </motion.div>
+        {/* 2026-10-14 用户要求去掉「数据实时同步自平台接口」这行小字。
+            本区块的数字区已有独立的状态渲染：接口异常显示「平台接口暂不可用，数据未加载」、
+            加载中显示「正在同步平台数据…」，所以这里删掉不会让失败态失去说明。 */}
       </div>
 
       {/* Absolute Top Layer Side Shadow */}

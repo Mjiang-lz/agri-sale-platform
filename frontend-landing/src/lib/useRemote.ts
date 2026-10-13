@@ -9,10 +9,19 @@ import { useEffect, useState } from 'react'
  */
 export type RemoteState = 'loading' | 'ok' | 'error'
 
-/** 状态标注文案，供各区块角落的小字统一使用 */
+/**
+ * 状态标注文案，供各区块角落的小字统一使用。
+ *
+ * ★ ok 态**刻意留空**（2026-10-14 用户要求「去掉提示词」）：
+ * 「数据实时同步自平台接口」属于**实现细节**，落地页是对外展示位，不该亮给访客看。
+ * 留空而不是删掉这个 key，是为了让各调用方仍然只按 state 取一次文案、缺省即不渲染。
+ *
+ * ★ loading / error **必须保留** —— 接口挂了却一声不吭，页面空白会让人以为是「没数据」，
+ * 这正是本文件开头区分 ok 与 error 的初衷，别顺手一起删了。
+ */
 export const REMOTE_STATUS_TEXT: Record<RemoteState, string> = {
   loading: '正在同步平台数据…',
-  ok: '数据实时同步自平台接口',
+  ok: '',
   error: '平台接口暂不可用',
 }
 
