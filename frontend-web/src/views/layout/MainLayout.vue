@@ -143,17 +143,18 @@
           </el-sub-menu>
         </el-menu>
 
-        <!-- 已登录：退出登录 + 消息提醒 + 头像（自左向右，两项都在头像左边）。
-             2026-10-13 改版，原先是 el-dropdown（账号身份 / 个人中心 / 退出登录）：
+        <!-- 已登录：消息提醒 + 头像 + 退出登录（自左向右）。
+             2026-10-13 第一次改版，原先是 el-dropdown（账号身份 / 个人中心 / 退出登录）：
                · 「账号身份」是一行 disabled 文字，信息与顶栏按角色的菜单分流重复；
                · 退出登录藏在两层菜单最里面，用户明确反馈「这个没必要要了」。
-             现在：退出提成常驻按钮；头像本身即「进个人中心」的入口，点一下直达。 -->
+             ⇒ 退出提成常驻按钮；头像本身即「进个人中心」的入口，点一下直达。
+             2026-10-13 第二次改版（用户对着截图提的两条）：
+               · 退出登录**只留图标**，去掉文字；
+               · 顺序改为「铃铛在左、退出在最右」，即 铃铛 → 头像 → 退出。
+             ★ 退出去掉文字后，语义就只能靠 title / aria-label 承载 —— 缺了它们，
+               这个按钮对视障用户、以及「悬停想确认一下」的用户都是无字的。
+               两个图标按钮统一成 34×34 圆角方块，视觉上算一组（见 .logout-btn）。 -->
         <div v-if="isLoggedIn" class="user-area">
-          <el-button class="logout-btn" size="small" plain @click="handleLogout">
-            <RxtIcon name="ico-logout" :size="15" />
-            <span>退出登录</span>
-          </el-button>
-
           <el-popover
             v-model:visible="msgOpen"
             placement="bottom-end"
@@ -203,6 +204,12 @@
             <el-avatar :size="34" :src="avatarUrl">{{ nameInitial }}</el-avatar>
             <span class="ub-name">{{ displayName }}</span>
           </button>
+
+          <!-- 退出登录：整行最右端，只留图标（用户 2026-10-13 要求去掉文字）。
+               不写 size="small" —— 尺寸由 .logout-btn 定死成 34×34，与铃铛一致。 -->
+          <el-button class="logout-btn" plain title="退出登录" aria-label="退出登录" @click="handleLogout">
+            <RxtIcon name="ico-logout" :size="17" />
+          </el-button>
         </div>
 
         <!-- 未登录访客：商品货源与商品详情已经开放，此时不能显示身份切换器 ——
@@ -384,9 +391,11 @@ function goMessage(m) {
 .top-nav :deep(.rxt-icon) { margin-right: 7px; }
 .user-area { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 /* 退出登录：常驻按钮（原先进下拉最里层，用户反馈藏得太深）。
-   plain + small 是不抢头像的视觉重心；字重提一档让它读起来是「可点的动作」。 */
-.logout-btn { font-weight: 600; }
-.logout-btn :deep(.rxt-icon) { margin-right: 5px; }
+   2026-10-13 去掉文字后改成 34×34 的方形图标靶位，与右边铃铛同尺寸、同圆角 ——
+   两个纯图标按钮挨在一起，尺寸不一致会立刻显得是「拼出来的」。
+   plain 保留：它仍然不该抢头像的视觉重心。 */
+.logout-btn { width: 34px; height: 34px; padding: 0; border-radius: 10px; }
+.logout-btn :deep(.rxt-icon) { margin-right: 0; }
 /* 消息铃铛：方形图标按钮。用 button 而不是 el-button —— 这里要的是一个纯图标靶位，
    套 el-button 会多带一层内边距与文字基线，34px 的方块会缩成 28px。 */
 .icon-btn {

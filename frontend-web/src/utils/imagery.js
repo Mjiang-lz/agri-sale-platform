@@ -443,24 +443,68 @@ export function demandInitial(d) {
 }
 
 /**
- * 专家横幅：用其专业领域对应的农业实景图。
- * 这是真实田间照片，不用插画或纯色块冒充。
+ * 专家卡片顶部横幅 —— 2026-10-13 整族换素材。
+ *
+ * ⚠️ 老实现是**直接复用商品图池**（`DOMAIN_IMG` → `/products/*.jpg`），三个后果
+ *   （2026-10-13 A/B 实测的修前观测值，不是推测）：
+ *   ① 图和专家对不上：「种植与植保」的专家配的是一颗大白菜（p25）、
+ *      「畜牧与水产」配一条草鱼（p20）；
+ *   ② 领域关键词没命中时**一起落到同一张兜底图**：实测 5 张卡的 src 是
+ *      `p25, p20, p08, p08, p08` —— **5 张里只有 3 张不同**，后三位专家共用一张；
+ *   ③ 把「人」的卡片背景做成一盘菜，人物卡片本身的观感就是错的。
+ *
+ * 现在换成「人物在工作的实景」照片：从免费可商用图库（Pexels License）下载进
+ * `public/experts/` 本地引用。★ 刻意不放外链 —— 换服务器、断网、图库改版都不受影响，
+ * 也不会像 OBS 那样把绝对地址写死进库。
+ *
+ * ★ 取图纪律（换图/加图请照做）：优先选**人物是场景的一部分**的构图
+ *   （背影 / 口罩 / 多人中景），**避免清晰陌生人正脸** —— 头像旁边多一张别人的脸，
+ *   用户会以为那就是专家的照片，比配错图更糟。
+ * ★ 裁剪口径 880×320（≈2.75:1），与卡片横幅 326×118 同比例。换图请按这个比例出，
+ *   否则 `object-fit: cover` 会把主体裁掉。
+ * ★ 素材清单与出处（Pexels License：可商用、无需署名，此处仍记录以便追溯）：
+ *   banner-1 → pexels.com/photo/8442371   检测中心全景
+ *   banner-2 → pexels.com/photo/9243558   化验取样特写
+ *   banner-3 → pexels.com/photo/32845671  厂区持表巡检
+ *   banner-4 → pexels.com/photo/31090813  车间工位作业
+ *   banner-5 → pexels.com/photo/7693692   会议桌谈方案
  */
-const DOMAIN_IMG = {
-  种植: '/products/p25.jpg',
-  蔬菜: '/products/p26.jpg',
-  果树: '/products/p11.jpg',
-  养殖: '/products/p17.jpg',
-  水产: '/products/p20.jpg',
-  粮油: '/products/p08.jpg',
-  食用菌: '/products/p22.jpg'
+const BANNER_IMG = {
+  1: '/experts/banner-1.jpg',
+  2: '/experts/banner-2.jpg',
+  3: '/experts/banner-3.jpg',
+  4: '/experts/banner-4.jpg',
+  5: '/experts/banner-5.jpg'
 }
 
+/**
+ * 领域关键词 → 横幅。给「还没登记进 BANNER_IMG 的新专家」兜底。
+ *
+ * ★ 这是 `find` 取**第一个命中**，所以数组顺序有意义：有包含关系的词必须让
+ *   更精确的排在前面，否则短词先命中，长词永远走不到（与 NAME_IMG 同一条纪律）。
+ */
+const DOMAIN_BANNER = [
+  ['加工', '/experts/banner-4.jpg'],
+  ['质量', '/experts/banner-4.jpg'],
+  ['电商', '/experts/banner-5.jpg'],
+  ['经营', '/experts/banner-5.jpg'],
+  ['土壤', '/experts/banner-3.jpg'],
+  ['肥料', '/experts/banner-3.jpg'],
+  ['畜牧', '/experts/banner-2.jpg'],
+  ['水产', '/experts/banner-2.jpg'],
+  ['种植', '/experts/banner-1.jpg'],
+  ['植保', '/experts/banner-1.jpg']
+]
+
+/** 领域也认不出来时的兜底：恒有图，不留空横幅。 */
+const BANNER_DEFAULT = '/experts/banner-1.jpg'
+
 export function expertBanner(e) {
+  const byId = BANNER_IMG[Number(e?.expertId || 0)]
+  if (byId) return assetUrl(byId)
   const d = String(e?.expertDomain || '')
-  if (!d) return assetUrl('/products/p08.jpg')
-  const hit = Object.keys(DOMAIN_IMG).find((k) => d.includes(k))
-  return assetUrl(hit ? DOMAIN_IMG[hit] : '/products/p08.jpg')
+  const hit = DOMAIN_BANNER.find(([k]) => d.includes(k))
+  return assetUrl(hit ? hit[1] : BANNER_DEFAULT)
 }
 
 // 导出时也过 assetUrl：调用方拿到就能直接塞进 `src`，不必再关心构建 base。

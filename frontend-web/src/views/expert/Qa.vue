@@ -17,8 +17,23 @@
     </section>
 
     <section class="expert-strip">
-      <article v-for="expert in expertOptions" :key="expert.expertId" class="expert-chip" :class="{ active: form.expertId === expert.expertId }" @click="selectExpert(expert)">
-        <el-avatar :size="46">{{ expert.realName.slice(0, 1) }}</el-avatar>
+      <!-- ★ 点整张卡 = 进这位专家的介绍页（用户 2026-10-13 要求「点各个专家卡片
+           对应各个专家的介绍页」）。原先点一下是「选中该专家」，但同一件事下方
+           「指定专家」下拉本来就能做，所以这里让位给介绍页，功能不丢。
+           ★ .active 高亮仍跟着 form.expertId 走：从下拉选人时卡片会亮起来，
+             这条视觉线索保留，只是不再由点击产生。 -->
+      <article
+        v-for="expert in expertOptions"
+        :key="expert.expertId"
+        class="expert-chip"
+        :class="{ active: form.expertId === expert.expertId }"
+        :title="`查看 ${expert.realName} 的介绍`"
+        @click="goExpert(expert)"
+      >
+        <!-- ★ :src 必须接：expertAvatar() 优先用库里的 avatarUrl，为空才落到
+             public/experts/ 的本地图，两级都有兜底。原先这里只有姓名首字，
+             所以接口早就把 avatarUrl 发下来了，页面上却永远是「赵 / 孙 / 吴…」 -->
+        <el-avatar :size="46" :src="expertAvatar(expert) || undefined">{{ expertInitial(expert.realName) }}</el-avatar>
         <div>
           <strong>{{ expert.realName }}</strong>
           <span>{{ expert.expertDomain }}</span>
@@ -78,7 +93,10 @@
             <div class="expert-target">提问对象：{{ getExpertName(item.expertId) }}</div>
             <div v-if="item.answers?.length" class="answer-list">
               <div v-for="answer in item.answers" :key="answer.answerId" class="answer-item">
-                <el-avatar :size="36" class="expert-avatar">{{ getExpertName(answer.expertId).slice(0, 1) }}</el-avatar>
+                <!-- ★ 回答者头像同理：getExpert() 拿整条 ExpertVO 才能喂给
+                     expertAvatar()。找不到该专家（如答案属已下架的专家）时，
+                     两级兜底都空，自动回退到姓名首字，不会留碎图。 -->
+                <el-avatar :size="36" class="expert-avatar" :src="expertAvatar(getExpert(answer.expertId)) || undefined">{{ getExpertName(answer.expertId).slice(0, 1) }}</el-avatar>
                 <div>
                   <div class="answer-head"><strong>{{ getExpertName(answer.expertId) }} · 专家回复</strong><span>{{ formatDateTime(answer.answerTime) }}</span></div>
                   <p>{{ answer.content }}</p>
@@ -96,10 +114,12 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import ExpertAnswerPanel from '@/components/expert/ExpertAnswerPanel.vue'
 import { askQuestion, getMyQuestions, getQuestionAnswers } from '@/api/expert'
-import { expertOptions, getExpertName, useExperts } from '@/constants/experts'
+import { expertOptions, getExpert, getExpertName, useExperts } from '@/constants/experts'
+import { expertAvatar, expertInitial } from '@/utils/imagery'
 import { useUserStore } from '@/store/user'
 
 /**
@@ -108,6 +128,7 @@ import { useUserStore } from '@/store/user'
  * 数据来源：登录农户自己的 t_question 记录和对应的 t_answer 回答。
  */
 const userStore = useUserStore()
+const router = useRouter()
 const isExpert = computed(() => userStore.profile?.roleName === '专家')
 const formRef = ref()
 const loading = ref(false)
@@ -128,8 +149,9 @@ const repliedCount = computed(() => questions.value.filter((item) => item.status
 const pendingCount = computed(() => questions.value.filter((item) => item.status === '待回复').length)
 const filteredQuestions = computed(() => statusFilter.value === '全部' ? questions.value : questions.value.filter((item) => item.status === statusFilter.value))
 
-function selectExpert(expert) {
-  form.expertId = form.expertId === expert.expertId ? null : expert.expertId
+/** 点专家卡 → 该专家的介绍页（路由 `expert/:id`，即 ExpertDetail.vue）。 */
+function goExpert(expert) {
+  if (expert?.expertId != null) router.push(`/expert/${expert.expertId}`)
 }
 
 async function loadQuestions() {

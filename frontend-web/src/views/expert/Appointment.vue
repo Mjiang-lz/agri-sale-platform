@@ -111,7 +111,7 @@
 
     <el-dialog v-model="dialogVisible" title="提交专家预约" width="min(620px, 94vw)" destroy-on-close>
       <div v-if="selectedExpert" class="selected-expert">
-        <el-avatar :size="46">{{ selectedExpert.realName.slice(0, 1) }}</el-avatar>
+        <el-avatar :size="46" :src="expertAvatar(selectedExpert) || undefined">{{ expertInitial(selectedExpert.realName) }}</el-avatar>
         <div><strong>{{ selectedExpert.realName }} · {{ selectedExpert.expertDomain }}</strong><span v-if="selectedExpert.workloadStat">{{ selectedExpert.workloadStat }}</span></div>
       </div>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
