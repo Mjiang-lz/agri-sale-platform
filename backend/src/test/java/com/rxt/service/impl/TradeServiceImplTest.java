@@ -340,6 +340,44 @@ class TradeServiceImplTest {
         verify(productMapper).deductStock(PRODUCT_ID, 3);
     }
 
+    @Test
+    @DisplayName("★ 下单：单价 × 数量越过 order_amount DECIMAL(12,2) → 400，且不扣库存、不生成订单")
+    void createOrder_amountOverflow_throws400BeforeTouchingStock() {
+        // 两个乘数各自都合法：单价 9999999999.99 正是 DECIMAL(12,2) 能容纳的上限
+        // （10 位整数 + 2 位小数），数量 2 也合法，但乘积 19999999999.98 越界。
+        // 不拦的话插入订单时数据库报 DataError 1264，被全局兜底成 500「系统繁忙」——
+        // 而这只要少买一件就能过，属于「调用方输入」问题，必须是 400。
+        // 校验放在扣库存之前，所以这里同时断言「库存一点没动」。
+        Product pricey = sellableProduct();
+        pricey.setPrice(new BigDecimal("9999999999.99"));
+        when(productMapper.selectById(PRODUCT_ID)).thenReturn(pricey);
+
+        BizException ex = expectBizException(ResultCode.BAD_REQUEST.getCode(),
+                () -> tradeService.createOrder(BUYER, orderDto(2)));
+
+        assertTrue(ex.getMessage().contains("金额"),
+                "提示要点明是金额超限，调用方才知道该改哪里。实际：" + ex.getMessage());
+        verify(productMapper, never()).deductStock(anyLong(), anyInt());
+        verify(orderMapper, never()).insert(any(Order.class));
+    }
+
+    @Test
+    @DisplayName("下单边界：金额正好等于 DECIMAL(12,2) 上限 → 放行（「不超过」含等号）")
+    void createOrder_amountExactlyAtLimit_isAccepted() {
+        Product pricey = sellableProduct();
+        pricey.setPrice(new BigDecimal("9999999999.99"));
+        when(productMapper.selectById(PRODUCT_ID)).thenReturn(pricey);
+        when(productMapper.deductStock(PRODUCT_ID, 1)).thenReturn(1);
+        when(orderMapper.insert(any(Order.class))).thenReturn(1);
+
+        tradeService.createOrder(BUYER, orderDto(1));
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderMapper).insert(captor.capture());
+        assertEquals(0, new BigDecimal("9999999999.99").compareTo(captor.getValue().getOrderAmount()),
+                "上限本身是合法的，校验不能写成 > 与 >= 混淆");
+    }
+
     // ==================== 二、支付 ====================
 
     @Test

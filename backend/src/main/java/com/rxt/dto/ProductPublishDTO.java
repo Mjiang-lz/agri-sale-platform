@@ -1,6 +1,7 @@
 package com.rxt.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -37,9 +38,23 @@ public class ProductPublishDTO {
     @Size(max = 30, message = "商品品类不能超过 30 字")
     private String category;
 
-    /** 单价 */
+    /**
+     * 单价。DDL：{@code price DECIMAL(12,2)}
+     *
+     * <p>{@code @Digits} 与列定义严格对应：DECIMAL(12,2) 即「最多 10 位整数 + 2 位小数」，
+     * 超过这个精度数据库会以 {@code DataError 1264 Out of range} 拒绝写入。</p>
+     *
+     * <p><b>只写 {@code @DecimalMin} 不够</b>：它只守下界，上界与小数位数全放行。
+     * 传 {@code 999999999999.99}（12 位整数）或 {@code 1.234}（3 位小数）都能通过校验，
+     * 一路走到 JDBC 才抛错，被全局兜底分支回成 {@code 500 系统繁忙} ——
+     * 一个「价格多打了一位小数」的问题，被伪装成服务端故障，前端只能提示「请稍后重试」。
+     * 本机 {@code sql_mode} 含 {@code STRICT_TRANS_TABLES}，实测确实报 1264 而非静默截断。</p>
+     *
+     * <p>与 {@link DemandPublishDTO#getExpectPrice()} 用同一套注解，两边口径保持一致。</p>
+     */
     @NotNull(message = "请填写单价")
     @DecimalMin(value = "0.01", message = "单价必须大于 0")
+    @Digits(integer = 10, fraction = 2, message = "单价最多 10 位整数、2 位小数")
     private BigDecimal price;
 
     /** 可售库存 */
