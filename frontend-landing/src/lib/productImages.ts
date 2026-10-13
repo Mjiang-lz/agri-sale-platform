@@ -36,7 +36,8 @@ const NAME_PHOTO: Record<string, string> = {
   // 粮油
   '菜籽油5L': '/products/p24.jpg',
   '有机小米5斤': '/products/p08.jpg',
-  '现磨玉米面5斤': '/products/p07.jpg',
+  // p07 是「田间/农事」场景图（frontend-web imagery.js 也在用），玉米面另配 p28
+  '现磨玉米面5斤': '/products/p28.jpg',
   '五常大米10kg': '/products/p14.jpg',
   '红薯10斤装': '/products/p15.jpg',
   // 畜禽产品
@@ -69,7 +70,7 @@ const KEYWORD_PHOTO: Array<[RegExp, string]> = [
   [/白菜|甘蓝|卷心菜/, '/products/p25.jpg'],
   [/黄瓜|丝瓜|苦瓜|西葫芦/, '/products/p26.jpg'],
   [/西红柿|番茄/, '/products/p02.jpg'],
-  [/玉米/, '/products/p08.jpg'],
+  [/玉米/, '/products/p28.jpg'],
   [/猕猴桃|奇异果/, '/products/p11.jpg'],
   [/柚/, '/products/p12.jpg'],
   [/砂糖橘|砂糖桔|蜜橘|橘|桔|柑|橙/, '/products/p03.jpg'],
