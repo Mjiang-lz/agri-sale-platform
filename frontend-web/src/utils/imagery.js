@@ -61,7 +61,8 @@ export function assetUrl(path) {
 const NAME_IMG = [
   { keys: ['赣南脐橙', '脐橙'], img: '/products/p03.jpg' },
   { keys: ['砂糖橘', '沙糖橘'], img: '/products/p13.jpg' },
-  { keys: ['蜜柚', '柚子'], img: '/products/p12.jpg' },
+  // p12 是挂在树上的青皮柚（通体暗绿），不像蜜柚；改用 p30（半个红心蜜柚实拍）
+  { keys: ['蜜柚', '柚子'], img: '/products/p30.jpg' },
   { keys: ['猕猴桃', '奇异果'], img: '/products/p11.jpg' },
   { keys: ['小番茄', '西红柿', '番茄'], img: '/products/p02.jpg' },
   { keys: ['干香菇', '香菇'], img: '/products/g04.jpg' },
