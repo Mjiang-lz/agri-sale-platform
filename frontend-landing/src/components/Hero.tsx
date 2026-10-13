@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import logoUrl from "@/assets/logo.svg";
-import arrowDownUrl from "@/assets/ArrowDown.svg";
 import arrowRightUrl from "@/assets/ArrowRight.svg";
 import { RxtLogo } from "./RxtLogo";
 import { platformUrl } from "@/lib/api";
@@ -48,16 +47,20 @@ export function Hero() {
             </motion.span>
           </div>
 
+          {/* 三项都是页内锚点跳转（#capability / #solution / #news 分别对应
+              Section3 / Section4 / Section6），**没有下拉菜单** —— 所以不带任何
+              「可展开」的图标。此前「平台能力」「解决方案」后面各跟了一个向下的
+              箭头，语义上暗示点开有子菜单，实际点下去只是滚到对应区块，属于误导。 */}
           <nav className="flex items-center gap-[60px] text-xs font-semibold uppercase">
-            <motion.a href="#capability" className="flex items-center gap-1"
+            <motion.a href="#capability"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}>
-              平台能力 <img src={arrowDownUrl} alt="" />
+              平台能力
             </motion.a>
-            <motion.a href="#solution" className="flex items-center gap-1"
+            <motion.a href="#solution"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }}>
-              解决方案 <img src={arrowDownUrl} alt="" />
+              解决方案
             </motion.a>
             <motion.a href="#news"
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -105,9 +108,9 @@ export function Hero() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
               className="lg:hidden flex flex-col gap-5 px-5 pb-6 text-sm font-semibold uppercase">
-              <a href="#capability" className="flex items-center gap-1">平台能力 <img src={arrowDownUrl} alt="" /></a>
-              <a href="#solution" className="flex items-center gap-1">解决方案 <img src={arrowDownUrl} alt="" /></a>
-              <a href="#news">资讯中心</a>
+              {/* 移动端不放「平台能力 / 解决方案 / 资讯中心」三项：它们都是页内锚点，
+                  手机上手滑两下就能看到对应区块，做成菜单项没有实际价值。
+                  这里只留需要跳出落地页的两项（登录 / 免费入驻）。 */}
               <a href={platformUrl("/login")} className="flex items-center gap-2 normal-case text-base font-medium">登录 <img src={arrowRightUrl} alt="" /></a>
               <a href={platformUrl("/register")} className="bg-white px-5 py-3 text-base font-normal normal-case text-zinc-800 w-fit">免费入驻</a>
             </motion.div>

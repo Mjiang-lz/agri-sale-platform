@@ -57,7 +57,25 @@
     </el-aside>
     <el-container>
       <el-header class="header">
-        <span>{{ $route.meta.title || '融销通 · 管理后台' }}</span>
+        <span class="header-title">{{ $route.meta.title || '融销通 · 管理后台' }}</span>
+        <!--
+          ★ 2026-10-12 补：「退出登录」入口此前**完全不存在** ——
+          store/user.js 的 logout() 一直写着却无人调用，管理员登录后除了手改
+          localStorage 没有任何办法退出。这里对齐业务端 MainLayout 的顶栏下拉。
+          后台只有管理员一种角色，所以不放「个人中心」项（管理员没有资料页）。
+        -->
+        <el-dropdown trigger="click" @command="handleUserCommand">
+          <button class="user-button" type="button">
+            <el-avatar :size="30" :src="avatarUrl">{{ nameInitial }}</el-avatar>
+            <span class="ub-name">{{ displayName }}</span>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item disabled>账号身份：{{ actualRole || '未同步' }}</el-dropdown-item>
+              <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </el-header>
       <el-main class="main">
         <router-view />
@@ -72,8 +90,14 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/store/user'
 import RxtIcon from '@/components/RxtIcon.vue'
 import RxtLogo from '@/components/RxtLogo.vue'
+
+const router = useRouter()
+const userStore = useUserStore()
 
 /*
  * ★ 2026-10-12 修复：这两个组件此前**既没 import、也没全局注册**。
@@ -84,6 +108,36 @@ import RxtLogo from '@/components/RxtLogo.vue'
  *   修法就是最直白的那种：显式 import + 补一个 year。
  */
 const year = computed(() => new Date().getFullYear())
+
+/** 顶栏显示当前管理员的姓名与首字头像；整页刷新后 profile 还没回来时兜底 */
+const displayName = computed(() => userStore.profile?.realName || '管理员')
+const nameInitial = computed(() => displayName.value.slice(0, 1))
+const actualRole = computed(() => userStore.profile?.roleName || '')
+/** 头像地址写 `|| undefined` 而不是 `|| ''` —— el-avatar 拿到空串会去请求当前页面 URL */
+const avatarUrl = computed(() => userStore.profile?.avatarUrl || undefined)
+
+/**
+ * 顶栏用户下拉的唯一命令：退出登录。
+ *
+ * 二次确认是必须的 —— 在编辑审核意见或填表的中途误点一下就会丢登录态，
+ * 而这里没有草稿恢复机制，未提交的内容直接没了。
+ */
+async function handleUserCommand(command) {
+  if (command !== 'logout') return
+  try {
+    await ElMessageBox.confirm('退出后需要重新登录，确定退出？', '退出登录', {
+      type: 'warning',
+      confirmButtonText: '确定退出',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    // 点了取消 —— 这是正常分支，不是错误
+    return
+  }
+  userStore.logout()
+  ElMessage.success('已退出登录')
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -130,7 +184,29 @@ const year = computed(() => new Date().getFullYear())
 .header {
   display: flex;
   align-items: center;
+  /* 标题靠左、用户下拉靠右 */
+  justify-content: space-between;
   border-bottom: 1px solid var(--el-border-color-light);
+}
+/* 顶栏右侧的用户下拉，观感对齐业务端 MainLayout 的 .user-button */
+.user-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+}
+.user-button:hover { background: var(--el-fill-color-light); }
+.ub-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .main {
   /* 让滚动交给整个页面：el-main 默认 overflow:auto 会自己开一个滚动区，

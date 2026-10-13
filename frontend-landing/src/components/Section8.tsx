@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Link } from "@tanstack/react-router";
 
 export function Section8() {
   // 版权行按空格切词，每个词一个 mr-[5px]（原实现的分词间距机制保留）
@@ -61,9 +62,12 @@ export function Section8() {
               transition={{ duration: 0.5, delay: 0.6 }}
             >
               •{" "}
-              <a href="#" className="text-[#A2A2A2] hover:text-white transition-colors underline-offset-4 hover:underline ml-1">
+              <Link
+                to="/privacy"
+                className="text-[#A2A2A2] hover:text-white transition-colors underline-offset-4 hover:underline ml-1"
+              >
                 隐私政策
-              </a>
+              </Link>
             </motion.span>
           </div>
         </div>

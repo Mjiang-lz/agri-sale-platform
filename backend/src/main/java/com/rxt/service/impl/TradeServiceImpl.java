@@ -38,8 +38,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 /**
  * 农产品交易模块业务实现。
@@ -561,7 +564,14 @@ public class TradeServiceImpl implements TradeService {
 
         // 2. 分页查询后转 VO（VO 里会补齐商品名称、单位、图片）
         Page<Order> orderPage = orderMapper.selectPage(page, wrapper);
-        return orderPage.convert(this::convertToOrderVO);
+        IPage<OrderVO> result = orderPage.convert(this::convertToOrderVO);
+
+        // 3. 一次性查「这一页涉及的商品里，我已经评过哪些」再回填。
+        //    不要写进 convertToOrderVO 里逐条查 —— 一页 10 条就是 10 次数据库往返，
+        //    而这里只要 1 次 IN 查询。（convertToOrderVO 里逐条查商品是历史包袱，
+        //    不在本次改动范围。）
+        fillCommentStatus(result.getRecords(), buyerId);
+        return result;
     }
 
     @Override
@@ -589,7 +599,16 @@ public class TradeServiceImpl implements TradeService {
         if (order == null || !isParticipant(order, userId)) {
             throw new BizException(ResultCode.NOT_FOUND.getCode(), "订单不存在");
         }
-        return convertToOrderVO(order);
+        OrderVO vo = convertToOrderVO(order);
+        // 评论状态按「买家」口径算（发表评论是买家的动作），农户看买家订单详情时
+        // 也能看到买家评没评过。productId 理论上非空，这里仍防一手：
+        // List.of(null) 会直接抛 NPE，不能省这个判断。
+        if (order.getProductId() != null) {
+            vo.setCommentStatus(commentService
+                    .commentStatusOf(order.getBuyerId(), List.of(order.getProductId()))
+                    .get(order.getProductId()));
+        }
+        return vo;
     }
 
     @Override
@@ -791,6 +810,32 @@ public class TradeServiceImpl implements TradeService {
             vo.setUnit(product.getUnit());
         }
         return vo;
+    }
+
+    /**
+     * 回填订单列表的「买家是否已评价该商品」，供前端决定显示
+     * 「评价」按钮还是禁用的「审核中 / 已评价」。
+     *
+     * <p>整页只做一次 IN 查询。若写进 {@link #convertToOrderVO} 逐条查评论表，
+     * 一页 10 条就是 10 次往返。</p>
+     *
+     * @param vos     本页订单 VO，原地修改
+     * @param buyerId 买家主键；为空时全部按「未评价」处理
+     */
+    private void fillCommentStatus(List<OrderVO> vos, Long buyerId) {
+        if (vos == null || vos.isEmpty()) {
+            return;
+        }
+        Set<Long> productIds = vos.stream()
+                .map(OrderVO::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> statusMap = commentService.commentStatusOf(buyerId, productIds);
+        for (OrderVO vo : vos) {
+            // map 里没有 = 还没评价过（或评论被驳回），留 null 让前端显示「评价」
+            vo.setCommentStatus(statusMap.get(vo.getProductId()));
+        }
     }
 
     /**

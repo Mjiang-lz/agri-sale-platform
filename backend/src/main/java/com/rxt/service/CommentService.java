@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.rxt.dto.CommentPublishDTO;
 import com.rxt.vo.CommentVO;
 
+import java.util.Collection;
+import java.util.Map;
+
 /**
  * 商品评论业务接口。
  *
@@ -32,4 +35,16 @@ public interface CommentService {
      * @param pageSize  每页条数
      */
     IPage<CommentVO> pageProductComments(Long productId, long pageNum, long pageSize);
+
+    /**
+     * 批量查询「某用户对若干商品」的评论状态，供订单列表标记「审核中 / 已评价」。
+     *
+     * <p>只回「待审核 / 已通过」两种有效状态。从未评价、以及被驳回（未通过）的
+     * 商品**不会出现在返回的 map 里** —— 这两种情况对调用方含义相同：还能再评价。</p>
+     *
+     * @param userId     评论人，取自登录态
+     * @param productIds 商品主键集合
+     * @return productId → 审核状态（待审核 / 已通过）；无有效评论的商品不在 map 中
+     */
+    Map<Long, String> commentStatusOf(Long userId, Collection<Long> productIds);
 }
