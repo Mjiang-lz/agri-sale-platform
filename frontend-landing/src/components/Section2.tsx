@@ -1,5 +1,6 @@
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import { useRef, useState, useMemo } from "react";
+import arrow45 from "@/assets/Arrow45.svg";
 import { fetchHotProducts, resolveImage, type ApiProduct } from "@/lib/api";
 import { pickProductPhoto } from "@/lib/productImages";
 import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
@@ -239,7 +240,7 @@ export function Section2() {
               style={{ x: sx, y: sy }}
               animate={{ opacity: isHovering ? 1 : 0, scale: isHovering ? 1 : 0 }}
               transition={{ duration: 0.25, ease: "easeOut" }}>
-              <img src="/Arrow45.svg" className="w-[40px] h-[40px] brightness-0 invert" alt="" />
+              <img src={arrow45} className="w-[40px] h-[40px] brightness-0 invert" alt="" />
             </motion.div>
           </div>
         </>

@@ -73,3 +73,13 @@ dump-*.sql
 *_backup.sql
 *_bak.sql
 data-backup*/
+
+# ---------------------- 别的部署平台的配置 ----------------------
+# `frontend-landing/public/edgeone.json` 是腾讯云 EdgeOne Pages 的 SPA 回退规则
+# （`/*` → `/index.html`，作用等价于 nginx 的 try_files 回退）。它是某次部署实验留下的，
+# 本项目实际走宝塔 + nginx（分流规则见 deploy/nginx.conf、部署手册见
+# docs/部署-腾讯云共享环境.md），这份文件不参与任何构建。
+#
+# 刻意「忽略但不删」：本机留着（将来真要试 EdgeOne 就直接可用），
+# 同时不再一直挂在 `git status` 上让人以为漏提交了什么。
+frontend-landing/public/edgeone.json

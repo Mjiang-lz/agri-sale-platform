@@ -31,7 +31,6 @@ npm run build
 |---|---|
 | `src/assets/logo.svg` | 反白版 —— **Hero 深色视频底专用** |
 | `src/assets/logo-color.svg` | 彩色版 —— 浅色底使用 |
-| `src/assets/logo-legacy-v1-square.svg` | v1 旧标留档，勿在新页面引用 |
 | `public/favicon.svg` | 简化版 favicon，已做深色模式自适应 |
 | `public/apple-touch-icon.png` | iOS 主屏图标，180×180 |
 
@@ -51,7 +50,10 @@ npm run build
   已从第三方 CDN 本地化并压缩（原图 16.7MB → 1.4MB，WebP 保留透明通道）。
 - `public/fonts/` —— 全站字体 Inter Tight（可变字重 200–900）的 latin / latin-ext 两个
   子集，共 132KB。`@font-face` 写在 `src/styles.css`。
-- `verify/` —— 页面验收截图留档。
+- `verify/data-integration.html` —— 落地页数据对接的验收报告（自包含单页，直接双击看）。
+  历史验收截图与探针脚本已从仓库移除，需要时 `git log --diff-filter=D -- verify/` 找回。
+- `src/assets/Arrow45.svg` —— 箭头的**唯一**副本。以前 `public/Arrow45.svg` 还留着一份一模一样的
+  （Section2 走 public、Section6 走 assets），已统一走 `@/assets/` 这一份。
 
 ## 已知待办
 
