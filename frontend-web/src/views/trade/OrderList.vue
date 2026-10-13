@@ -79,7 +79,7 @@
             <el-tag :type="statusType(row.orderStatus)">{{ row.orderStatus }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="185" fixed="right">
+        <el-table-column label="操作" width="215" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <template v-if="viewMode === 'buy'">
@@ -91,6 +91,23 @@
                 type="danger"
                 @click="doCancel(row)"
               >取消</el-button>
+              <!--
+                评价入口。两个判据缺一不可：
+                · orderStatus === '已完成' —— 后端只认「已确认收货」的订单可评（见
+                  CommentServiceImpl#PURCHASED_ORDER_STATUSES），其他状态给按钮
+                  等于让用户去撞一次 403
+                · !commentStatus —— commentStatus 由后端按「待审核 / 已通过」回填，
+                  有值时说明评过了，不再给第二次机会（评论被驳回的不在返回值里，
+                  所以仍会显示「评价」，允许重新提交）
+              -->
+              <el-button
+                v-if="row.orderStatus === '已完成' && !row.commentStatus"
+                link
+                type="primary"
+                @click="openComment(row)"
+              >评价</el-button>
+              <el-button v-else-if="row.commentStatus === '待审核'" link disabled>审核中</el-button>
+              <el-button v-else-if="row.commentStatus === '已通过'" link disabled>已评价</el-button>
             </template>
             <el-button v-else-if="row.orderStatus === '待发货'" link type="primary" @click="doDeliver(row)">发货</el-button>
           </template>
@@ -160,6 +177,32 @@
         </el-descriptions>
       </template>
     </el-drawer>
+
+    <!--
+      发表评价弹窗。用 el-dialog 而不是 el-drawer：这是一次性的短表单，
+      与「订单详情」（要展开长内容、和列表对照着看）性质不同。
+      ⚠️ el-dialog 默认 teleport 到 body，scoped 样式够不着，所以下面的
+      .comment-* 样式写在文件末尾的**非 scoped** 块里。
+    -->
+    <el-dialog v-model="commentVisible" title="发表商品评价" width="520px" class="comment-dialog">
+      <div v-if="commentTarget" class="comment-target">
+        <span class="comment-target-name">{{ commentTarget.productName || `商品 #${commentTarget.productId}` }}</span>
+        <span class="comment-target-no">订单 {{ commentTarget.orderNo }}</span>
+      </div>
+      <el-input
+        v-model="commentContent"
+        type="textarea"
+        :rows="5"
+        maxlength="500"
+        show-word-limit
+        placeholder="说说这次购买的感受，比如品质、品相、包装与发货速度"
+      />
+      <div class="comment-hint">评价提交后需经平台审核，审核通过后才会展示在商品详情页</div>
+      <template #footer>
+        <el-button @click="commentVisible = false">取消</el-button>
+        <el-button type="primary" :loading="commentSubmitting" @click="submitComment">提交评价</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -175,25 +218,27 @@ import {
   payOrder,
   receiveOrder
 } from '@/api/trade'
+import { publishProductComment } from '@/api/comment'
 import { formatDateTime } from '@/utils/text'
 import { productImage, productFallbackBg, productFallbackText } from '@/utils/imagery'
 
 /**
  * 页面用途：我的订单（可切换「我买的 / 我卖的」两个视角）。
- * 接口文件：frontend-web/src/api/trade.js
+ * 接口文件：frontend-web/src/api/trade.js、frontend-web/src/api/comment.js
  * 主要接口：
  *   GET  /api/trade/order/list    我买的（按状态筛选 + 分页）
  *   GET  /api/trade/order/sold    我卖的（农户视角，发货入口）
  *   GET  /api/trade/order/{id}    订单详情
  *   POST /api/trade/order/{id}/pay|cancel|receive   买家可操作
  *   POST /api/trade/order/{id}/deliver               农户可操作
+ *   POST /api/comment/product     发表商品评价（「我买的」列表 → 评价按钮）
  *
  * ⚠️ 路径是单数 order —— 旧注释里的 /api/trade/orders 在后端不存在。
  *
  * 后端返回 MyBatis-Plus Page，records 元素为 OrderVO：
  * orderId、orderNo、buyerId、sellerId、productId、productName、imageUrl、
  * unit、quantity、unitPrice、orderAmount、consignee、consigneePhone、
- * receiverAddress、orderRemark、orderStatus、
+ * receiverAddress、orderRemark、orderStatus、commentStatus、
  * payTime、deliverTime、receiveTime、createTime。
  *
  * 收货信息（consignee / consigneePhone / receiverAddress / orderRemark）是
@@ -202,6 +247,11 @@ import { productImage, productFallbackBg, productFallbackText } from '@/utils/im
  *
  * 订单状态取值：待支付 / 待发货 / 待收货 / 已完成 / 已取消（后端是中文枚举，
  * 不是数字），因此状态筛选直接把中文串传给后端的 orderStatus 参数。
+ *
+ * commentStatus 是**买家的**评论状态，取值 待审核 / 已通过；null 表示还没评过
+ * （含评论被驳回，允许重新提交）。只在「我买的」列表有值。前端据此决定显示
+ * 「评价」按钮还是禁用的「审核中 / 已评价」，但**裁定权始终在后端** ——
+ * 这里只决定要不要给入口，不能替代后端那道「已完成订单方可评价」的校验。
  *
  * 失败处理：流转失败一律弹提示并重新拉取列表，保证页面状态与后端一致，
  * 不做乐观更新 —— 库存与状态都由后端裁定，前端猜错会造成状态漂移。
@@ -218,6 +268,12 @@ const errorState = ref(false)
 
 const detailVisible = ref(false)
 const currentOrder = ref(null)
+
+/* 发表评价弹窗：目标订单 + 正文 + 提交中标记（防连点） */
+const commentVisible = ref(false)
+const commentTarget = ref(null)
+const commentContent = ref('')
+const commentSubmitting = ref(false)
 
 const STATUS_TYPE = {
   待支付: 'warning',
@@ -339,6 +395,43 @@ function doCancel(row) {
   )
 }
 
+/* ------------------------------------------------------------------ *
+ * 发表评价
+ * ------------------------------------------------------------------ */
+
+function openComment(row) {
+  commentTarget.value = row
+  commentContent.value = ''
+  commentVisible.value = true
+}
+
+async function submitComment() {
+  // 后端也会校验（trim 后 ≥2 字），这里先拦一道：既省一次往返，
+  // 也避免让用户看到后端那句「评论内容至少 2 个字」时误以为是系统故障
+  const content = commentContent.value.trim()
+  if (content.length < 2) {
+    ElMessage.warning('评价内容至少 2 个字')
+    return
+  }
+
+  commentSubmitting.value = true
+  try {
+    await publishProductComment({ productId: commentTarget.value.productId, content })
+    // 新评价一律「待审核」，不会立刻出现在商品详情里，所以不能提示「评价成功」
+    ElMessage.success('评价已提交，审核通过后展示')
+    commentVisible.value = false
+  } catch (err) {
+    // request.js 已统一弹过错误提示（例如「你已评价过该商品，请等待审核结果」），
+    // 不再补弹，只记日志
+    console.error('发表评价失败：', err)
+  } finally {
+    commentSubmitting.value = false
+    // 成败都重新拉列表：成功后 commentStatus 应变成「待审核」；
+    // 失败也可能是「其实早就评过了」，两种情况都得让页面回到后端真实状态
+    await loadOrders()
+  }
+}
+
 onMounted(loadOrders)
 </script>
 
@@ -394,4 +487,39 @@ onMounted(loadOrders)
 .error-alert { margin-bottom: 14px; }
 .error-alert :deep(.el-alert__content) { width: 100%; }
 .error-actions { margin-top: 8px; }
+</style>
+
+<!--
+  el-dialog 默认 teleport 到 body，上面的 scoped 选择器带 data-v 属性、够不着
+  它内部，所以评价弹窗的样式只能写在非 scoped 块里。用 .comment-dialog 前缀
+  收窄作用域，避免影响全局其他弹窗。
+-->
+<style>
+.comment-dialog .comment-target {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
+}
+.comment-dialog .comment-target-name {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comment-dialog .comment-target-no {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.comment-dialog .comment-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
 </style>
