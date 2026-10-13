@@ -80,7 +80,7 @@ const NAME_IMG = [
   { keys: ['草鱼'], img: '/products/g06.jpg' },
   { keys: ['小龙虾'], img: '/products/p19.jpg' },
   { keys: ['莲藕'], img: '/products/g10.jpg' },
-  { keys: ['菜籽油', '菜油'], img: '/products/g01.jpg' },
+  { keys: ['菜籽油', '菜油'], img: '/products/p29.jpg' },
   { keys: ['大闸蟹', '螃蟹'], img: '/products/g08.jpg' },
   { keys: ['松茸'], img: '/products/g09.jpg' },
   // 兜底：当关键词没命中时，用更宽泛的品类池
@@ -97,7 +97,7 @@ const CATEGORY_IMG = {
   水果: ['/products/p03.jpg', '/products/p13.jpg', '/products/p01.jpg', '/products/p11.jpg', '/products/p12.jpg', '/products/p09.jpg'],
   蔬菜: ['/products/p04.jpg', '/products/p26.jpg', '/products/p25.jpg', '/products/p02.jpg', '/products/p06.jpg', '/products/p05.jpg'],
   干货: ['/products/g04.jpg', '/products/p22.jpg', '/products/p21.jpg'],
-  粮油: ['/products/g02.jpg', '/products/g01.jpg', '/products/g03.jpg', '/products/g07.jpg', '/products/p14.jpg', '/products/p08.jpg'],
+  粮油: ['/products/g02.jpg', '/products/p29.jpg', '/products/g03.jpg', '/products/g07.jpg', '/products/p14.jpg', '/products/p08.jpg'],
   畜禽产品: ['/products/p27.jpg', '/products/p16.jpg', '/products/p17.jpg', '/products/g05.jpg'],
   水产: ['/products/g06.jpg', '/products/p19.jpg', '/products/g08.jpg', '/products/p20.jpg'],
   // data.sql 里出现过的其他品类，兜到最通用的田间图
@@ -262,7 +262,7 @@ const KNOWLEDGE_TITLE_IMG = [
   { keys: ['大米', '稻米'], img: '/products/g02.jpg' },
   { keys: ['小米', '谷子'], img: '/products/g03.jpg' },
   { keys: ['玉米'], img: '/products/g07.jpg' },
-  { keys: ['菜籽油', '榨油', '油菜'], img: '/products/g01.jpg' },
+  { keys: ['菜籽油', '榨油', '油菜'], img: '/products/p29.jpg' },
   // —— 水产 ——（小龙虾 已上移到专题组；原先这里指向的是「螃蟹」，物种就不对）
   { keys: ['大闸蟹', '螃蟹'], img: '/products/g08.jpg' },
   { keys: ['鱼塘', '淡水鱼', '缺氧', '水质'], img: '/products/p20.jpg' },
