@@ -92,6 +92,12 @@ public class TradeServiceImpl implements TradeService {
     /** 已取消 */
     private static final String ORDER_CANCELED = "已取消";
 
+    /**
+     * 单笔订单金额上限，取自 {@code t_order.order_amount DECIMAL(12,2)} 的列定义
+     * （10 位整数 + 2 位小数）。
+     */
+    private static final BigDecimal ORDER_AMOUNT_MAX = new BigDecimal("9999999999.99");
+
     private final ProductMapper productMapper;
     private final CartMapper cartMapper;
     private final OrderMapper orderMapper;
@@ -455,6 +461,18 @@ public class TradeServiceImpl implements TradeService {
             throw new BizException(ResultCode.BAD_REQUEST.getCode(), "商品不存在或已下架");
         }
 
+        // 3.1 金额上界校验：单价 × 数量必须落在 order_amount DECIMAL(12,2) 的范围内。
+        //     两个乘数各自都合法 —— 单价由 @Digits(10,2) 守住列宽，数量是 int ——
+        //     但乘积可以越界（单价 99 亿 × 买 2 件）。不拦的话，插入订单时数据库报
+        //     DataError 1264，被兜底成 500「系统繁忙」；而这只需少买一件就能过，
+        //     应该给 400。放在扣库存之前：与地址校验同理，这是「调用方输入」层面的
+        //     问题，没必要先锁住商品行、扣掉库存再回滚。
+        BigDecimal orderAmount = product.getPrice().multiply(BigDecimal.valueOf(dto.getQuantity()));
+        if (orderAmount.compareTo(ORDER_AMOUNT_MAX) > 0) {
+            throw new BizException(ResultCode.BAD_REQUEST.getCode(),
+                    "单笔订单金额不能超过 " + ORDER_AMOUNT_MAX + " 元");
+        }
+
         // 4. 原子扣减库存：判断「够不够」与扣减在同一条 UPDATE 里完成。
         //    ⚠️ 不能改成「先读 stock 判断、再 updateById 回写」——那是读-改-写，
         //    两个并发下单会读到同一个旧库存而双双通过，最终卖出的比库存还多（超卖）。
@@ -480,7 +498,7 @@ public class TradeServiceImpl implements TradeService {
         order.setProductId(dto.getProductId());
         order.setQuantity(dto.getQuantity());
         order.setUnitPrice(product.getPrice());
-        order.setOrderAmount(product.getPrice().multiply(BigDecimal.valueOf(dto.getQuantity())));
+        order.setOrderAmount(orderAmount);
         order.setConsignee(address.getConsignee());
         order.setConsigneePhone(address.getPhone());
         order.setReceiverAddress(address.getFullAddress());
