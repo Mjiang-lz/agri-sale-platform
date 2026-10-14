@@ -520,7 +520,7 @@ import { APPLY_STATUS, isApprovedApply } from '@/constants/finance'
 import { useCategories } from '@/composables/useCategories'
 import {
   productImage,
-  assetUrl,
+  mediaUrl,
   productFallbackBg,
   productFallbackText,
   expertInitial,
@@ -612,16 +612,18 @@ function onKnowledgeImgError(e, k) {
 
 /* ---------------- 首屏轮播 ---------------- */
 /* 这四张全部是真实田间/产地实拍图，不用抽象插画。 */
-/* ★ 路径必须过 assetUrl()：表里写的是「站点根绝对路径」，而本应用构建后挂在 `/app/` 下。
-   不过这一步，部署到子路径后浏览器会去**站点根**找图 —— 那里若恰好没有同名文件，
-   nginx 的 SPA 回退会返回 `200 + index.html`，图片静默变碎图：状态码全绿、
-   控制台无报错，只有肉眼看得出（2026-10-13 实际踩过一次）。 */
+/* ★ 路径必须过 mediaUrl()：表里写的是「存储对象键」，出口要拼成后端读地址
+   `/api/files/…`。
+   ★★ 但**绝不能拼构建 base** —— 那是站点根路径，拼成 `/app/api/files/…`
+   nginx 找不到，SPA 回退返回 `200 + index.html`，图片静默变碎图：状态码全绿、
+   控制台无报错，只有肉眼看得出（2026-10-13 实际踩过一次，同一个坑）。
+   素材已全部收归后端存储（2026-10-14），种子图随 jar 走、启动自动铺底。 */
 const HERO_IMAGES = [
   '/products/p08.jpg',
   '/products/p25.jpg',
   '/products/p20.jpg',
   '/products/p17.jpg'
-].map((p) => assetUrl(p))
+].map((p) => mediaUrl(p))
 const HERO_ALT = ['水稻田里的稻谷长势', '田间蔬菜批发市场的货架', '养殖基地的鱼塘', '农场的散养鸡蛋']
 const HERO_TEXT = [
   { kicker: '产地直供', title: '田间到餐桌，少中间一环', desc: '24 个在售货源全部来自产地直发，看得到产地、看得到库存' },
@@ -693,7 +695,7 @@ const categories = computed(() =>
   categoryList.value.map((c) => ({
     name: c.category,
     count: c.productCount,
-    img: assetUrl(CATEGORY_ENTRY_IMG[c.category] || productImage({ category: c.category, productId: 1 }))
+    img: mediaUrl(CATEGORY_ENTRY_IMG[c.category] || productImage({ category: c.category, productId: 1 }))
   }))
 )
 function goCategory(name) {

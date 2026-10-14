@@ -5,56 +5,66 @@
  * 而生鲜电商的价值全在图上 —— 没有实物大图的商品卡片等于一张灰底文字条，
  * 首页就退化成「个人中心的列表」。
  *
- * 图的来源：
- *   - `frontend-web/public/products/` 原有 27 张真实田间/市场照片
+ * 图的来源（★ 2026-10-14 起全部收归后端统一存储）：
+ *   - `backend/src/main/resources/seed-media/products/` 41 张真实田间/市场照片
+ *   - `seed-media/experts/` 10 张（5 头像 + 5 横幅）
+ *   - `seed-media/knowledge/` 32 张（18 张库内配图 + 14 张主题兜底图）
+ *   源图打 jar 随包走，启动时由 `MediaSeedInitializer` 幂等铺到后端本地目录，
+ *   访问地址统一是 `/api/files/<对象键>`。⇒ **下面的表存的是「对象键」，
+ *   与后台「图片资源管理」里显示的键一一对应**。
  *   - `g01.jpg` ~ `g10.jpg`：为 10 个无法被现有素材精确匹配的商品配的实拍图。
  *     2026-10-12 第九轮：换掉原来的 AI 生成图（右下角带「AI生成 / WorkBuddy」水印），
  *     改为 Pexels 实拍图（免费商用、无需署名），并从 PNG 转 JPEG ⇒ 16.5MB → 1.2MB。
- *   - 新增 `experts/zhao-guoqiang.png`、`experts/sun-lihua.png`：两位专家的 AI 生成写实头像
- *   - 新增 `public/knowledge/` 6 张**知识专题实拍图**（2026-10-10）：取自 Pexels，
- *     许可为免费商用、无需署名。用途见 `KNOWLEDGE_TITLE_IMG` 顶部注释。
- *     为什么单开一个目录：商品图是「一筐菜」，而知识文章要的是「场景」——
- *     讲绿色食品认证配一篮新鲜蔬菜合理，配一碗小米就是错的。
+ *   - `knowledge/` 那 14 张**语义命名**图（cert-green-food / farm-cooperative …）是
+ *     「按标题关键词配图」的兜底，与库里那 18 张哈希名配图不是同一批，两者都要留。
  *
  * 优先级（商品）：接口返回的 imageUrl > 按商品名精确匹配 > 按品类兜底 > 通用田间图
  * 优先级（专家）：接口返回的 avatarUrl（若可用）> 按 expertId 的生成头像 > 姓名首字
  * 优先级（知识）：接口返回的 imageUrl > 标题关键词匹配 > 分类渐变封面
  *
- * ★★ 2026-10-13：本文件所有素材路径**统一过 `assetUrl()` 再返回**。
- *    起因是一次真实事故 —— 路径写的是「站点根绝对路径」（`/products/g01.jpg`），
- *    而业务端构建后的 base 是 `/app/`，浏览器于是去**站点根**找图：那里只有落地页
- *    自带的 27 张，缺 `g01~g10`、缺整个 `experts/` 与 `knowledge/`。结果 nginx 的
- *    SPA 回退把「文件不存在」返回成 `200 + index.html`，`<img>` 解码失败，
- *    前端静默退化成「商品名首字色块」—— 状态码全绿，看不出任何异常。
- *
- *    ★ 关键认知：Vite 的 `base` 只作用于**它自己能看到的引用**（`import` 进来的资源、
- *      CSS 里的相对 url、index.html）。**JS 里手写的字符串它一概不管**，
- *      浏览器一律按站点根解析。所以这类字符串必须手动拼 `import.meta.env.BASE_URL`。
- *    ★ 判据：字符串开头是不是 `/`。是 ⇒ 必须过 `assetUrl()`；不是（`data:`、`http(s):`、
- *      相对地址）⇒ 原样放行。
- *
- *    下面这些常量表**刻意保留带前导 `/` 的写法** —— 可读，而且它们本身就是一份素材清单。
- *    转换只发生在**返回给调用方之前**，转换点集中，不容易漏。
+ * ★★ 出口纪律：所有素材地址**统一过 `mediaUrl()`**（见该函数注释）。
+ *    **不要用 `import.meta.env.BASE_URL`** —— `/api/files/…` 是站点根路径，
+ *    拼上构建 base 会变成 `/app/api/files/…` 而 404。
+ *    判据：字符串是不是「以 `/` 开头且属于后端」。是 ⇒ 过 `mediaUrl()`；
+ *    不是（`data:`、`http(s):` 外链、接口返回的完整地址）⇒ 原样放行。
+ *    下面这些常量表**刻意保留带前导 `/` 的对象键写法** —— 可读，
+ *    而且它们本身就是一份素材清单。转换只发生在**返回给调用方之前**，转换点集中。
  */
 
-/** 构建 base：开发态 `/`，`RXT_BASE=/app/` 构建时为 `/app/`（与 `createWebHistory` 读同一个值）。 */
-const ASSET_BASE = import.meta.env.BASE_URL || '/'
+/** 后端本地存储的读地址前缀。与 `context-path: /api` + `/files/**` 映射对应。 */
+const MEDIA_BASE = '/api/files'
 
 /**
- * 给「站点根绝对路径」拼上构建 base，得到浏览器能正确解析的地址。
+ * 把「存储对象键」拼成浏览器能取到的图片地址。
  *
- * **本文件所有素材路径的出口都必须过这里**；其他文件（如 `BizHome.vue` 的轮播图、
- * 品类圆入口）也请复用它，不要再手写裸路径。
+ * ★★ 2026-10-14：素材出口从 `assetUrl()` 换成 `mediaUrl()`。
  *
- * @param {string} path 素材路径
+ *    起因是图片**全部收归后端统一存储**（`backend/src/main/resources/seed-media/`，
+ *    启动时由 `MediaSeedInitializer` 铺到 `<localDir>/`）。此前后端 jar 里带
+ *    `application-local.yml`（写着 `rxt.obs.enabled: true`），图片走 OBS，
+ *    前端 `public/` 下那 65 张只是「本地的另一份副本」—— 两份各改一次、
+ *    后台「图片资源管理」还一张都列不出来。
+ *
+ * ★ 与 `assetUrl()` 的关键区别：**不能再拼构建 base**。
+ *   `/api/files/…` 是**站点根**路径（后端 context-path 就是 `/api`，与前端
+ *   挂在 `/app/` 下无关）。若过 `assetUrl()` 会被拼成 `/app/api/files/…`，
+ *   nginx 找不到 → SPA 回退返回 `200 + index.html` → 图片静默变碎图。
+ *   这正是本文件原来注释里记的那次事故的**同一个坑**，只是方向相反。
+ *
+ * @param {string} key 存储对象键，如 `products/p03.jpg`；也可直接传完整地址原样返回
  * @returns {string} 可安全放进 `<img src>` 的地址
  */
-export function assetUrl(path) {
-  if (!path) return path
+export function mediaUrl(key) {
+  if (!key) return key
   // data URI（渐变封面）与外链已是完整地址，不再拼前缀
-  if (!path.startsWith('/')) return path
-  // base 为 '/' 时去尾斜杠得空串；为 '/app/' 时得 '/app'
-  return ASSET_BASE.replace(/\/$/, '') + path
+  if (!key.startsWith('/')) return key
+  // ★ 幂等：已经是后端读地址的原样返回。
+  //   这是**真实会被踩到**的 —— `BizHome.vue` 的品类圆入口写的是
+  //   `mediaUrl(CATEGORY_ENTRY_IMG[x] || productImage(...))`，
+  //   而 `productImage()` 在库里 imageUrl 有值时返回的就是 `/api/files/…`，
+  //   不过滤就会拼成 `/api/files/api/files/…` ⇒ 404。
+  if (key.startsWith(`${MEDIA_BASE}/`)) return key
+  return MEDIA_BASE + key
 }
 
 /** 商品名关键词 → 精确图片。这是让「文案 / 搜索结果 / 图片」三者匹配的核心表。 */
@@ -140,13 +150,13 @@ export function productImage(p) {
   const name = String(p?.productName || '')
   // 1) 按商品名关键词精确匹配：让搜索结果和商品文案与图片对应
   const exact = NAME_IMG.find((item) => item.keys.some((k) => name.includes(k)))
-  if (exact) return assetUrl(exact.img)
+  if (exact) return mediaUrl(exact.img)
 
   // 2) 按品类兜底：用 productId 取模，保证同一商品永远拿到同一张图
   const cat = p?.category
   const pool = CATEGORY_IMG[cat] || CATEGORY_IMG['默认']
   const id = Number(p?.productId || p?.id || 0)
-  return assetUrl(pool[(id || 1) % pool.length])
+  return mediaUrl(pool[(id || 1) % pool.length])
 }
 
 /** 图片加载失败时的占位底色（按 id 稳定取色，避免整页一个颜色） */
@@ -161,17 +171,20 @@ export function productFallbackText(p) {
 }
 
 /**
- * 专家头像：按 expertId 落到 public/experts/ 的本地图。
+ * 专家头像：库里 `t_user.avatar_url` 有值就用，否则按 expertId 落到后端存储的本地图。
  *
  * ★ 两级回落，缺一不可：
- *   1. 库里 t_user.avatar_url 有值 → 优先用它（用户自己传的头像，
- *      走 /api/files/… 或 OBS，两种都试过能取到）；
+ *   1. 库里 t_user.avatar_url 有值 → 优先用它（用户自己传的头像）；
  *   2. 为空 → 用下面的本地图。库里 13 个用户有 8 个 avatar_url 是 NULL，
  *      只靠库里那列，演示时专家头像全是首字方块。
  *
- * ⚠️ OBS 那个绝对地址是**写死在库里的**：桶名或 endpoint 一变，
- *    所有历史头像同时失效。本地图走 BASE_URL，换服务器不用重建。
- *    所以新增专家一律往 public/experts/ 放图，别往 OBS 传。
+ * ★ 2026-10-14：原有一段「`/experts/` 开头要补 BASE_URL」的特例，
+ *   已删除 —— 素材全部收归后端后，库里存的就是 `/api/files/experts/…`，
+ *   那是站点根路径，本来就不该拼构建 base（拼了必 404）。
+ *
+ * ⚠️ 但**保留兜底池**这个设计：库里 avatar_url 为空时仍要有图。
+ *   新增专家时把图放进 `backend/src/main/resources/seed-media/experts/`，
+ *   然后在下面加一行 id → 文件名映射；**不要往数据库传图**。
  */
 const EXPERT_IMG = {
   1: '/experts/zhao-guoqiang.jpg',
@@ -183,16 +196,9 @@ const EXPERT_IMG = {
 
 export function expertAvatar(e) {
   const url = e?.avatarUrl || e?.avatar_url
-  // 库里可能存三种形态，都要能显示：
-  //   · 完整外链（OBS，https://…）      —— 原样用
-  //   · '/api/files/…'（后端本地存储）—— 走 dev 代理/同域，直接用
-  //   · '/experts/…'（前端 public 目录）—— ★ 必须补 BASE_URL，
-  //     web 端部署在 /app/ 下，写死 /experts/… 会 404（表现为碎图或首字方块）
-  if (url && typeof url === 'string' && url.trim()) {
-    return url.startsWith('/experts/') ? assetUrl(url) : url
-  }
+  if (url && typeof url === 'string' && url.trim()) return url
   const id = Number(e?.expertId || 0)
-  return assetUrl(EXPERT_IMG[id]) || ''
+  return mediaUrl(EXPERT_IMG[id]) || ''
 }
 
 export function expertInitial(name) {
@@ -389,7 +395,7 @@ function knowledgeCover(k) {
 export function knowledgeKeywordPhoto(k) {
   const title = String(k?.title || '')
   const hit = KNOWLEDGE_TITLE_IMG.find((item) => item.keys.some((key) => title.includes(key)))
-  return hit ? assetUrl(hit.img) : ''
+  return hit ? mediaUrl(hit.img) : ''
 }
 
 /**
@@ -430,7 +436,7 @@ export function demandImage(d) {
   const cat = d?.category
   const pool = CATEGORY_IMG[cat] || ALL
   const id = Number(d?.demandId || 0)
-  return assetUrl(pool[(id || 1) % pool.length])
+  return mediaUrl(pool[(id || 1) % pool.length])
 }
 
 export function demandFallbackBg(d) {
@@ -501,12 +507,12 @@ const BANNER_DEFAULT = '/experts/banner-1.jpg'
 
 export function expertBanner(e) {
   const byId = BANNER_IMG[Number(e?.expertId || 0)]
-  if (byId) return assetUrl(byId)
+  if (byId) return mediaUrl(byId)
   const d = String(e?.expertDomain || '')
   const hit = DOMAIN_BANNER.find(([k]) => d.includes(k))
-  return assetUrl(hit ? hit[1] : BANNER_DEFAULT)
+  return mediaUrl(hit ? hit[1] : BANNER_DEFAULT)
 }
 
-// 导出时也过 assetUrl：调用方拿到就能直接塞进 `src`，不必再关心构建 base。
+// 导出时也过 mediaUrl：调用方拿到就能直接塞进 `src`，不必再关心存储路径。
 // （当前仓库内无引用，保留是为了不破坏原有对外 API。）
-export const ALL_PRODUCT_IMAGES = ALL.map((p) => assetUrl(p))
+export const ALL_PRODUCT_IMAGES = ALL.map((p) => mediaUrl(p))

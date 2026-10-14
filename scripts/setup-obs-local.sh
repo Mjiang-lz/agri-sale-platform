@@ -56,6 +56,13 @@ umask 077
   printf '# 由 scripts/setup-obs-local.sh 生成于 %s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
   printf '# 关闭 OBS：bash scripts/setup-obs-local.sh --off\n'
   printf '#\n'
+  printf '# ⚠️⚠️ 本脚本会**整份覆盖**这个文件，手写的注释与说明都会丢失。\n'
+  printf '#\n'
+  printf '# ★ 2026-10-14 起本机默认应当**关闭** OBS（图片已统一收归后端存储，\n'
+  printf '#   地址是 /api/files/…）。切回 OBS 会让历史图片全部取不到：\n'
+  printf '#   WebResourceConfig 与 PublicEndpoints 都带 @ConditionalOnProperty(enabled=false)，\n'
+  printf '#   OBS 模式下 /files/** 路由压根不注册。确认要切回 OBS 再跑本脚本。\n'
+  printf '#\n'
   printf '# 这个文件只对本机生效：application.yml 里 `include: local` 是追加语义，\n'
   printf '# 文件不存在时 Spring 只是找不到配置、不报错，所以队友 clone 下来仍走本地磁盘。\n\n'
   printf 'rxt:\n  obs:\n    enabled: true\n'
