@@ -159,12 +159,39 @@ else
   note "落地页无 localhost:5173" "OK"
 fi
 
-# ③ 商品图逐名 diff（★ 不要写死条数：条数会变，而「少一个文件」只有 diff 能报出来）
-if diff -q <(/bin/ls -1 frontend-web/public/products) <(/bin/ls -1 "${R}/www/app/products") >/dev/null; then
-  note "业务端商品图与源码逐名一致" "OK"
-else
-  bad "业务端商品图与源码逐名一致" "有条目差异"
+# ③ 图片逐名 diff
+#   ★ 2026-10-14：业务端不再自带 public/products/knowledge/experts，
+#   图片已全部收归后端存储（jar 内 seed-media/）。所以这里改成核对
+#   「jar 内 seed-media 与源码逐名一致」—— 漏打一次种子图，服务器上
+#   /api/files/products/… 就整批取不到，而后台上传功能正常、图片列表为空，
+#   排查起来极难看出来源。
+#   ★ 不要写死条数：条数会变，而「少一个文件」只有 diff 能报出来。
+if [ -d backend/src/main/resources/seed-media ]; then
+  src_n=$(find backend/src/main/resources/seed-media -type f | wc -l | tr -d ' ')
+  if [ "${WITH_JAR}" = "1" ] && [ -f "${R}/app.jar" ]; then
+    jar_n="$(unzip -Z1 "${R}/app.jar" | /usr/bin/grep -c '^BOOT-INF/classes/seed-media/.*[^/]$' || true)"
+    jar_n="$(printf '%s' "${jar_n}" | tr -dc '0-9')"
+    if [ "${src_n}" = "${jar_n}" ]; then
+      note "jar 内图片种子与源码逐名一致" "OK ${src_n} 个"
+    else
+      bad "jar 内图片种子与源码逐名一致" "src=${src_n} jar=${jar_n}"
+    fi
+  else
+    note "图片种子（本次未装 jar，跳过核对）" "源码 ${src_n} 个"
+  fi
 fi
+#   反向断言：业务端不应再自带这三份图。图片已收归后端，前端留一份就成了
+#   「两份各改一次」的同源副本 —— 这正是本次要消灭的问题本身。
+leaked=""
+for d in products knowledge experts; do
+  [ -d "frontend-web/public/${d}" ] && leaked="${leaked} ${d}/"
+done
+if [ -z "${leaked}" ]; then
+  note "业务端未自带图片副本（已收归后端）" "OK"
+else
+  bad "业务端不应再有 public/ 下的图片" "发现：${leaked# }"
+fi
+#   落地页仍是独立静态站、自带 31 张（暗色设计体系，与业务端不共用），保留原核对
 if [ -d frontend-landing/public/products ]; then
   if diff -q <(/bin/ls -1 frontend-landing/public/products) <(/bin/ls -1 "${R}/www/products") >/dev/null; then
     note "落地页商品图与源码逐名一致" "OK"
