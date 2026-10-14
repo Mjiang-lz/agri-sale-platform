@@ -92,23 +92,28 @@ rxt:
   ai:
     # 大模型助手（DeepSeek），用于业务端「专家问答」页的农户自助咨询。
     #
-    # ★ 开关默认 false，与上面的 obs.enabled 同一条纪律：
-    #   仓库保持「clone 下来就能跑」——队友没有 API Key 也能起后端，
-    #   只是问答页不显示「问 AI 助手」这个入口，不会报错、也不会卡住启动。
-    #   要启用：export RXT_AI_ENABLED=true 与 RXT_AI_API_KEY=sk-xxx 后再重启后端。
-    enabled: ${RXT_AI_ENABLED:false}
+    # ★ 开关默认 **true**（2026-10-14 改）：AI 助手已随本文件进 jar，
+    #   服务器上不再需要在启动命令里传 RXT_AI_ENABLED / RXT_AI_API_KEY，
+    #   覆盖 jar + 重启即可用。
+    #   想临时关掉（比如省 token、或 key 失效）：export RXT_AI_ENABLED=false 后再重启。
+    enabled: ${RXT_AI_ENABLED:true}
     # DeepSeek 的 OpenAI 兼容地址。换成别家兼容 OpenAI 协议的服务时只改这里。
     base-url: ${RXT_AI_BASE_URL:https://api.deepseek.com}
     #
-    # ★ 密钥不进版本库（《概要设计说明书》§8.3），与 OBS 的 AK/SK、jwt.secret 同一条纪律。
-    #   这里只声明变量名，值一律留空：
-    #     export RXT_AI_API_KEY=sk-xxxxxxxx
-    #   或在 application-local.yml（已 gitignore）里写 rxt.ai.api-key。
+    # ★ 密钥**已随本文件进版本库与 jar**（2026-10-14 改）。取舍如下，说清楚免得日后误判：
+    #   · 目的 = 让服务器「覆盖 jar + 重启」就能用 AI，不必再碰启动命令、不必传环境变量。
+    #     沿用的是本文件里 rxt.jwt.secret 已有的写法（默认字面量 + ${VAR:默认} 占位符）。
+    #   · 暴露面 = **任何拿到本仓库或该 jar 的人都能用它**。这是有意接受的：
+    #     服务器是个人部署、不对外分发 jar（Nginx root 指向 www/，app.jar 在 web 根之外，
+    #     下载不到），仓库也只在项目成员范围内。代价仅为少量 token 费用。
+    #   · 一旦要对外发包/开源，必须先把这个默认值改回空串：
+    #       api-key: ${RXT_AI_API_KEY:}
+    #     改法与 OBS 的 AK/SK、jwt.secret 一样，用环境变量覆盖。
     #
     #   为什么这个密钥尤其不能进前端：前端的 VITE_* 变量会在构建时被内联进 JS 产物，
     #   等于把「可以扣钱的凭据」公开在 /app/assets/*.js 里，而落地页还是免登录的。
-    #   所以浏览器只与本站的 /api/ai/** 通信，密钥只存在于服务端进程内存中。
-    api-key: ${RXT_AI_API_KEY:}
+    #   所以浏览器只与本站的 /api/ai/** 通信，密钥只存在于服务端进程与 jar 内。
+    api-key: ${RXT_AI_API_KEY:sk-5d0a3ae2ff3d4b21a285f86aec025e5c}
     #
     # ★ 模型名：旧的 deepseek-chat / deepseek-reasoner 已于 2026-07-24 停用，调用会直接失败。
     #   当前可用 deepseek-flash（= V4.1-Flash，日常问答性价比最高）
