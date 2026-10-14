@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.HashMap;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -67,12 +69,27 @@ public class MediaSeedInitializer implements ApplicationRunner {
         int copied = 0;
         int skipped = 0;
         int failed = 0;
+        // 已经确认建不出来的目录：同一目录只试一次，避免 41 张图刷 41 条一样的 WARN
+        Map<Path, String> brokenDirs = new HashMap<>();
 
         try {
             Resource[] resources = resolver.getResources(SEED_PATTERN);
             for (Resource resource : resources) {
+                // ★★ 必须先跳过目录！`classpath:/seed-media/**/*` 会把**目录本身**也枚举进来
+                //   （实测：products/、experts/、knowledge/、knowledge/2026/、knowledge/2026/10/
+                //    正好 5 个，与 83 张图相加 = 88 —— 这就是日志里那个「失败 88 张」的来历）。
+                //   漏掉这一句的后果：对目录执行 Files.copy 抛「Is a directory」，
+                //   5 个目录各占一条 WARN，而 83 张真正该拷的图**反倒因为目录项排在前面
+                //   （字母序 experts < knowledge < products）而显得像"一张都没拷"**。
+                if (!resource.isReadable()) {
+                    continue;
+                }
                 String objectKey = objectKeyOf(resource);
                 if (objectKey == null || objectKey.isEmpty()) {
+                    continue;
+                }
+                // 以 / 结尾的是目录项；再判一次 contentLength == 0 兜住某些文件系统
+                if (objectKey.endsWith("/")) {
                     continue;
                 }
                 Path target = root.resolve(objectKey).normalize();
@@ -88,7 +105,7 @@ public class MediaSeedInitializer implements ApplicationRunner {
                     continue;
                 }
                 try {
-                    makeDirectory(target.getParent());
+                    makeDirectory(target.getParent(), brokenDirs);
                     try (InputStream in = resource.getInputStream()) {
                         Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
                     }
@@ -96,6 +113,12 @@ public class MediaSeedInitializer implements ApplicationRunner {
                 } catch (IOException e) {
                     // 单张失败不该让整个铺底中断：少一张图是页面上的一个裂图，
                     // 而抛异常会导致应用启动失败 —— 后者影响面大得多
+                    //
+                    // ★ brokenDirs 让「同一个父目录不可写」只报一次：
+                    //   否则 uploads/products 被一个同名文件挡住时，
+                    //   41 张 products 之后 knowledge 与 experts 也会各刷一遍同样的栈，
+                    //   88 条 WARN 里 87 条是噪音，真正有用的那 1 条反而被埋掉了。
+                    //   挡住的目录整块跳过，不影响另外两个目录正常铺完。
                     log.warn("媒体种子：复制失败 objectKey = {}", objectKey, e);
                     failed++;
                 }
@@ -119,6 +142,9 @@ public class MediaSeedInitializer implements ApplicationRunner {
                             + "页面上的对应位置会显示裂图。上面的 WARN 有具体原因，"
                             + "最常见的是磁盘写权限不足或同名文件挡住了目录。",
                     failed, root);
+            for (Map.Entry<Path, String> entry : brokenDirs.entrySet()) {
+                log.warn("媒体种子：   被挡住的目录 {} —— {}", entry.getKey(), entry.getValue());
+            }
         }
     }
 
@@ -131,19 +157,27 @@ public class MediaSeedInitializer implements ApplicationRunner {
      * 日志刷出 88 条栈，最后只剩一句「新增 0 张，失败 88 张」——
      * 症状是「83 张一张没铺」，但日志里既没有说清是哪个路径挡着，也看不出该怎么办。
      *
-     * <p>所以这里：① 先判一次「存在且是目录」直接返回；② 存在但是普通文件时**只报一次**
-     * 并抛一个说人话的异常，把「删掉那个文件」这个动作直接写进日志 ——
-     * 与其让 83 条一样的栈刷屏，不如第一条就讲清楚。
+     * <p>{@code brokenDirs} 记下已经失败过的目录，后续同一目录直接跳过而不重复尝试 ——
+     * 一个不可写的目录重复试 41 次，除了刷屏没有别的作用。
+     *
+     * @param dir 目标父目录
+     * @param brokenDirs 已确认不可用的目录（原地累加）
      */
-    private void makeDirectory(Path dir) throws IOException {
+    private void makeDirectory(Path dir, Map<Path, String> brokenDirs) throws IOException {
+        String broken = brokenDirs.get(dir);
+        if (broken != null) {
+            throw new IOException(broken);
+        }
         if (Files.isDirectory(dir)) {
             return;
         }
         if (Files.exists(dir)) {
-            throw new IOException(String.format(
+            String message = String.format(
                     "路径被一个非目录的文件挡住了：%s（%d 字节）。"
-                            + "请删掉它后重启 —— 它不是本程序该写的位置。",
-                    dir.toAbsolutePath(), Files.size(dir)));
+                            + "请删掉它后重启 —— 它不是本程序该写的位置。同目录其余图片已跳过。",
+                    dir.toAbsolutePath(), Files.size(dir));
+            brokenDirs.put(dir, message);
+            throw new IOException(message);
         }
         Files.createDirectories(dir);
     }
