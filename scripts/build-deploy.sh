@@ -197,11 +197,36 @@ if [ "${WITH_JAR}" = "1" ]; then
   else
     note "jar 内不含 application-local.yml" "OK"
   fi
+  # ★ 2026-10-14 起不再断言「jar 内无 sk- 形态密钥」。
+  #   起因：业务端 AI 助手要「覆盖 jar + 重启就能用」，于是把 DeepSeek key 作为
+  #   **默认值**写进了 application.yml（与本文件里 rxt.jwt.secret 同一套路）。
+  #   原断言会直接把包拦住 —— 它保护的东西，正是我们自己刚决定要放进去的东西。
+  #
+  #   换成两条**仍有意义**的断言：
+  #   ① jar 内的 application.yml 与源码逐字一致（sha256 比对）
+  #      —— 证明「源码里改的」真的进了 jar，而不是被资源过滤替换成了占位符。
+  #      这是原断言的**本意**（原注释也写了「还要确认 application.yml 没被误伤」），
+  #      只是当时用「有没有 sk-」这种间接信号来判断，绕了一圈还容易假阳性。
+  #   ② AI key 在 jar 里**恰好一处**（多处说明有人复制粘贴留下了残渣）
+  src_yml="backend/src/main/resources/application.yml"
+  src_sum="$(shasum -a 256 "${src_yml}" | cut -d' ' -f1)"
+  jar_sum="$( { unzip -p "${R}/app.jar" BOOT-INF/classes/application.yml || true; } | shasum -a 256 | cut -d' ' -f1)"
+  if [ "${src_sum}" = "${jar_sum}" ]; then
+    note "jar 内 application.yml 与源码一致" "OK"
+  else
+    bad "jar 内 application.yml 与源码一致" "src=${src_sum:0:12} jar=${jar_sum:0:12}"
+  fi
   # ★ 末尾的 `|| true` 不能省：脚本开了 `set -o pipefail`，而 grep 零命中会返回非 0，
   #   经管道传下去会让整条赋值语句失败 ⇒ `set -e` 直接中断脚本（静默「跑一半就停」）。
   #   这类「管道把退出码传下去」的坑在本项目出现过多次，凡「期望可能为空」的 grep 都要兜。
   n_sk="$( { unzip -p "${R}/app.jar" | /usr/bin/grep -aoE 'sk-[A-Za-z0-9_-]{20,}' || true; } | wc -l | tr -d ' ')"
-  if [ "${n_sk}" = "0" ]; then note "jar 内无 sk- 形态密钥" "OK"; else bad "jar 内无 sk- 形态密钥" "${n_sk} 处命中"; fi
+  if [ "${n_sk}" = "1" ]; then
+    note "jar 内 AI key 恰好一处" "OK"
+  elif [ "${n_sk}" = "0" ]; then
+    bad "jar 内 AI key 恰好一处" "0 处 —— AI 配置没打进包，问答会不可用"
+  else
+    bad "jar 内 AI key 恰好一处" "${n_sk} 处 —— 有重复残留"
+  fi
   note "jar sha256(前16)" "$(shasum -a 256 "${R}/app.jar" | cut -c1-16)"
 fi
 
