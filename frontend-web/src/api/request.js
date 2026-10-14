@@ -51,6 +51,28 @@ function explainServerError(path, fallback) {
   return `${fallback}（服务端异常，重试无效；请稍后再试或联系管理员）`
 }
 
+/**
+ * 后端「没有具体信息」的兜底文案。
+ *
+ * ★ 为什么要有这个判断：本项目的 `ResultCode.BIZ_ERROR` 就是 **500**，
+ *   而后端的 `BizException` 大量用来表达**用户自己能改正**的业务校验
+ *   （「验证码不正确或已过期」「该手机号已注册」……）。如果凡是 code 500 都套上
+ *   「服务端异常，重试无效；请联系管理员」，就等于把一个「看错了一个字」的问题
+ *   宣布成系统故障 —— 用户会去重试、去等、去联系管理员，唯独不会去改输入。
+ *
+ * 所以只有后端给的是**通用兜底**（等于没说）时才做翻译；后端已经说清楚的，
+ * 原样透出，那句话本身就是最好的提示。
+ */
+const GENERIC_SERVER_MESSAGES = new Set([
+  '业务处理失败', // ResultCode.BIZ_ERROR 的默认文案
+  '系统繁忙，请稍后重试', // ResultCode.SYSTEM_ERROR
+  '请求失败' // 本文件的兜底
+])
+
+function isGenericServerMessage(msg) {
+  return !msg || GENERIC_SERVER_MESSAGES.has(msg)
+}
+
 request.interceptors.response.use(
   (response) => {
     const body = response.data
@@ -63,8 +85,9 @@ request.interceptors.response.use(
     }
 
     const raw = body.message || '请求失败'
-    // 500 走服务端异常的翻译；其余（400 参数错/403 无权限等）后端文案本身已经足够具体
-    const message = body.code === 500
+    // 500 走服务端异常的翻译；其余（400 参数错/403 无权限等）后端文案本身已经足够具体。
+    // ★ 且只翻译「通用兜底」文案 —— 详见 isGenericServerMessage 的说明。
+    const message = body.code === 500 && isGenericServerMessage(raw)
       ? explainServerError(response.config?.url, raw)
       : raw
 

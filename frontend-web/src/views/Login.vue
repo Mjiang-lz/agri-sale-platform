@@ -40,8 +40,14 @@
         />
       </el-form-item>
       <!-- 图形验证码：每次提交都会一次性消费掉这个 key，所以成功/失败后都要刷新。
-           ★ v-model 用 captchaKey 而非 key —— key 是 Vue 保留属性，用它双向绑定会静默失效 -->
-      <CaptchaField ref="captchaRef" v-model:captcha-key="form.captchaKey" v-model:captcha-code="form.captchaCode" @submit="onSubmit" />
+           ★ v-model 用 captchaKey 而非 key —— key 是 Vue 保留属性，用它双向绑定会静默失效。
+           ★★ 这里**刻意不接** @submit：CaptchaField 的输入框自己 emit('submit')，
+              而它就在本表单内部，回车事件同时还会冒泡到 el-form 的 @keyup.enter ——
+              两边都接 onSubmit 就会**同一瞬间提交两次**。验证码是一次性凭据，
+              第一次成功、第二次必然判「验证码不正确」，表现为「登录成功」旁边
+              同时弹一条红色的验证码错误。表单级 @keyup.enter 已覆盖所有输入框，
+              所以只留它一个入口。 -->
+      <CaptchaField ref="captchaRef" v-model:captcha-key="form.captchaKey" v-model:captcha-code="form.captchaCode" />
       <el-form-item class="auth-submit">
         <el-button type="primary" :loading="loading" @click="onSubmit">登 录</el-button>
       </el-form-item>
@@ -93,28 +99,47 @@ const registerLink = computed(() => {
   return dest === '/' ? '/register' : { path: '/register', query: { redirect: dest } }
 })
 
-async function onSubmit() {
-  // EP 的 validate() 在失败时 reject；当布尔用必须先把异常吃掉，
-  // 否则表单没填全就直接抛出去，后面的 loading 逻辑根本不执行。
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
-  // 验证码单独校验：图没出来 / 没填都在这里拦，消息口径与后端一致
-  if (!captchaRef.value.validate()) return
+/**
+ * 防重入闸门。
+ *
+ * ★ 为什么必须是一个**同步**标志：`loading` 是在 await 之后才置真的，两次
+ *   几乎同时的提交都能越过 `loading` 的检查。而验证码是**一次性凭据** ——
+ *   第一次把 key 消费掉，第二次必然被判「验证码不正确或已过期」，于是
+ *   「登录成功」的绿条旁边会同时冒出一条红色的验证码错误，看起来像登录失败了。
+ *
+ * 可能触发重入的路径有三条：表单 @keyup.enter 与验证码输入框的 emit 同时触发、
+ * 用户快速双击「登录」按钮、以及回车后立刻又点了按钮。一个标志全部挡掉。
+ */
+let submitting = false
 
-  loading.value = true
+async function onSubmit() {
+  if (submitting) return
+  submitting = true
   try {
-    const data = await request.post('/auth/login', form)
-    userStore.saveLogin(data)
-    ElMessage.success('登录成功')
-    router.push(safeRedirect())
-    // 这个 key 已被一次性消费，换一张新的，别让下次进页面看到一张废图
-    captchaRef.value.refresh()
-  } catch {
-    // 失败提示由 request 拦截器统一弹出（业务错误 / 网络异常都在那儿），这里不重复弹
-    // 但验证码必须刷新：key 无论对错都已被消费，不换图用户会一直卡在同一个废 key 上
-    captchaRef.value.refresh()
+    // EP 的 validate() 在失败时 reject；当布尔用必须先把异常吃掉，
+    // 否则表单没填全就直接抛出去，后面的 loading 逻辑根本不执行。
+    const valid = await formRef.value.validate().catch(() => false)
+    if (!valid) return
+    // 验证码单独校验：图没出来 / 没填都在这里拦，消息口径与后端一致
+    if (!captchaRef.value.validate()) return
+
+    loading.value = true
+    try {
+      const data = await request.post('/auth/login', form)
+      userStore.saveLogin(data)
+      ElMessage.success('登录成功')
+      router.push(safeRedirect())
+      // 这个 key 已被一次性消费，换一张新的，别让下次进页面看到一张废图
+      captchaRef.value.refresh()
+    } catch {
+      // 失败提示由 request 拦截器统一弹出（业务错误 / 网络异常都在那儿），这里不重复弹
+      // 但验证码必须刷新：key 无论对错都已被消费，不换图用户会一直卡在同一个废 key 上
+      captchaRef.value.refresh()
+    } finally {
+      loading.value = false
+    }
   } finally {
-    loading.value = false
+    submitting = false
   }
 }
 </script>

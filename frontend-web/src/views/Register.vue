@@ -43,8 +43,12 @@
           <el-option v-for="r in ROLES" :key="r" :label="r" :value="r" />
         </el-select>
       </el-form-item>
-      <!-- ★ v-model 用 captchaKey 而非 key —— key 是 Vue 保留属性，用它双向绑定会静默失效 -->
-      <CaptchaField ref="captchaRef" v-model:captcha-key="form.captchaKey" v-model:captcha-code="form.captchaCode" @submit="onSubmit" />
+      <!-- ★ 刻意不接 @submit：CaptchaField 的输入框自己 emit('submit')，而它就在本表单
+           内部，回车还会冒泡到 el-form 的 @keyup.enter —— 两边都接 onSubmit 会
+           **同一瞬间提交两次**。注册接口的验证码同样是一次性凭据，第二次必被判
+           「验证码不正确」，会出现「注册成功」旁边又弹红色报错的怪象。
+           表单级 @keyup.enter 已覆盖所有输入框，只留它一个入口。 -->
+      <CaptchaField ref="captchaRef" v-model:captcha-key="form.captchaKey" v-model:captcha-code="form.captchaCode" />
       <el-form-item class="auth-submit">
         <el-button type="primary" :loading="loading" @click="onSubmit">注 册</el-button>
       </el-form-item>
@@ -99,23 +103,32 @@ const loginLink = computed(() => {
   return dest && dest !== '/' ? { path: '/login', query: { redirect: dest } } : '/login'
 })
 
-async function onSubmit() {
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
-  if (!captchaRef.value.validate()) return
+/** 防重入闸门。理由同 Login.vue：验证码是一次性凭据，重复提交必然第二次失败。 */
+let submitting = false
 
-  loading.value = true
+async function onSubmit() {
+  if (submitting) return
+  submitting = true
   try {
-    await request.post('/auth/register', form)
-    ElMessage.success('注册成功，请登录')
-    router.push(loginLink.value)
-    // key 已被一次性消费，换一张新的（此时往往紧接着就要填登录表单）
-    captchaRef.value.refresh()
-  } catch {
-    // 失败提示由 request 拦截器统一弹出（如「该手机号已注册」），这里不重复弹
-    captchaRef.value.refresh()
+    const valid = await formRef.value.validate().catch(() => false)
+    if (!valid) return
+    if (!captchaRef.value.validate()) return
+
+    loading.value = true
+    try {
+      await request.post('/auth/register', form)
+      ElMessage.success('注册成功，请登录')
+      router.push(loginLink.value)
+      // key 已被一次性消费，换一张新的（此时往往紧接着就要填登录表单）
+      captchaRef.value.refresh()
+    } catch {
+      // 失败提示由 request 拦截器统一弹出（如「该手机号已注册」），这里不重复弹
+      captchaRef.value.refresh()
+    } finally {
+      loading.value = false
+    }
   } finally {
-    loading.value = false
+    submitting = false
   }
 }
 </script>
