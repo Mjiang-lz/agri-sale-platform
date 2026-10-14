@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import request from '@/api/request'
 import { useUserStore } from '@/store/user'
 import { isPendingApply } from '@/constants/finance'
@@ -27,6 +27,10 @@ import { isPendingApply } from '@/constants/finance'
  *
  * 失败策略：每一条独立 try/catch，某一条挂掉不影响其它条目；整体异常时**保留上一次
  * 的结果**，不清空 —— 否则网络抖一下铃铛就从 3 跳成 0，比不显示更糟。
+ *
+ * ★ 已读红点：`total` 是**未读**条数之和，不是待办总数。点「全部已读」或点开某条
+ *   即把当前条数写成基线（见下方 READ_PREFIX 的说明）。★ 面板里**始终列出全部待办**，
+ *   已读的只是不再计入角标 —— 「红点消失」绝不能变成「待办消失」，那才是真的漏事。
  */
 
 const items = ref([])
@@ -44,14 +48,68 @@ const orderStatusOf = (o) => o?.orderStatus || o?.status || ''
 
 const countBy = (rows, want) => rows.filter((r) => want.includes(orderStatusOf(r))).length
 
+/**
+ * 「已读」基线：key = `rxt_msg_read_<userId>`，值 = `{ [待办 key]: 我确认过的条数 }`。
+ *
+ * ★ 为什么是 localStorage 而不是加一张通知表：这里的「消息」并不是真的消息，
+ *   而是从后端业务数据**实时派生**出来的待办（见文件开头说明）。服务端没有
+ *   可挂「已读」字段的实体；而「这批待办我看过了」本质上是**这台浏览器上
+ *   这个人的视图状态**，放客户端既够用，又不必为它加表加接口。
+ *
+ * ★ 为什么记「条数」而不是一个布尔：布尔区分不了「我看过了」和「之后又多了几条」。
+ *   记条数才做得到「已读 → 处理掉 1 条 → 又来 1 条」时重新亮红点。
+ *
+ * ★ 按 userId 分开存：同一台浏览器上换个账号登录，不应继承上一个人的已读状态。
+ */
+const READ_PREFIX = 'rxt_msg_read_'
+
+function loadReadMap(userId) {
+  if (!userId) return {}
+  try {
+    const raw = localStorage.getItem(READ_PREFIX + userId)
+    const obj = raw ? JSON.parse(raw) : null
+    return obj && typeof obj === 'object' ? obj : {}
+  } catch {
+    // 存坏了就当没读过，最多多亮一次红点，不能让整个消息面板跟着挂掉
+    return {}
+  }
+}
+
+function saveReadMap(userId, map) {
+  if (!userId) return
+  try {
+    localStorage.setItem(READ_PREFIX + userId, JSON.stringify({ ...map }))
+  } catch {
+    // 隐私模式 / 配额满：红点消退不了，但功能本身不该报错
+  }
+}
+
 export function useMessages() {
   const userStore = useUserStore()
 
   const role = computed(() => userStore.profile?.roleName || '')
   const perms = computed(() => String(userStore.menuPerms || '').split(',').filter(Boolean))
 
-  /** 铃铛角标：待办条数之和（比「有几条分组」更能说明有多少事要做） */
-  const total = computed(() => items.value.reduce((n, i) => n + (i.count || 0), 0))
+  /* ---------------- 「已读」基线 ---------------- */
+  const userId = computed(() => userStore.profile?.userId || '')
+  const readMap = ref({})
+  // 换账号要换一份基线。immediate 保证首次进入（profile 可能还没到位）也能读到
+  watch(userId, (id) => { readMap.value = loadReadMap(id) }, { immediate: true })
+
+  /** 某条待办还剩几条「没看过」。条数回落到基线及以下 → 视为已读 */
+  function unreadOf(item) {
+    return Math.max(0, (item?.count || 0) - (readMap.value[item?.key] || 0))
+  }
+
+  /** 铃铛角标：**未读**待办条数之和（比「有几条分组」更能说明还有多少事要看） */
+  const total = computed(() => items.value.reduce((n, i) => n + unreadOf(i), 0))
+
+  /**
+   * 待办总条数（不分读没读）。面板标题用它。
+   * ★ 与 total 分开是刻意的：红点可以被「全部已读」清掉，但待办本身不会因此消失 ——
+   *   标题必须继续如实报出「还有几件事要做」，否则清红点就等于把待办藏起来。
+   */
+  const pendingTotal = computed(() => items.value.reduce((n, i) => n + (i.count || 0), 0))
 
   const canTrade = computed(() => perms.value.includes('trade') || role.value === '管理员')
   const isExpert = computed(() => role.value === '专家')
@@ -202,6 +260,19 @@ export function useMessages() {
         }
       }
 
+      // ★ 基线只跟降、不跟升：条数比上次确认的少了，说明用户确实处理掉了一部分，
+      //   把基线跟着降下来。否则「3 条已读 → 处理掉 1 条 → 又来 1 条」会回到 3，
+      //   与基线相等，新增的那条被静默吞掉、永远不提醒。
+      let baselineChanged = false
+      next.forEach((it) => {
+        const ack = readMap.value[it.key] || 0
+        if ((it.count || 0) < ack) {
+          readMap.value[it.key] = it.count || 0
+          baselineChanged = true
+        }
+      })
+      if (baselineChanged) saveReadMap(userId.value, readMap.value)
+
       items.value = next
       loaded.value = true
       lastLoadAt = Date.now()
@@ -212,5 +283,19 @@ export function useMessages() {
     }
   }
 
-  return { items, total, loading, load }
+  /** 全部标记为已读：把每条当前的条数写成基线，红点随即归零 */
+  function markAllRead() {
+    items.value.forEach((it) => { readMap.value[it.key] = it.count || 0 })
+    saveReadMap(userId.value, readMap.value)
+  }
+
+  /** 标记单条已读。点进某条待办时调用 —— 用户已经看到它了 */
+  function markRead(key) {
+    const it = items.value.find((i) => i.key === key)
+    if (!it) return
+    readMap.value[key] = it.count || 0
+    saveReadMap(userId.value, readMap.value)
+  }
+
+  return { items, total, pendingTotal, loading, load, unreadOf, markAllRead, markRead }
 }

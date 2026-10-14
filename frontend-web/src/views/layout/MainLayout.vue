@@ -184,13 +184,16 @@
             <div class="msg-panel" v-loading="msgLoading">
               <header class="msg-head">
                 <strong>消息提醒</strong>
-                <span>{{ msgTotal ? `${msgTotal} 项待处理` : '暂无待处理' }}</span>
+                <!-- ★ 标题报「待办总数」（不含已读概念），角标才报未读。
+                     清红点不能让「还有几件事要做」一起消失 -->
+                <span>{{ msgPendingTotal ? `${msgPendingTotal} 项待处理` : '暂无待处理' }}</span>
               </header>
               <ul v-if="msgItems.length" class="msg-list">
                 <li
                   v-for="m in msgItems"
                   :key="m.key"
                   class="msg-item"
+                  :class="{ 'is-read': !unreadOf(m) }"
                   @click="goMessage(m)"
                 >
                   <span class="msg-dot" :class="`is-${m.tone}`"></span>
@@ -203,7 +206,15 @@
               </ul>
               <p v-else class="msg-empty">当前没有需要你处理的事项</p>
               <footer class="msg-foot">
-                <span>按当前账号角色实时汇总，点条目进入对应页面</span>
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="!msgTotal"
+                  title="把当前待办标记为已看，消除铃铛上的红点"
+                  @click="markAllRead"
+                >
+                  全部已读
+                </el-button>
                 <el-button link type="primary" :loading="msgLoading" @click="loadMessages(true)">刷新</el-button>
               </footer>
             </div>
@@ -337,7 +348,16 @@ if (actualRole.value === '专家') {
 
 /* ---------- 消息提醒（顶栏铃铛） ---------- */
 const msgOpen = ref(false)
-const { items: msgItems, total: msgTotal, loading: msgLoading, load: loadMessages } = useMessages()
+const {
+  items: msgItems,
+  total: msgTotal,
+  pendingTotal: msgPendingTotal,
+  loading: msgLoading,
+  load: loadMessages,
+  unreadOf,
+  markAllRead,
+  markRead
+} = useMessages()
 // 进页面就拉一次，铃铛上的角标不必等用户点开才出现
 loadMessages()
 
@@ -364,9 +384,14 @@ function handleLogout() {
   router.push('/login')
 }
 
-/** 点消息条目：关掉浮层再跳，否则浮层会挂在登录页/目标页上一瞬 */
+/**
+ * 点消息条目：关掉浮层再跳，否则浮层会挂在登录页/目标页上一瞬。
+ * ★ 同时把这条标记为已读 —— 用户已经点开看过了，铃铛不该继续为它亮着。
+ *   条目本身仍留在列表里（待办不会因为「看过」就消失）。
+ */
 function goMessage(m) {
   msgOpen.value = false
+  if (m?.key) markRead(m.key)
   if (m?.path) router.push(m.path)
 }
 </script>
@@ -468,6 +493,11 @@ function goMessage(m) {
 .msg-go { flex: none; margin-top: 2px; color: var(--rxt-primary); }
 
 .msg-empty { margin: 0; padding: 30px 16px; text-align: center; font-size: 13px; color: var(--rxt-ink-weak); }
+
+/* 已读的待办：圆点褪成中性色。★ 只弱化圆点，不隐藏条目、不降整行透明度 ——
+   「看过了」不等于「不用做了」，条目仍要能被点进去 */
+.msg-item.is-read .msg-dot { background: var(--el-border-color); }
+.msg-item.is-read .msg-body strong { color: var(--rxt-ink-weak); }
 
 .msg-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;

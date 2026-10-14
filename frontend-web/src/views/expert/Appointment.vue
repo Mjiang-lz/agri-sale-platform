@@ -236,8 +236,13 @@ function disabledDate(date) { return date.getTime() < new Date().setHours(0, 0, 
  */
 async function loadAppointments() {
   appointmentError.value = ''
-  if (!canBookAppointment.value && !isExpert.value) {
-    // 非农户/专家身份没有预约记录可查，不必请求（后端也会 403）
+  if (!canBookAppointment.value) {
+    // 只有农户/管理员有「我的预约」可查。
+    // ★ 专家**绝不能**走这里：GET /expert/appointment/my 在 ExpertController 上写死
+    //   requireRole(FARMER)，专家一调必然吃 403「没有该操作的权限」，在页面右上角
+    //   弹一条红色提示 —— 而专家进本页时渲染的是 ExpertAppointmentPanel
+    //   （走 /expert/appointment/expert），下面这张表根本不显示，请求纯属自找报错。
+    //   原判据是 `!canBookAppointment && !isExpert`，把专家放了进来，正是这条误报的来源。
     appointments.value = []
     return
   }
@@ -247,7 +252,7 @@ async function loadAppointments() {
     appointments.value = Array.isArray(data) ? data : []
   } catch (err) {
     appointments.value = []
-    appointmentError.value = err?.message || '无法连接后端服务，请确认后端已启动后重试'
+    appointmentError.value = err?.message || '数据加载失败，请稍后刷新重试'
   } finally {
     loadingAppointments.value = false
   }
