@@ -82,6 +82,9 @@ public class PublicEndpoints {
             // 只放行 POST。登录/注册都是写操作，没有 GET 的必要。
             rule(HttpMethod.POST.name(), "/auth/login"),
             rule(HttpMethod.POST.name(), "/auth/register"),
+            // 管理后台登录：与业务端登录一样是「未登录才能走」的入口，必须放行，
+            // 否则要登录先进后台、进后台要先登录 —— 死循环。同样只放行 POST。
+            rule(HttpMethod.POST.name(), "/auth/admin/login"),
             // 图形验证码：登录/注册都要先取图，不放开就是死循环（要图先登录、要登录先要图）
             rule(HttpMethod.POST.name(), "/auth/captcha"),
 

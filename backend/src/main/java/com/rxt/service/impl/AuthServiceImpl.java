@@ -2,6 +2,7 @@ package com.rxt.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.rxt.common.BizException;
+import com.rxt.common.ResultCode;
 import com.rxt.dto.LoginDTO;
 import com.rxt.dto.RegisterDTO;
 import com.rxt.entity.Role;
@@ -76,7 +77,34 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginVO login(LoginDTO dto) {
         requireCaptcha(dto.getCaptchaKey(), dto.getCaptchaCode());
+        return authenticate(dto);
+    }
 
+    /**
+     * 管理后台登录：<b>不校验图形验证码</b>，但只接受管理员账号。
+     *
+     * <p>为什么单独开一个入口而不是在 {@link #login(LoginDTO)} 里跳过验证码：
+     * 管理后台与业务端共用 {@code POST /auth/login}，而业务端（农户 / 采购方 / 专家 / 银行）
+     * 的登录页仍保留验证码。若在这里按「有没有传验证码」来决定校不校验，
+     * 等于把开关交到调用方手上 —— 攻击者只要不传验证码就能绕过，验证码形同虚设。
+     * 拆成两个入口后，「业务端必须过验证码、后台不过」是<b>服务端写死的规则</b>，
+     * 且后台入口顺带把角色闸口收紧到管理员，非管理员连令牌都拿不到。</p>
+     */
+    @Override
+    public LoginVO adminLogin(LoginDTO dto) {
+        LoginVO vo = authenticate(dto);
+        if (!RoleConstant.ADMIN.equals(vo.getRoleName())) {
+            throw new BizException(ResultCode.FORBIDDEN.getCode(), "该账号不是平台管理员，无法进入管理后台");
+        }
+        log.info("管理后台登录成功 userId={} phone={}", vo.getUserId(), vo.getPhone());
+        return vo;
+    }
+
+    /**
+     * 手机号 + 密码校验并签发令牌。<b>不含验证码环节</b> —— 验证码属于「入口策略」，
+     * 由 {@link #login(LoginDTO)} / {@link #adminLogin(LoginDTO)} 各自决定要不要。
+     */
+    private LoginVO authenticate(LoginDTO dto) {
         User user = userMapper.selectOne(
                 Wrappers.<User>lambdaQuery().eq(User::getPhone, dto.getPhone()));
 
