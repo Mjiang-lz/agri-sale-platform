@@ -89,6 +89,53 @@ rxt:
     # 两种落点都在 .gitignore 的 uploads/ 规则覆盖内（该规则不带前导斜杠，匹配任意层级），不会误提交。
     local-dir: uploads
 
+  ai:
+    # 大模型助手（DeepSeek），用于业务端「专家问答」页的农户自助咨询。
+    #
+    # ★ 开关默认 false，与上面的 obs.enabled 同一条纪律：
+    #   仓库保持「clone 下来就能跑」——队友没有 API Key 也能起后端，
+    #   只是问答页不显示「问 AI 助手」这个入口，不会报错、也不会卡住启动。
+    #   要启用：export RXT_AI_ENABLED=true 与 RXT_AI_API_KEY=sk-xxx 后再重启后端。
+    enabled: ${RXT_AI_ENABLED:false}
+    # DeepSeek 的 OpenAI 兼容地址。换成别家兼容 OpenAI 协议的服务时只改这里。
+    base-url: ${RXT_AI_BASE_URL:https://api.deepseek.com}
+    #
+    # ★ 密钥不进版本库（《概要设计说明书》§8.3），与 OBS 的 AK/SK、jwt.secret 同一条纪律。
+    #   这里只声明变量名，值一律留空：
+    #     export RXT_AI_API_KEY=sk-xxxxxxxx
+    #   或在 application-local.yml（已 gitignore）里写 rxt.ai.api-key。
+    #
+    #   为什么这个密钥尤其不能进前端：前端的 VITE_* 变量会在构建时被内联进 JS 产物，
+    #   等于把「可以扣钱的凭据」公开在 /app/assets/*.js 里，而落地页还是免登录的。
+    #   所以浏览器只与本站的 /api/ai/** 通信，密钥只存在于服务端进程内存中。
+    api-key: ${RXT_AI_API_KEY:}
+    #
+    # ★ 模型名：旧的 deepseek-chat / deepseek-reasoner 已于 2026-07-24 停用，调用会直接失败。
+    #   当前可用 deepseek-flash（= V4.1-Flash，日常问答性价比最高）
+    #   与 deepseek-v4-pro（更强，约 4 倍价格）。本项目选 flash 且不开思考模式：
+    #   农技建议不需要长链推理，而思考模式要多花 2~3 倍输出 token、延迟升到 10~30 秒。
+    model: ${RXT_AI_MODEL:deepseek-flash}
+    # 连不上就快速失败，不要让用户对着转圈等 30 秒
+    connect-timeout-ms: 3000
+    read-timeout-ms: 30000
+    # 单次输出上限。农技建议 500 字足够，卡住它是控成本最有效的一招
+    max-output-tokens: 800
+    # 要稳不要花。★ 注意：思考模式下这个参数**不生效**（官方文档明确），所以它只在 thinking=false 时有意义
+    temperature: 0.3
+    #
+    # ★★ 必须保持 false。DeepSeek 的思考模式**默认打开、effort 默认 high**，
+    #    而思维链与最终回答**共用同一个输出上限**。不显式关掉时出现的失败极其迷惑：
+    #    HTTP 200、上游无报错、completion_tokens 正好打满、但 content 是**空字符串** ——
+    #    页面上什么都没有，而日志里没有任何异常。这条踩过一次，别再改回去。
+    thinking: ${RXT_AI_THINKING:false}
+    # 三层限额，防止一个演示账号（或一个手滑写的循环）把余额烧掉
+    per-user-per-hour: 20
+    per-user-per-day: 200
+    global-per-day: 500
+    # 随问题回传的历史轮数上限，1 轮 = 1 问 + 1 答；超出部分服务端丢弃
+    max-history-rounds: 3
+    max-question-chars: 500
+
   api-docs:
     # 接口文档（OpenAPI + Swagger UI）总开关。
     # 默认关：它需要把 /v3/api-docs** 与 /swagger-ui** 加进免登录白名单，

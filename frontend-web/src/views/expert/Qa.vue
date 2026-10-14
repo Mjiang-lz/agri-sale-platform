@@ -46,12 +46,25 @@
       <el-card shadow="never" class="ask-card">
         <template #header>
           <div class="card-head">
-            <div><strong>我要提问</strong><span>问题会进入专家工作台</span></div>
+            <div>
+              <strong>我要提问</strong>
+              <span>{{ askMode === 'ai' ? 'AI 即时给参考建议，不进入专家工作台' : '问题会进入专家工作台' }}</span>
+            </div>
           </div>
         </template>
 
+        <!-- ★ 问谁：由农户自己选。
+             ★ AI 未启用（后端 /ai/status 返回 enabled:false）时这一整块**不渲染** ——
+               宁可没有入口，也不要给一个点了就报错的按钮。这正是本页同一批改动里
+               「落地页资讯看起来能点却点不动」那条教训的用法。 -->
+        <el-radio-group v-if="aiEnabled" v-model="askMode" class="ask-mode">
+          <el-radio-button value="expert">问平台专家</el-radio-button>
+          <el-radio-button value="ai">问 AI 助手</el-radio-button>
+        </el-radio-group>
+
         <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-          <el-form-item label="指定专家（可不选）" prop="expertId">
+          <!-- 指定专家只在「问平台专家」时有意义：AI 模式没有指派对象 -->
+          <el-form-item v-if="askMode === 'expert'" label="指定专家（可不选）" prop="expertId">
             <el-select v-model="form.expertId" clearable placeholder="不选择则由平台分派" style="width: 100%">
               <el-option v-for="expert in expertOptions" :key="expert.expertId" :label="`${expert.realName} · ${expert.expertDomain}`" :value="expert.expertId" />
             </el-select>
@@ -63,21 +76,44 @@
               :rows="7"
               maxlength="500"
               show-word-limit
-              placeholder="请说明品种、当前现象、已采取的措施，以及希望专家重点判断的问题"
+              :placeholder="askMode === 'ai'
+                ? '例如：露地番茄坐果期叶子背面出现白粉状霉层，连续阴雨一周，该怎么办'
+                : '请说明品种、当前现象、已采取的措施，以及希望专家重点判断的问题'"
             />
           </el-form-item>
-          <el-button type="primary" size="large" :loading="submitting" style="width: 100%" @click="handleAsk">
-            提交问题
+
+          <!-- ★ 报错只在这一处渲染，且**不清空输入框**：AI 失败（超时/额度用完）时
+               用户最需要的是「我刚才写的那段话还在」，而不是重打一遍。
+               全局拦截器已经弹过一次 toast（err.notified），这里只补一条留在页面上的记录，
+               不复读、不重复弹。 -->
+          <el-alert
+            v-if="askMode === 'ai' && aiError"
+            class="ask-error"
+            :title="aiError"
+            type="warning"
+            :closable="false"
+            show-icon
+          />
+
+          <el-button
+            type="primary"
+            size="large"
+            :loading="askMode === 'ai' ? aiAsking : submitting"
+            style="width: 100%"
+            @click="handleSubmit"
+          >
+            {{ askMode === 'ai' ? '问 AI 助手' : '提交问题' }}
           </el-button>
         </el-form>
 
         <div class="ask-tip">
           <strong>提问小技巧</strong>
-          <p>描述越具体，专家越容易给出可执行建议。涉及用药时，请同时说明当前生育期和近期天气</p>
+          <p v-if="askMode === 'ai'">说明品种、生育期、当地天气和已经做过的处置，AI 的参考建议会更贴合你的地块</p>
+          <p v-else>描述越具体，专家越容易给出可执行建议。涉及用药时，请同时说明当前生育期和近期天气</p>
         </div>
       </el-card>
 
-      <section class="question-list-wrap">
+      <section v-if="askMode === 'expert'" class="question-list-wrap">
         <div class="list-head">
           <div><h3>我的问答</h3><span>共 {{ filteredQuestions.length }} 条记录</span></div>
           <el-segmented v-model="statusFilter" :options="statusOptions" />
@@ -108,6 +144,39 @@
           <el-empty v-if="!loading && !filteredQuestions.length" description="暂无问答记录，提交第一个问题吧" />
         </div>
       </section>
+
+      <!-- AI 模式的右栏：只放「本次会话」的问答。
+           ★ 刻意**不与「我的问答」混排**：那一边是数据库里的真实提问记录（t_question），
+             这一边是模型即时生成的参考意见，两者的可信度与留存期都不同。
+             放在一起会让人以为 AI 的回答也是平台留下的正式答复。 -->
+      <section v-else class="ai-thread-wrap">
+        <div class="list-head">
+          <div>
+            <h3>AI 助手问答</h3>
+            <span>{{ aiThread.length ? `本次会话 ${aiThread.length} 轮` : '回答由模型即时生成' }}</span>
+          </div>
+          <el-button v-if="aiThread.length" link @click="clearAiThread">清空记录</el-button>
+        </div>
+
+        <div v-loading="aiAsking" element-loading-text="AI 正在思考…" class="ai-thread">
+          <article v-for="item in aiThread" :key="item.id" class="ai-entry">
+            <p class="ai-question"><span class="ai-badge ai-badge-question">我的提问</span>{{ item.question }}</p>
+            <!-- white-space: pre-line 让模型输出的分段与换行保留下来。
+                 模型按提示词固定输出「现象判断 / 处置建议 / 注意事项」三段，
+                 若折叠成一个长句，这个结构就白设计了。 -->
+            <div class="ai-answer">
+              <span class="ai-badge">AI 助手</span>
+              <p>{{ item.answer }}</p>
+            </div>
+          </article>
+          <el-empty
+            v-if="!aiThread.length && !aiAsking"
+            description="还没有提问，试着描述一下地里的情况"
+          />
+        </div>
+
+        <p class="ai-disclaimer">AI 回答由模型生成，仅供参考。涉及用药与用量的最终判断，请咨询当地农技站或平台专家</p>
+      </section>
     </div>
   </div>
 </template>
@@ -118,14 +187,22 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import ExpertAnswerPanel from '@/components/expert/ExpertAnswerPanel.vue'
 import { askQuestion, getMyQuestions, getQuestionAnswers } from '@/api/expert'
+import { askAi, getAiStatus } from '@/api/ai'
 import { expertOptions, getExpert, getExpertName, useExperts } from '@/constants/experts'
 import { expertAvatar, expertInitial } from '@/utils/imagery'
 import { useUserStore } from '@/store/user'
 
 /**
  * 页面用途：专家问答。
- * 接口文件：frontend-web/src/api/expert.js
- * 数据来源：登录农户自己的 t_question 记录和对应的 t_answer 回答。
+ * 接口文件：frontend-web/src/api/expert.js、frontend-web/src/api/ai.js
+ * 数据来源：登录农户自己的 t_question 记录和对应的 t_answer 回答；
+ *           AI 问答不落库，只在本次浏览器会话内保留（见下方 AI_THREAD_KEY）。
+ *
+ * ★ 两种提问方式由农户自己选（askMode）：
+ *   - expert：走真实流程，问题进入专家工作台，回答落 t_answer；
+ *   - ai    ：只调大模型拿一条参考意见，**不写库、不对外发布**。
+ *   分开的原因不只是「谁回答」：两者的可信度、留存期、责任主体都不同，
+ *   混在一起会让农户以为 AI 的回答也是平台留下的正式答复。
  */
 const userStore = useUserStore()
 const router = useRouter()
@@ -137,6 +214,45 @@ const questions = ref([])
 const statusFilter = ref('全部')
 const statusOptions = ['全部', '待回复', '已回复']
 const form = reactive({ expertId: null, content: '' })
+
+// ——— AI 助手 ———
+/** 后端是否已启用 AI。false 时「问 AI 助手」这个选项整块不出现 */
+const aiEnabled = ref(false)
+const askMode = ref('expert')
+const aiAsking = ref(false)
+const aiThread = ref([])
+const aiError = ref('')
+
+/** AI 会话记录只存本次浏览器会话，且按用户分开 —— 同机换账号不继承上一个人的问答 */
+const AI_THREAD_KEY = 'rxt_ai_thread_'
+/** 只留最近若干轮：再多也翻不动，还要占 sessionStorage */
+const AI_THREAD_MAX = 10
+/** 回传给后端的历史轮数。服务端还会再收口一次，这里的值只影响流量，不影响安全 */
+const AI_HISTORY_ROUNDS = 3
+
+function aiThreadKey() {
+  return `${AI_THREAD_KEY}${userStore.profile?.userId ?? 'anon'}`
+}
+
+function loadAiThread() {
+  try {
+    const raw = sessionStorage.getItem(aiThreadKey())
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.slice(-AI_THREAD_MAX) : []
+  } catch {
+    // 存坏了就当没有。会话记录是附加体验，不该因为它让整页报错
+    return []
+  }
+}
+
+function saveAiThread() {
+  try {
+    sessionStorage.setItem(aiThreadKey(), JSON.stringify(aiThread.value.slice(-AI_THREAD_MAX)))
+  } catch {
+    // 隐私模式或配额满时写入会抛异常。静默放弃：提问本身已经成功了，
+    // 不该因为「没记住」再给用户报一个错
+  }
+}
 
 const rules = {
   content: [
@@ -176,6 +292,76 @@ async function loadQuestions() {
   }
 }
 
+/**
+ * 检查 AI 是否可用，决定「问 AI 助手」这个选项显不显示。
+ *
+ * ★ 失败即视为不可用：接口不存在（后端未升级）、未登录、未开启 —— 对用户来说都是同一件事
+ *   「现在用不了」。`getAiStatus()` 带了 silent，所以这里不会弹出任何提示，
+ *   页面只是安静地少一个选项。
+ */
+async function loadAiStatus() {
+  try {
+    const data = await getAiStatus()
+    aiEnabled.value = Boolean(data?.enabled)
+  } catch {
+    aiEnabled.value = false
+  }
+  if (!aiEnabled.value) {
+    askMode.value = 'expert'
+    return
+  }
+  aiThread.value = loadAiThread()
+}
+
+function handleSubmit() {
+  return askMode.value === 'ai' ? handleAskAi() : handleAsk()
+}
+
+/**
+ * AI 提问。与「问专家」共用同一个校验与同一个输入框，只是出口不同。
+ */
+async function handleAskAi() {
+  aiError.value = ''
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
+
+  const question = form.content.trim()
+  aiAsking.value = true
+  try {
+    const data = await askAi({
+      content: question,
+      // ★ 只带**此前**的轮次，本轮由 content 单独传 —— 若把本轮也塞进 history，
+      //   同一个问题会以 user 消息出现两次。
+      history: aiThread.value
+        .slice(-AI_HISTORY_ROUNDS)
+        .flatMap((item) => [
+          { role: 'user', content: item.question },
+          { role: 'assistant', content: item.answer }
+        ])
+    })
+    aiThread.value.push({
+      id: `${Date.now()}-${aiThread.value.length}`,
+      question,
+      answer: data?.content || ''
+    })
+    saveAiThread()
+    form.content = ''
+  } catch (err) {
+    // 全局拦截器已经弹过一次 toast（err.notified），这里只把话留在页面上。
+    // ★ 刻意**不清空输入框**：AI 超时或额度用完时，用户最需要的是
+    //   「我刚才写的那段话还在」，而不是重打一遍。
+    aiError.value = err?.message || 'AI 助手暂时忙不过来，请稍后重试，或直接提交给专家'
+  } finally {
+    aiAsking.value = false
+  }
+}
+
+function clearAiThread() {
+  aiThread.value = []
+  aiError.value = ''
+  saveAiThread()
+}
+
 async function handleAsk() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -201,6 +387,9 @@ const { load: loadExperts } = useExperts()
 onMounted(() => {
   loadExperts()
   loadQuestions()
+  // 与上面两个并行发起、互不依赖：AI 是否可用决定了这里多不多一个选项，
+  // 而「我的问答」无论 AI 开没开都要照常拉
+  loadAiStatus()
 })
 </script>
 
@@ -246,6 +435,27 @@ onMounted(() => {
 .answer-item p { margin: 8px 0 0; line-height: 1.7; }
 .answer-head span { color: var(--el-text-color-secondary); font-size: 11px; }
 .expert-avatar { flex: 0 0 auto; }
+
+/* 问谁：两个等宽的按钮，占满提问卡的宽度，选择状态一眼可见 */
+.ask-mode { display: flex; width: 100%; margin-bottom: 18px; }
+.ask-mode :deep(.el-radio-button) { flex: 1; }
+.ask-mode :deep(.el-radio-button__inner) { width: 100%; }
+.ask-error { margin-bottom: 12px; }
+
+/* AI 会话区：外壳与「我的问答」保持一致，内部按「提问在上、回答在下」排 */
+.ai-thread-wrap { padding: 20px; border-radius: 16px; background: #fff; border: 1px solid var(--el-border-color-light); }
+.ai-thread { display: grid; gap: 16px; min-height: 260px; margin-top: 16px; }
+.ai-entry { padding: 16px 17px; border: 1px solid var(--el-border-color-light); border-radius: 14px; background: linear-gradient(145deg, #fff, #f7fbf8); }
+.ai-question { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding-bottom: 12px; font-weight: 600; line-height: 1.7; border-bottom: 1px dashed var(--el-border-color-lighter); }
+/* 回答里的分段与换行必须保留：模型按提示词固定输出「现象判断 / 处置建议 / 注意事项」三段，
+   折叠成一个长句的话，这个结构就白设计了 */
+.ai-answer { margin-top: 14px; }
+.ai-answer p { margin: 8px 0 0; line-height: 1.8; white-space: pre-line; }
+.ai-badge { flex: 0 0 auto; padding: 2px 9px; border-radius: 999px; color: var(--el-color-primary); background: var(--el-color-primary-light-9); font-size: 12px; font-weight: 400; line-height: 1.7; }
+.ai-badge-question { color: var(--el-text-color-secondary); background: var(--el-fill-color-light); }
+/* 免责说明：AI 的涉农建议（尤其用药）出错是有实际后果的，这条不能省 */
+.ai-disclaimer { margin: 16px 0 0; color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.7; }
+
 @media (max-width: 980px) { .qa-layout { grid-template-columns: 1fr; } .ask-card { position: static; } }
 @media (max-width: 680px) { .qa-hero { align-items: flex-start; flex-direction: column; } .hero-metrics, .expert-strip { grid-template-columns: 1fr; width: 100%; } .expert-chip small { display: none; } }
 </style>
