@@ -181,6 +181,43 @@
 
     <build>
         <finalName>rxt-backend</finalName>
+        <!--
+            ★ 必须排除 application-local.yml：
+            它就在 src/main/resources/ 下，而 mvn package 会把整个 resources 目录
+            打进 BOOT-INF/classes/。该文件是本地私有配置（真实 OBS 的 AK/SK、AI api-key），
+            一旦进 jar，密钥就被烤进上传到共享服务器的产物里 —— 比进版本库更严重。
+            判据：unzip -l target/rxt-backend.jar | grep application 必须看不到 local。
+            ★ 顺带说明：它与 application-dev.yml 是并列 profile，不存在覆盖关系，
+            所以靠 @Profile 之类的注解解决不了，只能从打包环节排除；
+            服务器上的配置由显式 -D 参数提供（OS 属性优先级最高），不受此排除影响。
+        -->
+        <resources>
+            <!--
+                下面两段资源声明是逐字复刻 spring-boot-starter-parent 的默认配置
+                （自定义 <resources> 会整段顶掉父 POM 的，不是叠加），
+                只在第一段上追加了一条 application-local.yml 的排除。
+            -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/application*.yml</include>
+                    <include>**/application*.yaml</include>
+                    <include>**/application*.properties</include>
+                </includes>
+                <excludes>
+                    <exclude>**/application-local.yml</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>**/application*.yml</exclude>
+                    <exclude>**/application*.yaml</exclude>
+                    <exclude>**/application*.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
