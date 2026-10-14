@@ -33,6 +33,17 @@ public class AuthController {
     }
 
     /**
+     * 管理后台登录：免图形验证码，只允许管理员账号。
+     *
+     * <p>入参仍是 {@link LoginDTO}，但 {@code captchaKey / captchaCode} 两个字段
+     * <b>不需要传</b>（传了也会被忽略）—— 后台登录页本来就没有验证码输入框。</p>
+     */
+    @PostMapping("/admin/login")
+    public Result<LoginVO> adminLogin(@RequestBody @Valid LoginDTO dto) {
+        return Result.success(authService.adminLogin(dto));
+    }
+
+    /**
      * 注册：按所选身份创建账号，同样要过图形验证码。
      */
     @PostMapping("/register")
