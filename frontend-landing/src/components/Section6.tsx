@@ -41,6 +41,8 @@ export function Section6() {
   // 每类最多列 6 条，与改版前的展示口径一致；要看全量走右上角「查看全部」。
   const items = filtered.slice(0, 6).map((k) => ({
     key: String(k.knowledgeId),
+    // ★ 单篇知识需要它才能跳到对应帖子页（业务端 /knowledge/:id）
+    id: k.knowledgeId,
     title: k.title,
     date: formatCnDate(k.createTime),
   }));
@@ -186,10 +188,17 @@ export function Section6() {
             {items.length === 0 && (
               <div className="flex items-center py-8 text-white/50 text-lg">{listEmptyText}</div>
             )}
+            {/* ★ 2026-10-14 用户第 3 条：每条资讯要能点进对应的帖子页。
+                改前这里是 motion.div —— 带光标手型、带 hover 底色、右边还画了个箭头，
+                看起来处处像链接，但**压根没有 href 也没有 onClick**，所以点不动。
+                「看起来能点但点不动」比一眼就知道不能点更糟，这次把它做成真链接。
+                路径与业务端的知识详情路由一致（router 里注册的是 knowledge/:id，
+                挂在 /app/ 下，所以走 platformUrl 拼前缀）。 */}
             {items.map((item, index) => (
-              <motion.div
+              <motion.a
                 key={item.key}
-                className="flex flex-col cursor-pointer group"
+                href={platformUrl(`/knowledge/${item.id}`)}
+                className="flex flex-col cursor-pointer group no-underline"
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true, amount: 0.2 }}
@@ -214,7 +223,7 @@ export function Section6() {
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.8, ease: "easeInOut" }}
                 />
-              </motion.div>
+              </motion.a>
             ))}
           </div>
         </div>
