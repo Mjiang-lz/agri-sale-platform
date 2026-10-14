@@ -18,7 +18,6 @@ import com.rxt.mapper.UserMapper;
 import com.rxt.security.PermissionChecker;
 import com.rxt.service.AddressService;
 import com.rxt.service.CommentService;
-import com.rxt.service.DemandExpireService;
 import com.rxt.service.NotificationService;
 import com.rxt.vo.AddressVO;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -95,13 +94,14 @@ class ErrorCodeConsistencyTest {
     private PermissionChecker permissionChecker;
     @Mock
     private DemandMapper demandMapper;
-    /**
-     * 求购到期自动失效（W2）。10-12 给 DemandServiceImpl 加了这一步之后，
-     * 本类有三个用例（详情 / 编辑 / 关闭）开始以 NPE 失败 —— 当时只跑了
-     * DemandServiceImplTest，没跑本类，所以一直没被发现。
+    /*
+     * 求购到期自动失效（W2）的实现已并入 DemandServiceImpl 的私有方法，复用上面那个
+     * demandMapper，不再需要单独的协作对象。
+     *
+     * 历史教训：10-12 首次给 DemandServiceImpl 加这一步依赖时，本类有三个用例
+     * （详情 / 编辑 / 关闭）以 NPE 失败 —— 当时只跑了 DemandServiceImplTest，
+     * 没跑本类，所以一直没被发现。
      */
-    @Mock
-    private DemandExpireService demandExpireService;
     /** 收货地址校验（10-10 组长加入 createOrder） */
     @Mock
     private AddressService addressService;
