@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import request from '@/api/request'
 import { useUserStore } from '@/store/user'
 import { isPendingApply } from '@/constants/finance'
+import { getToken } from '@/utils/auth'
 
 /**
  * 顶栏「消息提醒」铃铛的数据源。
@@ -116,6 +117,13 @@ export function useMessages() {
   const isBank = computed(() => role.value === '银行用户')
 
   async function load(force = false) {
+    // ★ 游客不发消息接口（2026-10-15 实测踩到）：访客在公开页（商品/知识详情）上
+    //   也挂着 MainLayout，setup 里的 loadMessages() 会无条件执行 —— 而游客四个
+    //   角色判据全为 false，恰好落进下面的「需求侧：我买的单」分支去调
+    //   GET /trade/order/list → 401 → request 拦截器把它当「会话失效」
+    //   removeToken + router.push('/login') ⇒ **任何公开页的游客都会被踢去登录**，
+    //   落地页点进帖子就断在这里。登录后铃铛展开（@show）会重新触发，不丢功能。
+    if (!getToken()) return
     if (loading.value) return
     const now = Date.now()
     if (!force && loaded.value && now - lastLoadAt < FRESH_MS) return

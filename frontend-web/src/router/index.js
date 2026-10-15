@@ -48,12 +48,17 @@ const routes = [
       // 融资审批（银行用户视角）。与上面的「我的融资」是两个模块：
       // /finance/* 是申请人看自己的，/loan-admin/* 是银行看别人提交的。
       { path: 'finance/bank-review', component: () => import('@/views/finance/BankReview.vue'), meta: { title: '融资审批' } },
-      { path: 'expert/knowledge', component: () => import('@/views/expert/Knowledge.vue'), meta: { title: '农业知识' } },
+      // 农业知识列表对游客开放：落地页「查看全部」直达这里，游客能看得到入口就该看得见内容
+      // （与商品货源 LX-4 ③ 同一裁决口径；后端白名单已放行 GET /knowledge/list）。
+      // 页内的专家专属区（我的投稿/发布）由 isExpert 守卫，游客不触发对应接口。
+      { path: 'expert/knowledge', component: () => import('@/views/expert/Knowledge.vue'), meta: { title: '农业知识', public: true } },
       // 单篇农业知识的独立阅读页。刻意**不挂在 /expert/ 下**：
       // 知识是对所有角色都开放的内容，挂在专家模块下会让从首页点进来的读者
       // 看到顶栏高亮切到「专家助力」，归属感是错的（用户 2026-10-12 的反馈）。
       // 上一版是列表页里的弹窗，没有自己的地址、前进后退也管不了。
-      { path: 'knowledge/:id', component: () => import('@/views/knowledge/KnowledgeDetail.vue'), meta: { title: '农业知识详情' } },
+      // 对游客开放：落地页每条资讯都链到这里，此前游客点进帖子会被甩到登录页
+      // （后端白名单已放行 GET /knowledge/{id}，详情页只依赖这一个接口）。
+      { path: 'knowledge/:id', component: () => import('@/views/knowledge/KnowledgeDetail.vue'), meta: { title: '农业知识详情', public: true } },
       { path: 'expert/qa', component: () => import('@/views/expert/Qa.vue'), meta: { title: '专家问答' } },
       { path: 'expert/appointment', component: () => import('@/views/expert/Appointment.vue'), meta: { title: '专家预约' } },
       // 专家详细介绍页（需求 9）。放在 expert/appointment **之前**：

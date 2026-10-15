@@ -96,6 +96,19 @@ public class PublicEndpoints {
             rule(HttpMethod.GET.name(), "/trade/categories"),
             rule(HttpMethod.GET.name(), "/demand/list"),      // 求购需求列表
 
+            // 农业知识列表与详情：落地页公开宣传帖子、每条都链到 /app/knowledge/:id，
+            // 游客点进去却被甩到登录页 —— 与商品 LX-4 ③ 完全同一类自相矛盾，同一裁决口径：
+            // 看得到入口就该看得见内容。只放行 GET：发布/编辑/删除（POST/PUT/DELETE）
+            // 天然不受影响。
+            //
+            // ⚠️ {knowledgeId} 是单段变量模式，会把字面量 /knowledge/my 一并命中 ——
+            // 这是可接受的：myKnowledge() 走 UserContext，游客上下文为空 →
+            // expert == null → 干净的 403（「仅专家可查看自己的知识投稿」），不泄露任何数据；
+            // 前端也只在专家登录后才调它（isExpert 守卫）。若将来 /knowledge/ 下新增
+            // 单段敏感路径，记得回这里复查这条模式。
+            rule(HttpMethod.GET.name(), "/knowledge/list"),
+            rule(HttpMethod.GET.name(), "/knowledge/{knowledgeId}"),
+
             // 商品详情：游客点开货源卡片就能看到价格、产地与发布农户，无需先注册。
             // 这是 LX-4 ③ 的裁决结果（此前只放行了列表、详情仍要求登录，
             // 于是游客能翻列表却点不进任何一件商品，行为是自相矛盾的）。
