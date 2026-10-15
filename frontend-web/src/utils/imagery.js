@@ -67,6 +67,46 @@ export function mediaUrl(key) {
   return MEDIA_BASE + key
 }
 
+/**
+ * 历史格式的对象键前缀 —— 图片收归后端存储之前，前端 `public/` 下的那三个目录。
+ * 那个目录**已随本次改造删除**，所以库里若还留着这些前缀，浏览器去站点根找会拿到
+ * nginx 的 **404**（那三条 `location ^~ /products/ /experts/ /knowledge/` 没有
+ * `try_files`，所以老实 404 而不是回退成 index.html）。
+ */
+const LEGACY_PREFIXES = ['/products/', '/knowledge/', '/experts/']
+
+/**
+ * 归一化「**数据库里存的值**」—— 与 {@link mediaUrl} 的区别就在这里。
+ *
+ * ★ 为什么必须有这个函数（2026-10-15 实测踩到）：
+ *   「图片统一收归后端」那次改造把前端 `public/{products,knowledge,experts}` 整目录删了，
+ *   同时删掉了旧代码里「`/experts/` 开头要补 BASE_URL」的兼容特例。
+ *   当时判断「库里已全部迁移成 `/api/files/…`，该特例不再命中」——
+ *   **这个判断成立的前提是「迁移 SQL 一定被执行过」**。
+ *   而迁移 SQL 是要人去服务器上手动跑的：一旦跳过（换服务器、只换 jar、忘了跑），
+ *   库里仍是 `/experts/x.jpg`，前端又不再兜底 ⇒ 专家头像集体消失成纯色圆，
+ *   而横幅、知识配图、商品图全都正常 —— 因为它们要么走代码表、要么走 OBS 外链，
+ *   只有头像的旧值指向了一个**已经不存在**的目录。
+ *
+ * ★ 所以这里做「值级自愈」：识别历史前缀并映射到当前存储地址。
+ *   于是**忘了跑迁移 SQL 也不会丢图**，迁移从「必须做」降级为「应该做」。
+ *   判据是对**白名单前缀**做映射而不是一律加前缀 ——
+ *   这三个字段只装图片地址，但显式列出前缀能避免将来某个 `/xxx/` 开头
+ *   的非图片地址被误改。
+ *
+ * @param {string} url 数据库里的原始值
+ * @returns {string} 可直接放进 `<img src>` 的地址
+ */
+export function storedUrl(url) {
+  if (!url || typeof url !== 'string' || !url.trim()) return url
+  // 外链（https://…）与 data URI 原样放行
+  if (!url.startsWith('/')) return url
+  // 已经是当前格式 —— 原样返回（mediaUrl 的幂等分支同义）
+  if (url.startsWith(`${MEDIA_BASE}/`)) return url
+  const isLegacy = LEGACY_PREFIXES.some((prefix) => url.startsWith(prefix))
+  return isLegacy ? MEDIA_BASE + url : url
+}
+
 /** 商品名关键词 → 精确图片。这是让「文案 / 搜索结果 / 图片」三者匹配的核心表。 */
 const NAME_IMG = [
   { keys: ['赣南脐橙'], img: '/products/p03.jpg' },
@@ -145,7 +185,9 @@ const FALLBACK_BG = ['#EAF3DE', '#E6F1FB', '#FAEEDA', '#EEEDFE', '#FBEAF0', '#E1
  */
 export function productImage(p) {
   const real = p?.imageUrl || p?.image_url
-  if (real && typeof real === 'string' && real.trim()) return real
+  // ★ 走 storedUrl 而不是原样返回：库里可能是历史格式 `/products/x.jpg`
+  //   （前端 public 目录已删 ⇒ 直接 404）。详见 storedUrl 的注释。
+  if (real && typeof real === 'string' && real.trim()) return storedUrl(real)
 
   const name = String(p?.productName || '')
   // 1) 按商品名关键词精确匹配：让搜索结果和商品文案与图片对应
@@ -196,7 +238,11 @@ const EXPERT_IMG = {
 
 export function expertAvatar(e) {
   const url = e?.avatarUrl || e?.avatar_url
-  if (url && typeof url === 'string' && url.trim()) return url
+  // ★ 走 storedUrl：2026-10-15 线上事故的直接原因就在这一行。
+  //   库里若是历史格式 `/experts/x.jpg`，前端 public/experts/ 已随「图片收归后端」
+  //   删除 ⇒ 404 ⇒ 头像退化成纯色圆；而横幅/知识图/商品图都正常（不走这个旧值），
+  //   所以现象是「只有头像没了」，极难联想到是迁移脚本没跑。
+  if (url && typeof url === 'string' && url.trim()) return storedUrl(url)
   const id = Number(e?.expertId || 0)
   return mediaUrl(EXPERT_IMG[id]) || ''
 }
@@ -405,7 +451,9 @@ export function knowledgeKeywordPhoto(k) {
  */
 export function knowledgePhoto(k) {
   const real = k?.imageUrl || k?.image_url
-  if (real && typeof real === 'string' && real.trim()) return real
+  // ★ 同 productImage：库里可能是历史格式 `/knowledge/x.jpg`（前端目录已删 ⇒ 404）。
+  //   OBS 绝对地址（迁移前的另一种形态）不以 / 开头，storedUrl 原样放行。
+  if (real && typeof real === 'string' && real.trim()) return storedUrl(real)
   return knowledgeKeywordPhoto(k)
 }
 
