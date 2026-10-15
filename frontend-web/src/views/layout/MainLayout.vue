@@ -248,6 +248,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { useMessages } from '@/composables/useMessages'
 import { getExpertProfile } from '@/api/expert'
+import { storedUrl } from '@/utils/imagery'
 import RxtIcon from '@/components/RxtIcon.vue'
 import RxtLogo from '@/components/RxtLogo.vue'
 
@@ -275,8 +276,12 @@ const nameInitial = computed(() => displayName.value.slice(0, 1))
  *
  * 死链不用额外处理：el-avatar 在图片 error 时会自动回退到插槽内容（昵称首字），
  * 不会显示碎图。库里那几条指向不存在文件的种子 avatar_url 就走这条回退。
+ *
+ * ★ 但历史**格式**要处理：库里可能是 `/experts/x.jpg` 这种指向已删除的前端
+ *   public 目录的路径，过 storedUrl() 才会自愈成 /api/files/experts/…。
+ *   el-avatar 的 error 回退只能挡住「文件不存在」，挡不住「路径整个都不对了」。
  */
-const avatarUrl = computed(() => userStore.profile?.avatarUrl || undefined)
+const avatarUrl = computed(() => storedUrl(userStore.profile?.avatarUrl) || undefined)
 const menuPerms = computed(() => String(userStore.menuPerms || '').split(',').filter(Boolean))
 const isLoggedIn = computed(() => Boolean(userStore.token))
 

@@ -296,6 +296,7 @@ import { useUserStore } from '@/store/user'
 import { getProfile, updateProfile, updateFarmerProfile } from '@/api/user'
 import { getExpertProfile, updateExpertProfile, submitExpertCertify } from '@/api/expert'
 import { checkImageFile, uploadAvatar } from '@/api/common'
+import { storedUrl } from '@/utils/imagery'
 import { APPLY_STATUS, isPendingApply } from '@/constants/finance'
 
 /**
@@ -518,8 +519,10 @@ const expertAuditDesc = computed(() =>
     ? '请根据审批意见修改擅长领域与服务简介后重新提交，管理员会再次核对'
     : '填好下面的擅长领域与服务简介后点「提交认证材料」，管理员核对通过后你就能接单答疑与预约'
 )
-// 头像预览跟随输入实时变化，便于填完地址立刻看到效果
-const avatarPreview = computed(() => baseForm.avatarUrl.trim() || undefined)
+// 头像预览跟随输入实时变化，便于填完地址立刻看到效果。
+// ★ storedUrl：库里/表单里可能是历史格式（/experts/x.jpg，指向前端 public 目录，
+//   该目录已随「图片统一收归后端」删除），归一化后才取得到图。
+const avatarPreview = computed(() => storedUrl(baseForm.avatarUrl.trim()) || undefined)
 const nameInitial = computed(() => (baseForm.realName.trim() || profile.value?.realName || '用').slice(0, 1))
 
 const uploadingAvatar = ref(false)

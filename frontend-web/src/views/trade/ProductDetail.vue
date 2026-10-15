@@ -158,7 +158,7 @@
 
             <div v-if="comments.length" class="comment-list">
               <div v-for="comment in comments" :key="comment.commentId" class="comment-item">
-                <el-avatar :size="34" :src="comment.avatarUrl">
+                <el-avatar :size="34" :src="storedUrl(comment.avatarUrl)">
                   {{ (comment.userName || '用').slice(0, 1) }}
                 </el-avatar>
                 <div class="comment-body">
@@ -190,7 +190,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { addToCart, getTradeProductDetail } from '@/api/trade'
 import { getToken } from '@/utils/auth'
-import { productImage } from '@/utils/imagery'
+import { productImage, storedUrl } from '@/utils/imagery'
 
 /**
  * 页面用途：商品详情（REQ-06）。
