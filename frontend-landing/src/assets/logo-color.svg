@@ -1,0 +1,12 @@
+<svg width="36" height="36" viewBox="20 20 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="融销通">
+  <!--
+    融销通品牌标 v2 · 彩色版（2026-09-24 定版）
+    适用：浅色底（雾白 #F6F8F6 / 纯白 / 浅绿底）。
+    深色底请用 logo.svg（反白版），否则禾青环会糊进深底。
+  -->
+  <path d="M159.9 83.95 A62 62 0 1 1 116.05 40.1" fill="none" stroke="#0E7A5F" stroke-width="14" stroke-linecap="round"/>
+  <ellipse cx="100" cy="126" rx="10.5" ry="12.5" fill="#1D9E75"/>
+  <ellipse cx="100" cy="100" rx="12.5" ry="13.5" fill="#1D9E75"/>
+  <ellipse cx="100" cy="74" rx="10.5" ry="12.5" fill="#1D9E75"/>
+  <circle cx="143.8" cy="56.2" r="7.5" fill="#F5A524"/>
+</svg>

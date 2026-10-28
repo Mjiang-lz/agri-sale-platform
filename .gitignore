@@ -17,6 +17,18 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# 锁文件不入库。
+# 现状：仓库从未跟踪过任何锁文件，`frontend-web` / `frontend-admin` 只提交 package.json，
+# 装依赖时按 `^` 范围解析。这样做的好处是不会出现几百行的锁文件冲突；
+# 代价是不同机器可能装到不同的补丁版本。
+#
+# ⚠️ 这几个文件是本地 `npm install` 自动生成的，**不是**要提交的产物。
+# 想改成"锁定版本"（对交付/答辩更稳），删掉下面三行、各前端目录提交自己的
+# package-lock.json，并在群里通知全组重装依赖 —— 属独立决策，别顺手做。
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
 # ---------------------- IDE ----------------------
 .idea/
 *.iml
@@ -39,9 +51,54 @@ logs/
 *.tmp
 *.bak
 
+# ---------------------- 本地上传文件 ----------------------
+# rxt.obs.local-dir 的默认值：OBS 未启用时后端把上传的图片写到 backend/uploads。
+# 那是运行时数据（且随时会变大），不入库。
+uploads/
+
 # ---------------------- 敏感配置 ----------------------
 # 本地数据源、对象存储密钥等不应入库
 application-local.yml
 application-prod.yml
 *.keystore
 *.jks
+
+# docker compose 的 .env。
+# ⚠️ 这一条以前是漏的：`.env` 是 docker compose **自动读取**的、和 docker-compose.yml
+#    同目录的文件，正是放 RXT_DB_PASSWORD / RXT_JWT_SECRET 的地方。缺了它，
+#    服务器上 `git add .` 会把数据库密码和 JWT 签名密钥一起提交进版本库 ——
+#    而且提交后即使删除，密钥也已经留在历史里了，必须重新生成才算干净。
+#    模板见 .env.example（那个是要入库的）。
+.env
+.env.*
+!.env.example
+
+# ---------------------- 数据库导出 / 转储 ----------------------
+# 结构变更一律改 db/schema.sql 或 db/migrations/ 下的脚本，
+# 不要提交从 Navicat 等工具导出的数据库文件（含真实数据、密码哈希）。
+*.dump
+*.ibd
+dump-*.sql
+*-dump.sql
+*_backup.sql
+*_bak.sql
+data-backup*/
+
+# ---------------------- 别的部署平台的配置 ----------------------
+# `frontend-landing/public/edgeone.json` 是腾讯云 EdgeOne Pages 的 SPA 回退规则
+# （`/*` → `/index.html`，作用等价于 nginx 的 try_files 回退）。它是某次部署实验留下的，
+# 本项目实际走宝塔 + nginx（分流规则见 deploy/nginx.conf、部署手册见
+# docs/部署-腾讯云共享环境.md），这份文件不参与任何构建。
+#
+# 刻意「忽略但不删」：本机留着（将来真要试 EdgeOne 就直接可用），
+# 同时不再一直挂在 `git status` 上让人以为漏提交了什么。
+frontend-landing/public/edgeone.json
+
+# ---------------------- 本地测试工具（不入库） ----------------------
+# `docs/QA-AI测试提示词包.md` 是驱动 AI 跑测试的本机工作台：里面的路径、分类编号、
+# 追踪表结构都是按当前代码现状写的，代码一改就过时。它是个人测试工具，不是项目文档，
+# 入库反而会误导后来人以为那就是测试基线。
+#
+# 刻意「忽略但不删」：本机留着随时可用，同时不再挂在 `git status` 上
+# 让人以为漏提交了什么（同 frontend-landing/public/edgeone.json 的处理）。
+docs/QA-AI测试提示词包.md

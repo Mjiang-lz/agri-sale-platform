@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rxt.mapper.AuditRecordMapper">
+
+    <!--
+      审核统计（M6）的两条查询，对应 docs/接口约定-M6内容审核.md 第 8 节。
+
+      两个方法都通过 target_type IN (...) 限定范围：t_audit 是全站公共流水表，
+      除内容审核还记录 USER / EXPERT 主体审核（属 M1），不限定就会把它们算进来。
+
+      结果词表（通过 / 不通过）由调用方以参数传入，不在 SQL 里再写一份中文字面量 ——
+      该词表在 Java 侧已有唯一来源（AuditServiceImpl.RESULT_PASS / RESULT_REJECT），
+      两处各写一份的话，改词表时漏改一处就会静默统计出错。
+    -->
+
+    <!-- 我的累计已审数：当前登录审核员在内容审核范围内的流水条数（不限时间） -->
+    <select id="countByAuditor" resultType="long">
+        SELECT COUNT(*)
+        FROM t_audit
+        WHERE auditor_id = #{auditorId}
+          AND target_type IN
+        <foreach collection="targetTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+    </select>
+
+    <!--
+      近 7 日按天统计：一天一行，同时给出通过数与驳回数（各用条件 COUNT，一次查询拿全，
+      不必按天发 14 条 SQL）。
+
+      时间条件刻意写成 audit_time 的范围比较，而不是 DATE(audit_time) BETWEEN ...：
+      对列套函数会让 idx_audit_time 直接失效、退化成全表扫描。
+    -->
+    <select id="selectDailyStats" resultType="com.rxt.vo.AuditDailyStatVO">
+        SELECT DATE_FORMAT(audit_time, '%Y-%m-%d')                                  AS `date`,
+               COUNT(CASE WHEN audit_result = #{passResult} THEN 1 END)             AS reviewed,
+               COUNT(CASE WHEN audit_result = #{rejectResult} THEN 1 END)           AS rejected
+        FROM t_audit
+        WHERE audit_time &gt;= #{startTime}
+          AND audit_time &lt; #{endTime}
+          AND target_type IN
+        <foreach collection="targetTypes" item="type" open="(" separator="," close=")">#{type}</foreach>
+        GROUP BY DATE_FORMAT(audit_time, '%Y-%m-%d')
+    </select>
+
+</mapper>

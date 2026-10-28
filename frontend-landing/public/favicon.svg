@@ -1,0 +1,19 @@
+<svg viewBox="20 20 160 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="融销通">
+  <!--
+    融销通 favicon · 简化版（2026-09-24 定版）
+    ≤20px 必须用简化版：麦粒合并为 R27 实心圆、环宽 14→17、节点 R7.5→R12。
+    这不是缩放，是换图形 —— 完整版在 16px 下麦粒会糊成一团。
+    深色模式下自动转反白（白环白麦粒 + 暖橙节点），避免深绿糊在黑色标签栏上。
+  -->
+  <style>
+    .ring { stroke: #0E7A5F; }
+    .seed { fill: #1D9E75; }
+    @media (prefers-color-scheme: dark) {
+      .ring { stroke: #FFFFFF; }
+      .seed { fill: #FFFFFF; }
+    }
+  </style>
+  <path class="ring" d="M159.9 83.95 A62 62 0 1 1 116.05 40.1" fill="none" stroke-width="17" stroke-linecap="round"/>
+  <circle class="seed" cx="100" cy="100" r="27"/>
+  <circle cx="143.8" cy="56.2" r="12" fill="#F5A524"/>
+</svg>

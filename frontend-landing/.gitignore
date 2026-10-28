@@ -1,0 +1,18 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+__unconfig*
+todos.json
+# 大文件留档区：视频源素材（原片/备选档）。
+# 发布用的是 public/ 里的成片，其余留档不进版本库。
+# （`verify/shots/` 的原始验收截图原意也是不进库，但历史上被跟踪进去了；
+#   2026-10-13 已清理，需要时从 git 历史取。）
+media-src/

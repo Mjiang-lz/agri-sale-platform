@@ -2,8 +2,12 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/rxt?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: root
+    # 账号密码用环境变量注入，冒号后面是默认值。本机 MySQL 就是 root/root 的话不用做任何事；
+    # 密码不同的人只需设置环境变量，不要去改这个文件（改了会覆盖别人的配置）。
+    #   IDEA：Run → Edit Configurations → Environment variables 加 RXT_DB_PASSWORD
+    #   命令行：RXT_DB_PASSWORD=你的密码 mvn spring-boot:run
+    username: ${RXT_DB_USERNAME:root}
+    password: ${RXT_DB_PASSWORD:root}
     hikari:
       minimum-idle: 5
       maximum-pool-size: 20
@@ -13,3 +17,16 @@ mybatis-plus:
   configuration:
     # 开发态打印 SQL，便于核对字段映射；生产环境请改为 NoLoggingImpl
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+rxt:
+  # 开发态打开接口文档（Swagger UI）。同理：这里打开，别的 profile 不跟着开。
+  # 打开后：
+  #   页面  http://localhost:8080/api/swagger-ui.html
+  #   描述  http://localhost:8080/api/v3/api-docs（JSON）、/api/v3/api-docs.yaml（YAML）
+  # 注意路径里的 /api 是 server.servlet.context-path，不是多写的。
+  #
+  # 写成 ${RXT_API_DOCS_ENABLED:true} 而不是直接 true：dev 默认开，
+  # 但环境变量仍能覆盖（OS 环境变量的优先级高于任何 application*.yml）。
+  # 于是临时要看"关掉的样子"不必改文件：RXT_API_DOCS_ENABLED=false mvn spring-boot:run
+  api-docs:
+    enabled: ${RXT_API_DOCS_ENABLED:true}

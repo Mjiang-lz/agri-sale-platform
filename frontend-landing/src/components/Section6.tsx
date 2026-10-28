@@ -1,0 +1,233 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import arrow from "@/assets/Arrow45.svg";
+import { fetchHomeNews, fetchHomeStats, formatCnDate, platformUrl, type ApiKnowledge, type HomeStats } from "@/lib/api";
+import { useRemote, REMOTE_STATUS_TEXT } from "@/lib/useRemote";
+
+// 本区所有内容都来自平台接口，**没有本地演示标题**：
+//   左卡精选  ← GET /api/home/knowledge 的第 1 条（标题与日期都是真实发布内容）
+//   右侧列表  ← 同上接口的条目（最多列 6 条）
+//   品类页签  ← GET /api/home/stats 的 knowledgeByCategory（真实分类与条数），点击就地筛选
+// 接口没通时显示「未加载」，不再摆一批编出来的资讯标题。
+export function Section6() {
+  // ★ limit 由 6 提到 50（2026-10-14）：品类页签要真的能筛，而「最新 6 条」只覆盖到
+  //   养殖技术 + 政策解读两个分类，点其余品类必然是空列表。
+  //   实测全库 16 条、limit=50 的响应体仅 9KB，代价可忽略；且分类分布与 /home/stats 的
+  //   knowledgeByCategory 完全一致 —— 页签上那串数字正是取自后者，两边同源才不会对不上。
+  const { data: knowledge, state } = useRemote(() => fetchHomeNews(50), [] as ApiKnowledge[]);
+  const { data: stats, state: statsState } = useRemote<HomeStats | null>(() => fetchHomeStats(), null);
+
+  // 品类页签：真实分类 + 真实条数（后端已按条数倒序），前面加一个「全部」
+  const catTabs = stats
+    ? [
+        { label: "全部", count: stats.knowledgeCount ?? 0 },
+        ...Object.entries(stats.knowledgeByCategory ?? {}).map(([label, count]) => ({ label, count })),
+      ]
+    : [];
+
+  // 选中的分类，null 表示「全部」。
+  // ★ 存分类名而不是下标：stats 可能晚于列表到达，catTabs 一到手就会重排，
+  //   存下标会让选中项悄悄跳到另一个品类上。
+  const [activeCat, setActiveCat] = useState<string | null>(null);
+
+  // 数据刷新后旧分类可能已不存在，兜回「全部」，免得点完之后列表全空且无从解释
+  const currentCat = activeCat && catTabs.some((t) => t.label === activeCat) ? activeCat : null;
+
+  // 左卡精选与右侧列表同源于这一份过滤结果：点品类时两者一起换，
+  // 否则「精选」还停在别的品类上，看起来像筛选没生效。
+  const filtered = currentCat ? knowledge.filter((k) => k.category === currentCat) : knowledge;
+  const featured = filtered[0];
+
+  // 每类最多列 6 条，与改版前的展示口径一致；要看全量走右上角「查看全部」。
+  const items = filtered.slice(0, 6).map((k) => ({
+    key: String(k.knowledgeId),
+    // ★ 单篇知识需要它才能跳到对应帖子页（业务端 /knowledge/:id）
+    id: k.knowledgeId,
+    title: k.title,
+    date: formatCnDate(k.createTime),
+  }));
+
+  const listEmptyText =
+    state === "error" ? "知识内容暂时加载失败，请稍后刷新" : "平台当前暂无已发布的农业知识";
+
+  // id="news" —— Hero 顶部导航「资讯中心」的锚点。2026-10-10 补。
+  // ⚠️ 注释写在 return 之外：放进 return 内且与根元素并列会让 JSX 有两个顶层节点，整页 500。
+  return (
+    <section id="news" className="relative z-40 w-full min-h-screen bg-[#1b1b1b] overflow-hidden font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 w-full h-full">
+        {/* LEFT */}
+        <div className="relative col-span-1 w-full h-full flex flex-col justify-start items-center lg:items-start pt-20 pb-20 px-10 lg:pt-[140px] lg:pb-[140px] lg:px-[125px]">
+          <motion.img
+            src="/landing/bg-card.webp"
+            alt=""
+            className="absolute left-0 right-0 top-20 bottom-20 lg:top-[140px] lg:bottom-[140px] w-full object-cover z-0"
+            initial={{ y: 150, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          />
+          <motion.div
+            className="relative z-10 w-full max-w-[530px] shadow-2xl mt-10 lg:mt-20 bg-white"
+            initial={{ y: 150, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+          >
+            <div className="flex items-center justify-between px-8 pt-8 text-[13px]">
+              {/* 日期取自该条知识的真实发布时间；没有数据时为空白，不编日期 */}
+              <span className="text-neutral-900">{featured ? formatCnDate(featured.createTime) : ""}</span>
+              <span className="text-neutral-400 tracking-[0.12em]">平台农业知识库</span>
+            </div>
+            <h3 className="mt-14 lg:mt-24 px-8 text-[30px] lg:text-[40px] leading-[1.15] font-semibold text-neutral-400 tracking-tight">
+              {featured ? featured.title : listEmptyText}
+            </h3>
+            <div className="mt-8 px-8">
+              <div className="w-full aspect-[793/700] overflow-hidden">
+                {/* 装饰插图：知识条目在库里没有配图（image_url 全为空），这里不假装成该条的实拍图 */}
+                <img
+                  src="/landing/article-tower.webp"
+                  alt="农业知识栏目装饰插图"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+            {/* 判空再渲染：ok 态为空串（2026-10-14 用户要求去掉这句技术提示词） */}
+            {REMOTE_STATUS_TEXT[state] && (
+              <div className="px-8 pb-8 text-[12px] text-neutral-400">
+                {REMOTE_STATUS_TEXT[state]}
+              </div>
+            )}
+          </motion.div>
+          <div
+            className="absolute left-0 right-0 top-20 bottom-20 lg:top-[140px] lg:bottom-[140px] z-20 bg-repeat opacity-[0.15] mix-blend-overlay pointer-events-none"
+            style={{ backgroundImage: `url(/landing/noise.webp)` }}
+          />
+        </div>
+
+        {/* RIGHT */}
+        <div className="col-span-1 flex flex-col pt-20 pb-20 px-10 lg:pt-[140px] lg:pb-[140px] lg:pr-[120px] lg:pl-10 font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
+          <div className="flex flex-col items-start gap-6 w-full lg:flex-row lg:justify-between lg:items-start lg:gap-8">
+            <motion.h2
+              className="text-3xl sm:text-4xl lg:text-[60px] leading-[1.05] font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif] max-w-[500px] lg:max-w-[600px]"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.8 }}
+            >
+              <span className="text-white">平台资讯，</span>{" "}
+              <span className="text-stone-300">政策与农事提醒</span>
+            </motion.h2>
+            <motion.a
+              href={platformUrl('/expert/knowledge')}
+              className="bg-white text-black text-base px-7 py-4 flex items-center gap-2 whitespace-nowrap cursor-pointer font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif] shrink-0 rounded-[2px]"
+              initial={{ scale: 0 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.5, ease: "backOut" }}
+            >
+              查看全部
+              <img src={arrow} className="w-3 h-3" alt="" />
+            </motion.a>
+          </div>
+
+          <motion.div
+            className="flex flex-wrap items-center gap-4 lg:gap-8 mt-10 lg:mt-16 w-full"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.8 }}
+          >
+            {/* ★ 2026-10-14 用户第 4 条「解决不能点击问题」：
+                这里原先是 <motion.span> —— 没有 onClick、不与任何 state 关联，纯装饰，
+                所以「点不动」不是坏了，是从来没做过。现改为 button 并接上筛选。
+                用 button 而不是给 span 挂 onClick：只有 button 才自带键盘 Tab/回车与
+                aria-pressed，读屏用户才知道它是个可切换的选项。 */}
+            {catTabs.map((tab, i) => {
+              const isActive = tab.label === (currentCat ?? "全部");
+              return (
+                <motion.button
+                  key={tab.label}
+                  type="button"
+                  onClick={() => setActiveCat(tab.label === "全部" ? null : tab.label)}
+                  aria-pressed={isActive}
+                  className={`cursor-pointer text-sm font-medium uppercase transition-colors ${
+                    isActive ? "text-white" : "text-white/40 hover:text-white/70"
+                  }`}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                >
+                  {tab.label} ({tab.count})
+                </motion.button>
+              );
+            })}
+            {/* 判空再渲染：ok 态为空串（2026-10-14 去掉「数据实时同步自平台接口」） */}
+            {REMOTE_STATUS_TEXT[statsState] && (
+              <motion.span
+                className="ml-auto text-xs text-white/30"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
+                {REMOTE_STATUS_TEXT[statsState]}
+              </motion.span>
+            )}
+          </motion.div>
+          <motion.div
+            className="w-full lg:w-[calc(100%+80px)] h-[1px] bg-white/25 mt-6 mb-10 lg:mb-12 origin-left"
+            style={{ transformOrigin: "left" }}
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+          />
+
+          <div className="flex flex-col w-full lg:w-[calc(100%+80px)]">
+            {items.length === 0 && (
+              <div className="flex items-center py-8 text-white/50 text-lg">{listEmptyText}</div>
+            )}
+            {/* ★ 2026-10-14 用户第 3 条：每条资讯要能点进对应的帖子页。
+                改前这里是 motion.div —— 带光标手型、带 hover 底色、右边还画了个箭头，
+                看起来处处像链接，但**压根没有 href 也没有 onClick**，所以点不动。
+                「看起来能点但点不动」比一眼就知道不能点更糟，这次把它做成真链接。
+                路径与业务端的知识详情路由一致（router 里注册的是 knowledge/:id，
+                挂在 /app/ 下，所以走 platformUrl 拼前缀）。 */}
+            {items.map((item, index) => (
+              <motion.a
+                key={item.key}
+                href={platformUrl(`/knowledge/${item.id}`)}
+                className="flex flex-col cursor-pointer group no-underline"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+              >
+                <div className="flex justify-between items-center gap-6 pt-6 pb-[20px] px-10 -mx-10 hover:bg-white/5 transition-colors">
+                  <span className="text-lg text-white/60 group-hover:text-white transition-colors font-['Inter_Tight','PingFang_SC','Noto_Sans_SC',_sans-serif]">
+                    {item.title}
+                  </span>
+                  <span className="flex items-center gap-4 shrink-0">
+                    {item.date && (
+                      <span className="hidden text-xs text-white/30 sm:inline">{item.date}</span>
+                    )}
+                    <img src={arrow} className="w-3 h-3 brightness-0 invert opacity-100" alt="" />
+                  </span>
+                </div>
+                <motion.div
+                  className="w-full h-[1px] bg-white/25"
+                  style={{ transformOrigin: "left" }}
+                  initial={{ scaleX: 0 }}
+                  whileInView={{ scaleX: 1 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.8, ease: "easeInOut" }}
+                />
+              </motion.a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
